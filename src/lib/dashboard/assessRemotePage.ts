@@ -2,7 +2,11 @@ import type { DashboardJob } from "@/lib/dashboard/types";
 
 export type RemoteAssess =
   | { ok: true; reason: string }
-  | { ok: false; kind: "false_positive" | "invalid_link"; reason: string };
+  | {
+      ok: false;
+      kind: "false_positive" | "indeciso" | "invalid_link";
+      reason: string;
+    };
 
 const DEAD_PAGE_RE =
   /link you accessed isn'?t valid|oops,?\s*looks like|vaga\s+(n[aã]o\s+encontrada|indispon[ií]vel|encerrada|expirada|removida)|job\s+(not\s+found|no\s+longer\s+available)|p[aá]gina\s+n[aã]o\s+encontrada|this\s+job\s+is\s+no\s+longer|conte[uú]do\s+n[aã]o\s+encontrado|error\s*404|http\s*404/i;
@@ -139,6 +143,16 @@ export function assessRemotePage(
       reason: metaRemote
         ? "título/local indica remoto"
         : "página menciona remoto/home office",
+    };
+  }
+
+  // Veio do filtro remoto do portal, mas a página não deixa claro → indeciso
+  if (job.from_remote_filter) {
+    return {
+      ok: false,
+      kind: "indeciso",
+      reason:
+        "filtro remoto do portal, mas página não deixa claro (sem menção explícita)",
     };
   }
 

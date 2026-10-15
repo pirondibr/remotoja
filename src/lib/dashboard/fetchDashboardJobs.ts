@@ -136,11 +136,21 @@ export async function fetchDashboardJobs(
         errorsByPortal[result.name] = result.error;
       }
       // scrape = método; source = portal exibido (Google Vagas pode ser Gupy/LinkedIn/…)
+      // Portais pagos usam filtro remoto → from_remote_filter para "indeciso"
+      const fromRemoteFilter = [
+        "catho",
+        "gupy",
+        "indeed",
+        "infojobs",
+        "remotar",
+        "google_vagas",
+      ].includes(result.name);
       merged.push(
         ...result.jobs.map((job) => ({
           ...job,
           scrape: result.name,
           source: job.source || result.name,
+          from_remote_filter: job.from_remote_filter ?? fromRemoteFilter,
         }))
       );
     }

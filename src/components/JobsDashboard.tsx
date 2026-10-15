@@ -217,6 +217,11 @@ export function JobsDashboard() {
         count: count("false_positive"),
       },
       {
+        id: "indeciso" as const,
+        label: "Indeciso",
+        count: count("indeciso"),
+      },
+      {
         id: "invalid_link" as const,
         label: "Link ruim",
         count: count("invalid_link"),
@@ -393,6 +398,7 @@ export function JobsDashboard() {
                       <th className="py-1.5 pr-3 font-semibold">No feed</th>
                       <th className="py-1.5 pr-3 font-semibold">Válidas</th>
                       <th className="py-1.5 pr-3 font-semibold">Falso +</th>
+                      <th className="py-1.5 pr-3 font-semibold">Indeciso</th>
                       <th className="py-1.5 font-semibold">Link</th>
                     </tr>
                   </thead>
@@ -420,6 +426,9 @@ export function JobsDashboard() {
                         </td>
                         <td className="py-1.5 pr-3 text-amber-800">
                           {p.checked ? p.false_positives : "—"}
+                        </td>
+                        <td className="py-1.5 pr-3 text-stone-700">
+                          {p.checked ? p.indecisos ?? 0 : "—"}
                         </td>
                         <td className="py-1.5 text-red-700">
                           {p.checked ? p.invalid_links : "—"}
@@ -467,11 +476,13 @@ export function JobsDashboard() {
                       active
                         ? tab.id === "false_positive"
                           ? "bg-amber-700 text-white"
-                          : tab.id === "invalid_link"
-                            ? "bg-red-700 text-white"
-                            : tab.id === "validated"
-                              ? "bg-forest text-cream"
-                              : "bg-ink text-cream"
+                          : tab.id === "indeciso"
+                            ? "bg-stone-600 text-white"
+                            : tab.id === "invalid_link"
+                              ? "bg-red-700 text-white"
+                              : tab.id === "validated"
+                                ? "bg-forest text-cream"
+                                : "bg-ink text-cream"
                         : "border border-moss/15 bg-cream text-moss hover:border-moss/30"
                     }`}
                   >
@@ -481,7 +492,7 @@ export function JobsDashboard() {
                 );
               })}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
               <div>
                 <p className="text-2xl font-bold text-ink">
                   {validation.validated}
@@ -493,6 +504,12 @@ export function JobsDashboard() {
                   {validation.false_positives}
                 </p>
                 <p className="text-xs text-moss/60">falso positivos</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-stone-700">
+                  {validation.indecisos ?? 0}
+                </p>
+                <p className="text-xs text-moss/60">indecisos</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-red-700">
@@ -549,12 +566,14 @@ export function JobsDashboard() {
           <div className="mt-8">
             <p className="mb-3 text-sm font-semibold text-moss">
               {reviewTab === "false_positive"
-                ? "Falso positivos — revise se a análise errou"
-                : reviewTab === "validated"
-                  ? "Válidas — cargo ok + remoto + link"
-                  : reviewTab === "invalid_link"
-                    ? "Links inválidos / página quebrada"
-                    : "Revisão"}
+                ? "Falso positivos — híbrido/presencial ou claramente não remoto"
+                : reviewTab === "indeciso"
+                  ? "Indecisos — filtro remoto do portal, mas página não deixa claro"
+                  : reviewTab === "validated"
+                    ? "Válidas — cargo ok + remoto + link"
+                    : reviewTab === "invalid_link"
+                      ? "Links inválidos / página quebrada"
+                      : "Revisão"}
               <span className="ml-2 font-normal text-moss/55">
                 {reviewItems.length} vaga
                 {reviewItems.length === 1 ? "" : "s"}
@@ -575,9 +594,11 @@ export function JobsDashboard() {
                         className={`rounded-2xl border p-4 sm:p-5 ${
                           item.status === "false_positive"
                             ? "border-amber-300 bg-amber-50/80"
-                            : item.status === "invalid_link"
-                              ? "border-red-200 bg-red-50/70"
-                              : "border-moss/10 bg-white"
+                            : item.status === "indeciso"
+                              ? "border-stone-300 bg-stone-50/90"
+                              : item.status === "invalid_link"
+                                ? "border-red-200 bg-red-50/70"
+                                : "border-moss/10 bg-white"
                         }`}
                       >
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -600,14 +621,18 @@ export function JobsDashboard() {
                                     ? "bg-forest/15 text-forest"
                                     : item.status === "false_positive"
                                       ? "bg-amber-200 text-amber-950"
-                                      : "bg-red-200 text-red-900"
+                                      : item.status === "indeciso"
+                                        ? "bg-stone-200 text-stone-900"
+                                        : "bg-red-200 text-red-900"
                                 }`}
                               >
                                 {item.status === "validated"
                                   ? "Válida"
                                   : item.status === "false_positive"
                                     ? "Falso positivo"
-                                    : "Link inválido"}
+                                    : item.status === "indeciso"
+                                      ? "Indeciso"
+                                      : "Link inválido"}
                               </span>
                               <span className="rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-cream">
                                 Portal · {formatSource(item.source)}

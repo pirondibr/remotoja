@@ -159,6 +159,7 @@ export async function validateRemoteJobs(
   const items: ValidationItem[] = [];
   let validated = 0;
   let falsePositives = 0;
+  let indecisos = 0;
   let invalidLinks = 0;
   let skipped = 0;
 
@@ -169,6 +170,8 @@ export async function validateRemoteJobs(
       if (result.job) kept.push(result.job);
     } else if (result.item.status === "false_positive") {
       falsePositives += 1;
+    } else if (result.item.status === "indeciso") {
+      indecisos += 1;
     } else if (result.item.status === "invalid_link") {
       invalidLinks += 1;
     } else {
@@ -196,6 +199,7 @@ export async function validateRemoteJobs(
       checked: Math.min(jobs.length, validateLimit),
       validated,
       false_positives: falsePositives,
+      indecisos,
       invalid_links: invalidLinks,
       skipped,
       kept: kept.length,

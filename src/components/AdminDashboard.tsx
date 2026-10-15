@@ -424,8 +424,11 @@ export function AdminDashboard() {
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Válidas
                                     </th>
-                                    <th className="py-1.5 font-semibold">
+                                    <th className="py-1.5 pr-3 font-semibold">
                                       Falso +
+                                    </th>
+                                    <th className="py-1.5 font-semibold">
+                                      Indeciso
                                     </th>
                                   </tr>
                                 </thead>
@@ -466,10 +469,13 @@ export function AdminDashboard() {
                                       <td className="py-1.5 pr-3 font-semibold text-forest">
                                         {p.validas == null ? "—" : p.validas}
                                       </td>
-                                      <td className="py-1.5 text-amber-800">
+                                      <td className="py-1.5 pr-3 text-amber-800">
                                         {p.checked
                                           ? p.false_positives
                                           : "—"}
+                                      </td>
+                                      <td className="py-1.5 text-stone-700">
+                                        {p.checked ? p.indecisos ?? 0 : "—"}
                                       </td>
                                     </tr>
                                   ))}

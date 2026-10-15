@@ -13,6 +13,7 @@ export type SourceResult = {
 export type ValidationStatus =
   | "validated"
   | "false_positive"
+  | "indeciso"
   | "invalid_link"
   | "skipped";
 
@@ -31,6 +32,7 @@ export type ValidationReport = {
   checked: number;
   validated: number;
   false_positives: number;
+  indecisos: number;
   invalid_links: number;
   skipped: number;
   kept: number;
@@ -68,6 +70,7 @@ export type PortalScrapeStat = {
   /** Quantas passaram pelo double-check (top N da análise). */
   checked: number;
   false_positives: number;
+  indecisos: number;
   invalid_links: number;
   validated_ok: number;
   error?: string | null;

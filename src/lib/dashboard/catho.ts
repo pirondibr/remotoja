@@ -85,6 +85,7 @@ function parseCathoJobs(html: string, term: string): DashboardJob[] {
       posted: postedRaw,
       job_id: `catho-${id}`,
       remote: true,
+      from_remote_filter: true,
     });
   }
 
@@ -103,6 +104,7 @@ function parseCathoJobs(html: string, term: string): DashboardJob[] {
         source_url: `https://www.catho.com.br${path}`,
         job_id: `catho-${id}`,
         remote: true,
+        from_remote_filter: true,
       });
     }
   }
@@ -110,55 +112,43 @@ function parseCathoJobs(html: string, term: string): DashboardJob[] {
   return out;
 }
 
-function titleRemoteScore(job: DashboardJob): number {
-  const t = job.title || "";
-  if (/home\s*office/i.test(t)) return 2;
-  if (/\bremot/i.test(t)) return 1;
-  return 0;
+async function fetchCathoQuery(
+  query: string,
+  term: string
+): Promise<{ jobs: DashboardJob[]; available: number }> {
+  const html = await loadCathoHtml(cathoSearchUrl(query));
+  const jobs = parseCathoJobs(html, term);
+  return {
+    jobs,
+    available: parseCathoTotal(html) || jobs.length,
+  };
 }
 
 /**
- * Catho: filtro `remoto_home_office` + busca com "home office" no termo
- * (muito título traz "atendimento home office"). Cap em PORTAL_FETCH_LIMIT.
+ * Catho: 1º busca `cargo home office` + filtro remoto.
+ * Se zerar → fallback só com o cargo + filtro `remoto_home_office`.
  */
 export async function fetchCatho(term: string): Promise<PortalFetchResult> {
   const base = term.trim();
-  const queries = [base];
-  if (!/home\s*office/i.test(base)) {
-    queries.push(`${base} home office`);
+  const alreadyHasHomeOffice = /home\s*office/i.test(base);
+  const titleQuery = alreadyHasHomeOffice ? base : `${base} home office`;
+
+  const primary = await fetchCathoQuery(titleQuery, base);
+  if (primary.jobs.length > 0) {
+    return {
+      jobs: primary.jobs.slice(0, PORTAL_FETCH_LIMIT),
+      available: Math.max(primary.available, primary.jobs.length),
+    };
   }
 
-  const pages = await Promise.all(
-    queries.map(async (q) => {
-      const html = await loadCathoHtml(cathoSearchUrl(q));
-      return {
-        jobs: parseCathoJobs(html, base),
-        available: parseCathoTotal(html),
-      };
-    })
-  );
-
-  const seen = new Set<string>();
-  const merged: DashboardJob[] = [];
-  for (const page of pages) {
-    for (const job of page.jobs) {
-      const id = job.job_id || "";
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      merged.push(job);
-    }
+  // Título com "home office" zerou → filtro home office do portal com o cargo puro
+  if (!alreadyHasHomeOffice) {
+    const fallback = await fetchCathoQuery(base, base);
+    return {
+      jobs: fallback.jobs.slice(0, PORTAL_FETCH_LIMIT),
+      available: Math.max(fallback.available, fallback.jobs.length),
+    };
   }
 
-  merged.sort((a, b) => titleRemoteScore(b) - titleRemoteScore(a));
-
-  const available = Math.max(
-    0,
-    ...pages.map((p) => p.available || 0),
-    merged.length
-  );
-
-  return {
-    jobs: merged.slice(0, PORTAL_FETCH_LIMIT),
-    available: available || merged.length,
-  };
+  return { jobs: [], available: primary.available || 0 };
 }

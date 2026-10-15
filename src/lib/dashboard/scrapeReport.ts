@@ -22,6 +22,7 @@ function emptyPortal(portal: string, error?: string | null): PortalScrapeStat {
     validas: null,
     checked: 0,
     false_positives: 0,
+    indecisos: 0,
     invalid_links: 0,
     validated_ok: 0,
     error: error || null,
@@ -110,6 +111,7 @@ export function buildScrapeReport(input: {
     const row = byPortal.get(key)!;
     row.checked += 1;
     if (item.status === "false_positive") row.false_positives += 1;
+    else if (item.status === "indeciso") row.indecisos += 1;
     else if (item.status === "invalid_link") row.invalid_links += 1;
     else if (item.status === "validated") {
       row.validated_ok += 1;

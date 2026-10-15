@@ -17,6 +17,11 @@ export type DemoJob = {
   job_id?: string | null;
   remote?: boolean;
   snippet?: string | null;
+  /**
+   * Veio do filtro remoto/home office do portal (Catho, Gupy, etc.).
+   * Sem confirmação clara na página → status "indeciso" na análise.
+   */
+  from_remote_filter?: boolean;
   /** Alinhamento com o cargo pesquisado (feed pago / admin). */
   match_tier?: "exato" | "relacionado" | "fora" | null;
 };
