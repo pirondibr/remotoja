@@ -39,6 +39,14 @@ function extractAnalyzeJobs(
   return raw as DemoJob[];
 }
 
+function extractPulledJobs(
+  sources: Record<string, number | string | object> | null | undefined
+): DemoJob[] | null {
+  const raw = sources?._pulled_jobs;
+  if (!Array.isArray(raw)) return null;
+  return raw as DemoJob[];
+}
+
 function sourcesPlainCounts(
   sources: Record<string, number | string | object> | null | undefined
 ): Record<string, number | string> {
@@ -85,10 +93,12 @@ export async function GET(request: Request) {
         const analyzeJobs = extractAnalyzeJobs(cached.sources);
         const jobs =
           analyzeJobs ?? filterByRole(cached.jobs as DemoJob[], role);
+        const pulled_jobs = extractPulledJobs(cached.sources) ?? undefined;
         return NextResponse.json({
           role,
           count: jobs.length,
           jobs,
+          ...(pulled_jobs ? { pulled_jobs } : {}),
           fetched_via: "cache_analyze",
           sources: sourcesPlainCounts(cached.sources),
           validation,
@@ -198,6 +208,9 @@ export async function GET(request: Request) {
               ? { _validation: payload.validation }
               : {}),
             _analyze_jobs: payload.jobs,
+            ...(payload.pulled_jobs
+              ? { _pulled_jobs: payload.pulled_jobs }
+              : {}),
             _analyze_at: analyzeAt,
           },
         });

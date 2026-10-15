@@ -15,7 +15,7 @@ import type {
   ValidationStatus,
 } from "@/lib/dashboard/types";
 
-type ReviewTab = "feed" | ValidationStatus;
+type ReviewTab = "feed" | "pulled" | ValidationStatus;
 
 function postedLabel(job: DemoJob) {
   return formatJobAgo(job);
@@ -37,6 +37,22 @@ function formatSource(source: string) {
   const key = raw.toLowerCase();
   if (map[key]) return map[key];
   return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function reviewItemKey(item: {
+  title: string;
+  company: string;
+  scrape?: string | null;
+  source: string;
+}): string {
+  return `${(item.scrape || item.source || "").toLowerCase()}|${item.title}|${item.company}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function scrapeKeyOf(job: { scrape?: string | null; source?: string }): string {
+  return (job.scrape || job.source || "").toLowerCase();
 }
 
 export function JobsDashboard() {
@@ -67,8 +83,11 @@ export function JobsDashboard() {
   const [sources, setSources] = useState<Record<string, number | string>>({});
   const [validation, setValidation] = useState<ValidationReport | null>(null);
   const [scrapeReport, setScrapeReport] = useState<ScrapeReport | null>(null);
+  const [pulledJobs, setPulledJobs] = useState<DemoJob[]>([]);
   const [fromCache, setFromCache] = useState(false);
   const [reviewTab, setReviewTab] = useState<ReviewTab>("feed");
+  /** Filtro de revisão manual por portal de scrape (catho, gupy…). */
+  const [portalFilter, setPortalFilter] = useState<string | null>(null);
 
   const loadJobs = useCallback(
     async (
@@ -92,6 +111,8 @@ export function JobsDashboard() {
       setSources({});
       setValidation(null);
       setScrapeReport(null);
+      setPulledJobs([]);
+      setPortalFilter(null);
       setFromCache(false);
 
       if (preferCache && !inspect && !analyze) {
@@ -137,6 +158,9 @@ export function JobsDashboard() {
             ? (data.scrape_report as ScrapeReport)
             : null
         );
+        setPulledJobs(
+          Array.isArray(data.pulled_jobs) ? (data.pulled_jobs as DemoJob[]) : []
+        );
         setFromCache(Boolean(data.cached));
         if (!cacheOnly && !analyze) {
           saveJobSession(trimmed, list);
@@ -173,31 +197,67 @@ export function JobsDashboard() {
     return () => controller.abort();
   }, [roleFromUrl, loadJobs, adminMode, forceFresh]);
 
+  const validationByKey = useMemo(() => {
+    const map = new Map<string, ValidationItem>();
+    for (const item of validation?.items || []) {
+      map.set(reviewItemKey(item), item);
+    }
+    return map;
+  }, [validation]);
+
+  const matchesPortal = useCallback(
+    (scrape: string | null | undefined, source: string | undefined) => {
+      if (!portalFilter) return true;
+      return scrapeKeyOf({ scrape, source }) === portalFilter;
+    },
+    [portalFilter]
+  );
+
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return jobs;
-    return jobs.filter(
-      (job) =>
+    return jobs.filter((job) => {
+      if (!matchesPortal(job.scrape, job.source)) return false;
+      if (!q) return true;
+      return (
         job.title.toLowerCase().includes(q) ||
         job.company.toLowerCase().includes(q) ||
         (job.location || "").toLowerCase().includes(q) ||
         (job.source || "").toLowerCase().includes(q) ||
         (job.scrape || "").toLowerCase().includes(q)
-    );
-  }, [jobs, filter]);
+      );
+    });
+  }, [jobs, filter, matchesPortal]);
+
+  const pulledVisible = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return pulledJobs.filter((job) => {
+      if (!matchesPortal(job.scrape, job.source)) return false;
+      if (!q) return true;
+      return (
+        job.title.toLowerCase().includes(q) ||
+        job.company.toLowerCase().includes(q) ||
+        (job.source || "").toLowerCase().includes(q) ||
+        (job.scrape || "").toLowerCase().includes(q) ||
+        (job.match_tier || "").toLowerCase().includes(q)
+      );
+    });
+  }, [pulledJobs, filter, matchesPortal]);
 
   const reviewItems = useMemo(() => {
     if (!validation?.items?.length) return [] as ValidationItem[];
     const checked = validation.items.filter((i) => i.status !== "skipped");
     const byTab =
-      reviewTab === "feed"
+      reviewTab === "feed" || reviewTab === "pulled"
         ? []
         : reviewTab === "skipped"
           ? validation.items.filter((i) => i.status === "skipped")
           : checked.filter((i) => i.status === reviewTab);
+    const portalScoped = byTab.filter((item) =>
+      matchesPortal(item.scrape, item.source)
+    );
     const q = filter.trim().toLowerCase();
-    if (!q) return byTab;
-    return byTab.filter(
+    if (!q) return portalScoped;
+    return portalScoped.filter(
       (item) =>
         item.title.toLowerCase().includes(q) ||
         item.company.toLowerCase().includes(q) ||
@@ -205,37 +265,73 @@ export function JobsDashboard() {
         (item.scrape || "").toLowerCase().includes(q) ||
         (item.reason || "").toLowerCase().includes(q)
     );
-  }, [validation, reviewTab, filter]);
+  }, [validation, reviewTab, filter, matchesPortal]);
 
   const reviewTabs = useMemo(() => {
-    if (!validation) return [] as Array<{ id: ReviewTab; label: string; count: number }>;
-    const items = validation.items || [];
+    if (!inspect) return [] as Array<{ id: ReviewTab; label: string; count: number }>;
+    const items = (validation?.items || []).filter((i) =>
+      matchesPortal(i.scrape, i.source)
+    );
     const count = (status: ValidationStatus) =>
       items.filter((i) => i.status === status).length;
-    return [
-      { id: "feed" as const, label: "Feed", count: jobs.length },
+    const feedCount = jobs.filter((j) =>
+      matchesPortal(j.scrape, j.source)
+    ).length;
+    const pulledCount = pulledJobs.filter((j) =>
+      matchesPortal(j.scrape, j.source)
+    ).length;
+    const tabs: Array<{ id: ReviewTab; label: string; count: number }> = [
+      { id: "feed", label: "Feed", count: feedCount },
       {
-        id: "validated" as const,
-        label: "Válidas",
-        count: count("validated"),
-      },
-      {
-        id: "false_positive" as const,
-        label: "Falso +",
-        count: count("false_positive"),
-      },
-      {
-        id: "indeciso" as const,
-        label: "Indeciso",
-        count: count("indeciso"),
-      },
-      {
-        id: "invalid_link" as const,
-        label: "Link ruim",
-        count: count("invalid_link"),
+        id: "pulled",
+        label: "Puxadas",
+        count: pulledCount || feedCount,
       },
     ];
-  }, [validation, jobs.length]);
+    if (validation) {
+      tabs.push(
+        { id: "validated", label: "Válidas", count: count("validated") },
+        {
+          id: "false_positive",
+          label: "Falso +",
+          count: count("false_positive"),
+        },
+        { id: "indeciso", label: "Indeciso", count: count("indeciso") },
+        {
+          id: "invalid_link",
+          label: "Link ruim",
+          count: count("invalid_link"),
+        }
+      );
+    }
+    return tabs;
+  }, [inspect, validation, jobs, pulledJobs, matchesPortal]);
+
+  const portalChips = useMemo(() => {
+    if (scrapeReport?.portals?.length) {
+      return scrapeReport.portals
+        .filter((p) => (p.found || 0) > 0 || (p.available || 0) > 0)
+        .map((p) => ({
+          id: p.portal.toLowerCase(),
+          label: formatSource(p.portal),
+          count: p.found,
+        }));
+    }
+    const counts: Record<string, number> = {};
+    const pool = pulledJobs.length > 0 ? pulledJobs : jobs;
+    for (const job of pool) {
+      const key = scrapeKeyOf(job);
+      if (!key) continue;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({
+        id,
+        label: formatSource(id),
+        count,
+      }));
+  }, [scrapeReport, pulledJobs, jobs]);
 
   const sourceBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -245,6 +341,11 @@ export function JobsDashboard() {
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [jobs]);
+
+  function selectPortal(portal: string | null) {
+    setPortalFilter(portal);
+    if (portal) setReviewTab("pulled");
+  }
 
   function onSearch(event: FormEvent) {
     event.preventDefault();
@@ -408,6 +509,9 @@ export function JobsDashboard() {
                 <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
                   Scrape por portal
                 </p>
+                <p className="mt-1 text-[11px] text-moss/55">
+                  Clique no portal para revisar as vagas puxadas e as tags.
+                </p>
                 <table className="mt-3 min-w-full text-left text-xs">
                   <thead className="text-moss/55 uppercase tracking-wide">
                     <tr>
@@ -426,42 +530,103 @@ export function JobsDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {scrapeReport.portals.map((p) => (
-                      <tr key={p.portal} className="border-t border-moss/10">
-                        <td className="py-1.5 pr-3 font-medium">
-                          {formatSource(p.portal)}
-                        </td>
-                        <td className="py-1.5 pr-3 font-medium">
-                          {(p.available ?? p.found).toLocaleString("pt-BR")}
-                        </td>
-                        <td className="py-1.5 pr-3">{p.found}</td>
-                        <td className="py-1.5 pr-3 text-forest">
-                          {p.exato ?? 0}
-                        </td>
-                        <td className="py-1.5 pr-3">{p.relacionado ?? 0}</td>
-                        <td className="py-1.5 pr-3 text-amber-800">
-                          {p.fora ?? 0}
-                        </td>
-                        <td className="py-1.5 pr-3">{p.remotas ?? 0}</td>
-                        <td className="py-1.5 pr-3">{p.kept}</td>
-                        <td className="py-1.5 pr-3 font-semibold text-forest">
-                          {p.validas == null ? "—" : p.validas}
-                        </td>
-                        <td className="py-1.5 pr-3 text-amber-800">
-                          {p.checked ? p.false_positives : "—"}
-                        </td>
-                        <td className="py-1.5 pr-3 text-stone-700">
-                          {p.checked ? p.indecisos ?? 0 : "—"}
-                        </td>
-                        <td className="py-1.5 text-red-700">
-                          {p.checked ? p.invalid_links : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {scrapeReport.portals.map((p) => {
+                      const key = p.portal.toLowerCase();
+                      const active = portalFilter === key;
+                      return (
+                        <tr
+                          key={p.portal}
+                          className={`border-t border-moss/10 ${
+                            active ? "bg-forest/5" : "hover:bg-sand/40"
+                          }`}
+                        >
+                          <td className="py-1.5 pr-3 font-medium">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                selectPortal(active ? null : key)
+                              }
+                              className={`text-left underline-offset-2 hover:underline ${
+                                active ? "text-forest" : "text-ink"
+                              }`}
+                            >
+                              {formatSource(p.portal)}
+                            </button>
+                          </td>
+                          <td className="py-1.5 pr-3 font-medium">
+                            {(p.available ?? p.found).toLocaleString("pt-BR")}
+                          </td>
+                          <td className="py-1.5 pr-3">{p.found}</td>
+                          <td className="py-1.5 pr-3 text-forest">
+                            {p.exato ?? 0}
+                          </td>
+                          <td className="py-1.5 pr-3">{p.relacionado ?? 0}</td>
+                          <td className="py-1.5 pr-3 text-amber-800">
+                            {p.fora ?? 0}
+                          </td>
+                          <td className="py-1.5 pr-3">{p.remotas ?? 0}</td>
+                          <td className="py-1.5 pr-3">{p.kept}</td>
+                          <td className="py-1.5 pr-3 font-semibold text-forest">
+                            {p.validas == null ? "—" : p.validas}
+                          </td>
+                          <td className="py-1.5 pr-3 text-amber-800">
+                            {p.checked ? p.false_positives : "—"}
+                          </td>
+                          <td className="py-1.5 pr-3 text-stone-700">
+                            {p.checked ? p.indecisos ?? 0 : "—"}
+                          </td>
+                          <td className="py-1.5 text-red-700">
+                            {p.checked ? p.invalid_links : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {inspect && portalChips.length > 0 && !loading && (
+          <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
+            <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+              Revisão por portal
+            </p>
+            <p className="mt-1 text-[11px] text-moss/55">
+              Filtra feed, puxadas e tags de análise para um scrape só.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => selectPortal(null)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  !portalFilter
+                    ? "bg-ink text-cream"
+                    : "border border-moss/15 bg-cream text-moss hover:border-moss/30"
+                }`}
+              >
+                Todos
+              </button>
+              {portalChips.map((chip) => {
+                const active = portalFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => selectPortal(active ? null : chip.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      active
+                        ? "bg-forest text-cream"
+                        : "border border-moss/15 bg-cream text-moss hover:border-moss/30"
+                    }`}
+                  >
+                    {chip.label}
+                    <span className="ml-1 opacity-80">({chip.count})</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -478,14 +643,14 @@ export function JobsDashboard() {
           </div>
         )}
 
-        {inspect && validation && (
+        {inspect && reviewTabs.length > 0 && (
           <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
             <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
               Revisão da análise
             </p>
             <p className="mt-1 text-[11px] text-moss/55">
-              Use as abas para checar manualmente se a classificação está
-              correta. Em Falso + só aparecem as vagas marcadas assim.
+              Puxadas = todas as vagas ingeridas do portal (cap 20), com tags de
+              cargo e análise. Clique num portal acima para revisar uma fonte.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {reviewTabs.map((tab) => {
@@ -515,36 +680,38 @@ export function JobsDashboard() {
                 );
               })}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <div>
-                <p className="text-2xl font-bold text-ink">
-                  {validation.validated}
-                </p>
-                <p className="text-xs text-moss/60">válidas</p>
+            {validation && (
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div>
+                  <p className="text-2xl font-bold text-ink">
+                    {validation.validated}
+                  </p>
+                  <p className="text-xs text-moss/60">válidas</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-amber-800">
+                    {validation.false_positives}
+                  </p>
+                  <p className="text-xs text-moss/60">falso positivos</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-stone-700">
+                    {validation.indecisos ?? 0}
+                  </p>
+                  <p className="text-xs text-moss/60">indecisos</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-red-700">
+                    {validation.invalid_links}
+                  </p>
+                  <p className="text-xs text-moss/60">links inválidos</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-ink">{validation.kept}</p>
+                  <p className="text-xs text-moss/60">ficaram no feed</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-amber-800">
-                  {validation.false_positives}
-                </p>
-                <p className="text-xs text-moss/60">falso positivos</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-stone-700">
-                  {validation.indecisos ?? 0}
-                </p>
-                <p className="text-xs text-moss/60">indecisos</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-red-700">
-                  {validation.invalid_links}
-                </p>
-                <p className="text-xs text-moss/60">links inválidos</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-ink">{validation.kept}</p>
-                <p className="text-xs text-moss/60">ficaram no feed</p>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -553,9 +720,11 @@ export function JobsDashboard() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder={
-              reviewTab === "feed"
-                ? "Filtrar nesta lista (título, empresa, portal…)"
-                : "Filtrar nesta aba (título, empresa, motivo…)"
+              reviewTab === "pulled"
+                ? "Filtrar puxadas (título, empresa, cargo…)"
+                : reviewTab === "feed"
+                  ? "Filtrar nesta lista (título, empresa, portal…)"
+                  : "Filtrar nesta aba (título, empresa, motivo…)"
             }
             className="w-full rounded-xl border border-moss/10 bg-white px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
@@ -584,8 +753,137 @@ export function JobsDashboard() {
           </div>
         )}
 
+        {/* Todas as vagas puxadas do portal (inclui cargo fora) */}
+        {!loading && reviewTab === "pulled" && (
+          <div className="mt-8">
+            <p className="mb-3 text-sm font-semibold text-moss">
+              Puxadas
+              {portalFilter ? ` · ${formatSource(portalFilter)}` : ""}
+              <span className="ml-2 font-normal text-moss/55">
+                {pulledVisible.length} vaga
+                {pulledVisible.length === 1 ? "" : "s"}
+                {pulledJobs.length === 0
+                  ? " — rode análise com fresh=1 para gravar a lista completa"
+                  : ""}
+              </span>
+            </p>
+            {pulledVisible.length === 0 ? (
+              <p className="rounded-2xl border border-moss/10 bg-white p-8 text-center text-sm text-moss/60">
+                {pulledJobs.length === 0
+                  ? "Sem lista de puxadas neste cache. Abra a análise com fresh=1 uma vez para salvar."
+                  : `Nenhuma vaga${filter.trim() ? " com esse filtro" : ""}${
+                      portalFilter ? ` em ${formatSource(portalFilter)}` : ""
+                    }.`}
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {pulledVisible.map((job, index) => {
+                  const href = job.source_url || undefined;
+                  const assessed = validationByKey.get(reviewItemKey(job));
+                  const status = assessed?.status;
+                  return (
+                    <li key={`pulled-${job.job_id || index}-${job.title}`}>
+                      <article className="rounded-2xl border border-moss/10 bg-white p-4 sm:p-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h2 className="text-lg font-semibold leading-snug text-ink">
+                              {job.title}
+                            </h2>
+                            <p className="mt-0.5 text-sm text-moss/70">
+                              {job.company}
+                            </p>
+                            {assessed?.reason && (
+                              <p className="mt-2 text-sm text-moss/80">
+                                Motivo: {assessed.reason}
+                              </p>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span className="rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-cream">
+                                Scrape ·{" "}
+                                {formatSource(job.scrape || job.source)}
+                              </span>
+                              <span className="rounded-full border border-moss/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-moss">
+                                Portal · {formatSource(job.source)}
+                              </span>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  job.match_tier === "exato"
+                                    ? "bg-forest/15 text-forest"
+                                    : job.match_tier === "relacionado"
+                                      ? "bg-sand text-moss"
+                                      : "bg-amber-100 text-amber-900"
+                                }`}
+                              >
+                                Cargo ·{" "}
+                                {job.match_tier === "exato"
+                                  ? "Exato"
+                                  : job.match_tier === "relacionado"
+                                    ? "Relacionado"
+                                    : "Fora"}
+                              </span>
+                              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-moss">
+                                {job.remote ? "Remoto" : "Remoto ?"}
+                              </span>
+                              {status === "validated" && (
+                                <span className="rounded-full bg-forest/15 px-2.5 py-1 text-[11px] font-semibold text-forest">
+                                  Análise · Válida
+                                </span>
+                              )}
+                              {status === "false_positive" && (
+                                <span className="rounded-full bg-amber-200 px-2.5 py-1 text-[11px] font-semibold text-amber-950">
+                                  Análise · Falso +
+                                </span>
+                              )}
+                              {status === "indeciso" && (
+                                <span className="rounded-full bg-stone-200 px-2.5 py-1 text-[11px] font-semibold text-stone-900">
+                                  Análise · Indeciso
+                                </span>
+                              )}
+                              {status === "invalid_link" && (
+                                <span className="rounded-full bg-red-200 px-2.5 py-1 text-[11px] font-semibold text-red-900">
+                                  Análise · Link ruim
+                                </span>
+                              )}
+                              {status === "skipped" && (
+                                <span className="rounded-full border border-moss/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-moss/70">
+                                  Análise · Não checada
+                                </span>
+                              )}
+                              {!status && (
+                                <span className="rounded-full border border-moss/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-moss/70">
+                                  Análise · —
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-cream transition hover:bg-forest"
+                            >
+                              Abrir vaga →
+                            </a>
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-sand px-5 py-2.5 text-sm font-medium text-moss/50">
+                              Sem URL
+                            </span>
+                          )}
+                        </div>
+                      </article>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
         {/* Abas de revisão da análise (só as vagas da categoria) */}
-        {!loading && reviewTab !== "feed" && (
+        {!loading &&
+          reviewTab !== "feed" &&
+          reviewTab !== "pulled" && (
           <div className="mt-8">
             <p className="mb-3 text-sm font-semibold text-moss">
               {reviewTab === "false_positive"
@@ -597,6 +895,7 @@ export function JobsDashboard() {
                     : reviewTab === "invalid_link"
                       ? "Links inválidos / página quebrada"
                       : "Revisão"}
+              {portalFilter ? ` · ${formatSource(portalFilter)}` : ""}
               <span className="ml-2 font-normal text-moss/55">
                 {reviewItems.length} vaga
                 {reviewItems.length === 1 ? "" : "s"}

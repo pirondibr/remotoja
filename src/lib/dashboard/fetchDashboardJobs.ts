@@ -202,6 +202,7 @@ export async function fetchDashboardJobs(
     role: term,
     count: ranked.length,
     jobs: ranked,
+    pulled_jobs: allTagged,
     fetched_via: "dashboard_multi",
     sources,
     validation,
