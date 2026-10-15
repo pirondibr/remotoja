@@ -1,6 +1,7 @@
 import { cleanText, fetchHtml, slugify } from "@/lib/dashboard/common";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
-import type { DashboardJob } from "@/lib/dashboard/types";
+import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 function buildUrl(term: string): string {
   const slug = slugify(term) || "emprego";
@@ -11,7 +12,16 @@ function decodeEntities(text: string): string {
   return cleanText(text, 300);
 }
 
-export async function fetchInfoJobs(term: string): Promise<DashboardJob[]> {
+function parseInfoJobsTotal(html: string): number | null {
+  const m =
+    html.match(/([\d.]+)\s*vagas?\s*(?:de\s+emprego|encontrad)/i) ||
+    html.match(/([\d.]+)\s*ofertas?/i);
+  if (!m) return null;
+  const n = Number(m[1].replace(/\./g, ""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export async function fetchInfoJobs(term: string): Promise<PortalFetchResult> {
   let html: string;
   try {
     html = await fetchHtml(buildUrl(term));
@@ -26,6 +36,7 @@ export async function fetchInfoJobs(term: string): Promise<DashboardJob[]> {
   const parts = html.split(/<div[^>]+class="[^"]*card[^"]*js_rowCard[^"]*"/i);
   const out: DashboardJob[] = [];
   const seen = new Set<string>();
+  const availableParsed = parseInfoJobsTotal(html);
 
   for (const part of parts.slice(1)) {
     const href =
@@ -84,5 +95,8 @@ export async function fetchInfoJobs(term: string): Promise<DashboardJob[]> {
       education: details.education,
     });
   }
-  return out;
+  return {
+    jobs: out.slice(0, PORTAL_FETCH_LIMIT),
+    available: Math.max(availableParsed || 0, out.length),
+  };
 }

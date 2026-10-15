@@ -18,7 +18,7 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
 
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
-    const jobs = await fetchRemotar(role);
+    const { jobs } = await fetchRemotar(role);
     return jobs
       .filter((job) =>
         termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)

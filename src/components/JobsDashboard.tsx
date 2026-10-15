@@ -384,12 +384,13 @@ export function JobsDashboard() {
                   <thead className="text-moss/55 uppercase tracking-wide">
                     <tr>
                       <th className="py-1.5 pr-3 font-semibold">Scrape</th>
-                      <th className="py-1.5 pr-3 font-semibold">Encontradas</th>
+                      <th className="py-1.5 pr-3 font-semibold">No portal</th>
+                      <th className="py-1.5 pr-3 font-semibold">Cap 20</th>
                       <th className="py-1.5 pr-3 font-semibold">Exato</th>
                       <th className="py-1.5 pr-3 font-semibold">Relac.</th>
                       <th className="py-1.5 pr-3 font-semibold">Fora</th>
                       <th className="py-1.5 pr-3 font-semibold">Remotas</th>
-                      <th className="py-1.5 pr-3 font-semibold">Pegamos</th>
+                      <th className="py-1.5 pr-3 font-semibold">No feed</th>
                       <th className="py-1.5 pr-3 font-semibold">Válidas</th>
                       <th className="py-1.5 pr-3 font-semibold">Falso +</th>
                       <th className="py-1.5 font-semibold">Link</th>
@@ -400,6 +401,9 @@ export function JobsDashboard() {
                       <tr key={p.portal} className="border-t border-moss/10">
                         <td className="py-1.5 pr-3 font-medium">
                           {formatSource(p.portal)}
+                        </td>
+                        <td className="py-1.5 pr-3 font-medium">
+                          {(p.available ?? p.found).toLocaleString("pt-BR")}
                         </td>
                         <td className="py-1.5 pr-3">{p.found}</td>
                         <td className="py-1.5 pr-3 text-forest">

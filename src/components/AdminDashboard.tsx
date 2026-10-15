@@ -401,7 +401,10 @@ export function AdminDashboard() {
                                       Scrape
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
-                                      Encontradas
+                                      No portal
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Cap 20
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Exato
@@ -416,7 +419,7 @@ export function AdminDashboard() {
                                       Remotas
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
-                                      Pegamos
+                                      No feed
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Válidas
@@ -439,6 +442,12 @@ export function AdminDashboard() {
                                             (erro)
                                           </span>
                                         ) : null}
+                                      </td>
+                                      <td className="py-1.5 pr-3 font-medium">
+                                        {(
+                                          p.available ??
+                                          p.found
+                                        ).toLocaleString("pt-BR")}
                                       </td>
                                       <td className="py-1.5 pr-3">{p.found}</td>
                                       <td className="py-1.5 pr-3 text-forest">

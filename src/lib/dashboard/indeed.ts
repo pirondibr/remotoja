@@ -1,5 +1,6 @@
 import { cleanText, fetchScrapingBee } from "@/lib/dashboard/common";
-import type { DashboardJob } from "@/lib/dashboard/types";
+import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 type MosaicRow = {
   jobkey?: string;
@@ -13,10 +14,10 @@ type MosaicRow = {
   snippet?: string;
 };
 
-function extractMosaic(html: string): MosaicRow[] {
+function extractMosaic(html: string): { rows: MosaicRow[]; available: number } {
   const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
   const idx = html.indexOf(marker);
-  if (idx < 0) return [];
+  if (idx < 0) return { rows: [], available: 0 };
   let start = idx + marker.length;
   let depth = 0;
   let end = start;
@@ -37,19 +38,30 @@ function extractMosaic(html: string): MosaicRow[] {
       blob?.metaData?.mosaicProviderJobCardsModel ||
       blob?.mosaicProviderJobCardsModel ||
       {};
-    return (model.results || []) as MosaicRow[];
+    const rows = (model.results || []) as MosaicRow[];
+    const available = Number(
+      model.totalJobCount ??
+        model.estimatedTotalSize ??
+        model.totalResults ??
+        rows.length
+    );
+    return {
+      rows,
+      available:
+        Number.isFinite(available) && available > 0 ? available : rows.length,
+    };
   } catch {
-    return [];
+    return { rows: [], available: 0 };
   }
 }
 
-export async function fetchIndeed(term: string): Promise<DashboardJob[]> {
+export async function fetchIndeed(term: string): Promise<PortalFetchResult> {
   if (!process.env.SCRAPINGBEE_API_KEY) {
     throw new Error("Indeed exige SCRAPINGBEE_API_KEY");
   }
   const url = `https://br.indeed.com/jobs?q=${encodeURIComponent(term)}&l=Remoto&sort=date`;
   const html = await fetchScrapingBee(url);
-  const rows = extractMosaic(html);
+  const { rows, available } = extractMosaic(html);
   const out: DashboardJob[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
@@ -74,5 +86,8 @@ export async function fetchIndeed(term: string): Promise<DashboardJob[]> {
       snippet: cleanText(row.snippet || "", 220) || null,
     });
   }
-  return out;
+  return {
+    jobs: out.slice(0, PORTAL_FETCH_LIMIT),
+    available: Math.max(available, out.length),
+  };
 }

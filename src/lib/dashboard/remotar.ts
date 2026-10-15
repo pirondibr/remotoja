@@ -1,5 +1,6 @@
 import { cleanText, slugify } from "@/lib/dashboard/common";
-import type { DashboardJob } from "@/lib/dashboard/types";
+import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 type RemotarJob = {
   id?: number;
@@ -45,7 +46,7 @@ function remotarSalary(row: RemotarJob): string | null {
   return null;
 }
 
-export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
+export async function fetchRemotar(term: string): Promise<PortalFetchResult> {
   const url = `https://api.remotar.com.br/jobs?search=${encodeURIComponent(term.trim())}`;
   const res = await fetch(url, {
     headers: {
@@ -56,8 +57,15 @@ export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Remotar HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: RemotarJob[] };
+  const data = (await res.json()) as {
+    data?: RemotarJob[];
+    meta?: { total?: number; totalCount?: number };
+    total?: number;
+  };
   const rows = data.data || [];
+  const available = Number(
+    data.meta?.total ?? data.meta?.totalCount ?? data.total ?? rows.length
+  );
   const out: DashboardJob[] = [];
   const seen = new Set<string>();
 
@@ -100,5 +108,11 @@ export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
       snippet: cleanText(row.subtitle || row.description || "", 220) || null,
     });
   }
-  return out;
+  return {
+    jobs: out.slice(0, PORTAL_FETCH_LIMIT),
+    available:
+      Number.isFinite(available) && available > 0
+        ? Math.max(available, out.length)
+        : out.length,
+  };
 }

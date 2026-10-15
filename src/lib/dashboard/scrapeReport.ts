@@ -12,6 +12,7 @@ export { classifyCargoMatch };
 function emptyPortal(portal: string, error?: string | null): PortalScrapeStat {
   return {
     portal,
+    available: 0,
     found: 0,
     kept: 0,
     exato: 0,
@@ -51,6 +52,8 @@ export function tagJobsWithMatch(
 
 export function buildScrapeReport(input: {
   foundByPortal: Record<string, number>;
+  /** Total reportado pelo portal (ex.: Catho 11k). */
+  availableByPortal?: Record<string, number>;
   errorsByPortal: Record<string, string>;
   /** Todas as vagas dedupeadas (já com match_tier). */
   allJobs: DashboardJob[];
@@ -67,6 +70,7 @@ export function buildScrapeReport(input: {
     );
     const row = byPortal.get(portal)!;
     row.found = found;
+    row.available = input.availableByPortal?.[portal] ?? found;
   }
 
   for (const [portal, err] of Object.entries(input.errorsByPortal)) {
@@ -139,7 +143,12 @@ export function buildScrapeReport(input: {
 
   const portals = [...byPortal.values()]
     .filter((p) => !p.portal.endsWith("_warning") && p.portal !== "unknown")
-    .sort((a, b) => b.found - a.found || a.portal.localeCompare(b.portal));
+    .sort(
+      (a, b) =>
+        b.available - a.available ||
+        b.found - a.found ||
+        a.portal.localeCompare(b.portal)
+    );
 
   let exato = 0;
   let relacionado = 0;

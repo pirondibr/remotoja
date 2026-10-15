@@ -37,10 +37,22 @@ export type ValidationReport = {
   items: ValidationItem[];
 };
 
+/** Resultado de um scraper de portal (antes do cap global). */
+export type PortalFetchResult = {
+  jobs: DashboardJob[];
+  /** Total reportado pelo portal (pode ser >> jobs.length). */
+  available?: number;
+};
+
 /** Métricas por portal para o admin decidir qualidade / corte. */
 export type PortalScrapeStat = {
   portal: string;
-  /** Vagas que o scraper trouxe (antes do filtro de cargo). */
+  /**
+   * Total no portal (ex.: 11.000 na Catho).
+   * Se o portal não informar, cai para `found`.
+   */
+  available: number;
+  /** Vagas que ingerimos neste scrape (cap por portal, antes do filtro de cargo). */
   found: number;
   /** Vagas que entramos no feed (após filtro de termo + dedupe). */
   kept: number;

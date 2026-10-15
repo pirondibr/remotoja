@@ -1,5 +1,6 @@
 import { cleanText, fetchHtml } from "@/lib/dashboard/common";
-import type { DashboardJob } from "@/lib/dashboard/types";
+import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 type GupyRow = {
   id?: number | string;
@@ -18,7 +19,7 @@ type GupyRow = {
   description?: string;
 };
 
-function parseNextData(html: string): GupyRow[] {
+function parseNextData(html: string): { rows: GupyRow[]; available: number } {
   const marker = 'id="__NEXT_DATA__"';
   const startAttr = html.indexOf(marker);
   if (startAttr < 0) throw new Error("Gupy: __NEXT_DATA__ não encontrado");
@@ -27,9 +28,23 @@ function parseNextData(html: string): GupyRow[] {
   const data = JSON.parse(html.slice(start, end));
   const pageProps = data?.props?.pageProps || {};
   const initial = pageProps.initialJobList || {};
-  if (Array.isArray(initial.data)) return initial.data;
-  if (Array.isArray(pageProps.jobs)) return pageProps.jobs;
-  return [];
+  const rows: GupyRow[] = Array.isArray(initial.data)
+    ? initial.data
+    : Array.isArray(pageProps.jobs)
+      ? pageProps.jobs
+      : [];
+  const available = Number(
+    initial.total ??
+      initial.totalCount ??
+      initial.pagination?.total ??
+      initial.pagination?.totalCount ??
+      pageProps.totalJobs ??
+      rows.length
+  );
+  return {
+    rows,
+    available: Number.isFinite(available) && available > 0 ? available : rows.length,
+  };
 }
 
 function mapRow(row: GupyRow): DashboardJob | null {
@@ -57,11 +72,11 @@ function mapRow(row: GupyRow): DashboardJob | null {
   };
 }
 
-export async function fetchGupy(term: string): Promise<DashboardJob[]> {
+export async function fetchGupy(term: string): Promise<PortalFetchResult> {
   const q = encodeURIComponent(term.trim());
   const url = `https://portal.gupy.io/job-search/term=${q}&workplaceTypes[]=remote`;
   const html = await fetchHtml(url);
-  const rows = parseNextData(html);
+  const { rows, available } = parseNextData(html);
   const out: DashboardJob[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
@@ -70,5 +85,8 @@ export async function fetchGupy(term: string): Promise<DashboardJob[]> {
     seen.add(mapped.job_id);
     out.push(mapped);
   }
-  return out;
+  return {
+    jobs: out.slice(0, PORTAL_FETCH_LIMIT),
+    available: Math.max(available, out.length),
+  };
 }

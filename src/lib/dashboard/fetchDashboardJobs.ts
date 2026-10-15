@@ -5,12 +5,17 @@ import { fetchGupy } from "@/lib/dashboard/gupy";
 import { fetchIndeed } from "@/lib/dashboard/indeed";
 import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
+import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import {
   buildScrapeReport,
   tagJobsWithMatch,
 } from "@/lib/dashboard/scrapeReport";
 import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
-import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
+import type {
+  DashboardJobsPayload,
+  DashboardJob,
+  PortalFetchResult,
+} from "@/lib/dashboard/types";
 
 export type FetchDashboardOptions = {
   /** Só para inspeção admin — não roda no fluxo do membro. */
@@ -19,7 +24,7 @@ export type FetchDashboardOptions = {
 
 type Fetcher = {
   name: string;
-  run: (term: string) => Promise<DashboardJob[]>;
+  run: (term: string) => Promise<PortalFetchResult | DashboardJob[]>;
   timeoutMs: number;
   /** Pula se a chave não existe. */
   requiresScrapingBee?: boolean;
@@ -30,7 +35,7 @@ const FETCHERS: Fetcher[] = [
   { name: "gupy", run: fetchGupy, timeoutMs: 12000 },
   { name: "remotar", run: fetchRemotar, timeoutMs: 12000 },
   { name: "infojobs", run: fetchInfoJobs, timeoutMs: 12000 },
-  { name: "catho", run: fetchCatho, timeoutMs: 15000 },
+  { name: "catho", run: fetchCatho, timeoutMs: 22000 },
   {
     name: "indeed",
     run: fetchIndeed,
@@ -39,6 +44,13 @@ const FETCHERS: Fetcher[] = [
   },
   { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 55000 },
 ];
+
+function asPortalResult(
+  raw: PortalFetchResult | DashboardJob[]
+): PortalFetchResult {
+  if (Array.isArray(raw)) return { jobs: raw };
+  return raw;
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -62,24 +74,36 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 async function runOne(
   fetcher: Fetcher,
   term: string
-): Promise<{ name: string; jobs: DashboardJob[]; error?: string }> {
+): Promise<{
+  name: string;
+  jobs: DashboardJob[];
+  available: number;
+  error?: string;
+}> {
   try {
     if (fetcher.requiresScrapingBee && !process.env.SCRAPINGBEE_API_KEY) {
       return {
         name: fetcher.name,
         jobs: [],
+        available: 0,
         error: "skipped: sem SCRAPINGBEE_API_KEY",
       };
     }
-    const jobs = await withTimeout(
+    const raw = await withTimeout(
       fetcher.run(term),
       fetcher.timeoutMs,
       fetcher.name
     );
-    return { name: fetcher.name, jobs };
+    const { jobs: all, available } = asPortalResult(raw);
+    const jobs = all.slice(0, PORTAL_FETCH_LIMIT);
+    return {
+      name: fetcher.name,
+      jobs,
+      available: Math.max(available ?? 0, all.length),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { name: fetcher.name, jobs: [], error: message };
+    return { name: fetcher.name, jobs: [], available: 0, error: message };
   }
 }
 
@@ -92,16 +116,21 @@ export async function fetchDashboardJobs(
 
   const sources: Record<string, number | string | object> = {};
   const foundByPortal: Record<string, number> = {};
+  const availableByPortal: Record<string, number> = {};
   const errorsByPortal: Record<string, string> = {};
   const merged: DashboardJob[] = [];
 
   for (const result of results) {
     foundByPortal[result.name] = result.jobs.length;
+    availableByPortal[result.name] = result.available;
     if (result.error && result.jobs.length === 0) {
       sources[result.name] = `error: ${result.error}`;
       errorsByPortal[result.name] = result.error;
     } else {
       sources[result.name] = result.jobs.length;
+      if (result.available > result.jobs.length) {
+        sources[`${result.name}_available`] = result.available;
+      }
       if (result.error) {
         sources[`${result.name}_warning`] = result.error;
         errorsByPortal[result.name] = result.error;
@@ -130,6 +159,7 @@ export async function fetchDashboardJobs(
 
   const scrapeBase = {
     foundByPortal,
+    availableByPortal,
     errorsByPortal,
     allJobs: allTagged,
     keptJobs: relevant,
