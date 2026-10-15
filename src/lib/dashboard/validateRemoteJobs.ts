@@ -1,4 +1,5 @@
 import { fetchHtml, UA } from "@/lib/dashboard/common";
+import { assessRemotePage } from "@/lib/dashboard/assessRemotePage";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
 import type {
   DashboardJob,
@@ -8,24 +9,11 @@ import type {
 
 export type { ValidationItem, ValidationReport, ValidationStatus } from "@/lib/dashboard/types";
 
-const REMOTE_RE =
-  /\b(remoto|remota|remote|home\s*office|trabalho\s+a\s+dist[aâ]ncia|100%\s*remoto|fully\s*remote|work\s+from\s+home|\bwfh\b)\b/i;
-
 const CONCURRENCY = 5;
-const FETCH_TIMEOUT_MS = 8000;
-const VALIDATE_LIMIT = 20;
+const FETCH_TIMEOUT_MS = 10000;
+/** Double-check rigoroso nas primeiras N (usuário pediu foco nas 10). */
+const VALIDATE_LIMIT = 10;
 const ENRICH_LIMIT = 50;
-
-function pageLooksRemote(text: string): boolean {
-  return REMOTE_RE.test(text);
-}
-
-function jobMetaLooksRemote(job: DashboardJob): boolean {
-  const blob = [job.title, job.location, job.snippet || "", job.remote ? "remoto" : ""]
-    .join(" ")
-    .trim();
-  return pageLooksRemote(blob);
-}
 
 function withDetails(job: DashboardJob, html: string): DashboardJob {
   const details = extractJobDetailsFromText(html);
@@ -82,8 +70,8 @@ async function mapPool<T, R>(
 }
 
 /**
- * - Top 20: valida link + remoto; remove inválidas/falso positivo; enriquece detalhes.
- * - Top 21–50: só enriquece salário/experiência/escolaridade (não remove).
+ * - Top 10: valida link (incl. soft-404) + remoto real; remove híbrido/presencial/quebradas.
+ * - Top 11–50: enriquece detalhes; se o link abrir, também remove híbrido óbvio.
  * - Demais: passam sem fetch.
  */
 export async function validateRemoteJobs(
@@ -125,58 +113,41 @@ export async function validateRemoteJobs(
 
       const probe = await probeUrl(url);
       if (!probe.ok) {
-        if (mustValidate) {
-          return {
-            job: null,
-            item: {
-              ...base,
-              status: "invalid_link",
-              reason: probe.reason || "link não abriu",
-            },
-          };
-        }
-        return {
-          job,
-          item: {
-            ...base,
-            status: "skipped",
-            reason: "link falhou no enrich",
-          },
-        };
-      }
-
-      const enriched = withDetails(job, probe.text);
-
-      if (!mustValidate) {
-        return {
-          job: enriched,
-          item: {
-            ...base,
-            status: "skipped",
-            reason: "enrich only",
-          },
-        };
-      }
-
-      const remoteOk =
-        jobMetaLooksRemote(enriched) || pageLooksRemote(probe.text);
-      if (!remoteOk) {
+        // Em enrich (11–50) também remove link quebrado
         return {
           job: null,
           item: {
             ...base,
-            status: "false_positive",
-            reason: "sem menção a remoto/home office na página",
+            status: "invalid_link",
+            reason: probe.reason || "link não abriu",
           },
         };
       }
 
+      const assess = assessRemotePage(job, probe.text);
+      if (!assess.ok) {
+        // Soft-404 / híbrido / sem remoto: remove sempre que baixamos a página
+        return {
+          job: null,
+          item: {
+            ...base,
+            status: assess.kind,
+            reason: assess.reason,
+          },
+        };
+      }
+
+      const enriched = withDetails(
+        { ...job, remote: true },
+        probe.text
+      );
+
       return {
-        job: { ...enriched, remote: true },
+        job: enriched,
         item: {
           ...base,
-          status: "validated",
-          reason: "remoto ok + detalhes",
+          status: mustValidate ? "validated" : "skipped",
+          reason: assess.reason,
         },
       };
     }
@@ -189,8 +160,7 @@ export async function validateRemoteJobs(
   let invalidLinks = 0;
   let skipped = 0;
 
-  for (let i = 0; i < fetched.length; i++) {
-    const result = fetched[i];
+  for (const result of fetched) {
     items.push(result.item);
     if (result.item.status === "validated") {
       validated += 1;

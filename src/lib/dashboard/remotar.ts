@@ -44,19 +44,27 @@ export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
     seen.add(id);
     const companySlug = slugify(company) || "empresa";
     const titleSlug = slugify(title) || "vaga";
-    const location =
-      [row.city, row.state].filter(Boolean).join(", ") || "Remoto";
+    const typeText = `${row.type || ""} ${row.subtitle || ""}`;
+    const cityState = [row.city, row.state].filter(Boolean).join(", ");
+    const looksRemote = /remot|home\s*office|dist[aâ]ncia/i.test(
+      `${typeText} ${cityState} ${title}`
+    );
+    const looksHybrid = /h[ií]brid|hybrid|presencial/i.test(
+      `${typeText} ${title}`
+    );
+    const location = cityState || (looksRemote && !looksHybrid ? "Remoto" : "");
     out.push({
       title,
       company,
-      location,
+      location: location || "Brasil",
       source: "remotar",
       source_url:
         row.externalLink ||
         `https://remotar.com.br/job/${id}/${companySlug}/${titleSlug}`,
       posted: (row.createdAt || "").slice(0, 10) || null,
       job_id: `remotar-${id}`,
-      remote: true,
+      // Não assumir remoto: a validação da página decide de verdade
+      remote: looksRemote && !looksHybrid,
       snippet: cleanText(row.subtitle || row.description || "", 220) || null,
     });
   }
