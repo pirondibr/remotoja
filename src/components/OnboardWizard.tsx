@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
-import { type DemoJob } from "@/lib/demoJobs";
+import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
@@ -12,7 +12,7 @@ import { CompanyAvatar } from "./CompanyAvatar";
 const ROLE_STORAGE_KEY = "remotoja_onboard_role";
 
 function postedLabel(job: DemoJob): string {
-  return job.posted || "Recente";
+  return formatJobAgo(job);
 }
 
 function isOffLinkedIn(source: string) {

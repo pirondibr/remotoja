@@ -10,11 +10,11 @@ import {
   captureAttributionFromUrl,
   loadAttribution,
 } from "@/lib/attribution";
-import { type DemoJob } from "@/lib/demoJobs";
+import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 
 function postedLabel(job: DemoJob): string {
-  return job.posted || "Recente";
+  return formatJobAgo(job);
 }
 
 function freshestPostedLabel(jobs: DemoJob[]): string {

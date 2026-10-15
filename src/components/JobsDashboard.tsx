@@ -5,13 +5,13 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { CompanyAvatar } from "@/components/CompanyAvatar";
-import type { DemoJob } from "@/lib/demoJobs";
+import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 
 function postedLabel(job: DemoJob) {
-  return job.posted || "Recente";
+  return formatJobAgo(job);
 }
 
 function formatSource(source: string) {
