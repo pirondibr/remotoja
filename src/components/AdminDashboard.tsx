@@ -109,7 +109,17 @@ export function AdminDashboard() {
     event.preventDefault();
     const role = paidRole.trim();
     if (role.length < 2) return;
-    window.location.href = `/app?role=${encodeURIComponent(role)}&inspect=1&validate=1`;
+    // Bypass do gate de membro: seta cookie de inspeção e abre relatório
+    window.location.href = `/api/admin/open-feed?role=${encodeURIComponent(role)}&inspect=1&validate=1`;
+  }
+
+  function inspectHref(role: string, validate = true) {
+    const q = new URLSearchParams({
+      role,
+      inspect: "1",
+      validate: validate ? "1" : "0",
+    });
+    return `/api/admin/open-feed?${q}`;
   }
 
   if (loading && !data) {
@@ -224,7 +234,7 @@ export function AdminDashboard() {
                     </td>
                     <td className="py-2.5 text-right">
                       <Link
-                        href={feed.href}
+                        href={inspectHref(feed.role, true)}
                         className="text-xs font-semibold text-forest hover:underline"
                       >
                         Abrir →
@@ -288,7 +298,7 @@ export function AdminDashboard() {
                           Vagas mostradas no demo
                         </p>
                         <Link
-                          href={`/app?role=${encodeURIComponent(row.role)}&inspect=1`}
+                          href={inspectHref(row.role, true)}
                           className="text-xs font-semibold text-forest hover:underline"
                           onClick={(e) => e.stopPropagation()}
                         >

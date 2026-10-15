@@ -259,16 +259,30 @@ export function JobsDashboard() {
                 <p className="text-xs text-moss/60">exibidas no feed</p>
               </div>
             </div>
+            {Object.keys(sources).length > 0 && (
+              <p className="mt-3 text-xs text-moss/60">
+                Contagem bruta por scraper:{" "}
+                <span className="font-medium text-moss">
+                  {Object.entries(sources)
+                    .filter(([k]) => !k.startsWith("_"))
+                    .map(([k, v]) => `${formatSource(k)}=${v}`)
+                    .join(" · ")}
+                </span>
+              </p>
+            )}
             {validation.items?.length > 0 && (
-              <details className="mt-4">
-                <summary className="cursor-pointer text-xs font-semibold text-moss/70">
-                  Ver detalhe por vaga checada
-                </summary>
-                <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-xs text-moss/80">
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-moss/70">
+                  Detalhe por vaga (portal + status)
+                </p>
+                <ul className="mt-2 max-h-80 space-y-1.5 overflow-y-auto text-xs text-moss/80">
                   {validation.items
                     .filter((item) => item.status !== "skipped")
                     .map((item, i) => (
-                      <li key={`${item.title}-${i}`}>
+                      <li
+                        key={`${item.title}-${i}`}
+                        className="rounded-lg border border-moss/10 bg-cream/50 px-2.5 py-1.5"
+                      >
                         <span
                           className={
                             item.status === "validated"
@@ -281,20 +295,18 @@ export function JobsDashboard() {
                           {item.status}
                         </span>
                         {" · "}
-                        {item.title} · {formatSource(item.source)}
-                        {item.reason ? ` · ${item.reason}` : ""}
+                        <span className="font-semibold text-ink">
+                          {formatSource(item.source)}
+                        </span>
+                        {" · "}
+                        {item.title}
+                        {item.reason ? (
+                          <span className="text-moss/55"> · {item.reason}</span>
+                        ) : null}
                       </li>
                     ))}
                 </ul>
-              </details>
-            )}
-            {Object.keys(sources).length > 0 && (
-              <p className="mt-3 text-[11px] text-moss/50">
-                Contagem bruta por scraper:{" "}
-                {Object.entries(sources)
-                  .map(([k, v]) => `${k}=${v}`)
-                  .join(" · ")}
-              </p>
+              </div>
             )}
           </div>
         )}

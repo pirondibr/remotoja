@@ -7,7 +7,7 @@ import { PLANS } from "@/lib/funnel";
 export const metadata: Metadata = {
   title: "Preços · RemotoJá",
   description:
-    "Planos RemotoJá: R$ 39/mês, trimestral ou anual. Cancele quando quiser.",
+    "Planos RemotoJá: R$ 39/mês ou trimestral. Cancele quando quiser.",
 };
 
 const features = [
@@ -38,7 +38,7 @@ export default function PricingPage() {
       </div>
 
       <section className="mx-auto max-w-5xl px-5 py-16 md:px-10">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 md:max-w-2xl">
           {PLANS.map((plan) => (
             <div
               key={plan.id}

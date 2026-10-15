@@ -1,38 +1,27 @@
-/** Planos no formato Remote Rocketship (preços do print BR). */
+/** Planos RemotoJá (checkout Mercado Pago). */
 export const RR_PLANS = [
   {
-    id: "yearly",
-    name: "Plano anual",
-    badge: "72% OFF aplicado",
-    strikethrough: "R$1.080",
-    billed: "R$ 299/ano",
-    perMonth: "R$24,90",
+    id: "monthly",
+    name: "Plano mensal",
+    badge: "30% OFF",
+    strikethrough: "R$55,70",
+    billed: null,
+    perMonth: "R$39",
     popular: true,
     /** Valor cobrado no Mercado Pago (BRL). */
-    priceBrl: 299,
-    durationDays: 365,
+    priceBrl: 39,
+    durationDays: 30,
   },
   {
     id: "quarterly",
     name: "Plano trimestral",
-    badge: "34% OFF aplicado",
-    strikethrough: "R$270",
-    billed: "R$ 179/ 3 meses",
-    perMonth: "R$59,60",
-    popular: false,
-    priceBrl: 179,
-    durationDays: 90,
-  },
-  {
-    id: "monthly",
-    name: "Plano mensal",
     badge: null,
     strikethrough: null,
-    billed: null,
-    perMonth: "R$90",
+    billed: "R$ 99/ 3 meses",
+    perMonth: "R$33",
     popular: false,
-    priceBrl: 90,
-    durationDays: 30,
+    priceBrl: 99,
+    durationDays: 90,
   },
 ] as const;
 

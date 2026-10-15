@@ -159,7 +159,7 @@ export function FinalV2() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] =
-    useState<(typeof RR_PLANS)[number]["id"]>("yearly");
+    useState<(typeof RR_PLANS)[number]["id"]>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 

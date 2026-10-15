@@ -135,7 +135,7 @@ export function OnboardWizard() {
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
   const [draft, setDraft] = useState("");
   const [selectedPlan, setSelectedPlan] =
-    useState<(typeof RR_PLANS)[number]["id"]>("yearly");
+    useState<(typeof RR_PLANS)[number]["id"]>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [liveJobs, setLiveJobs] = useState<DemoJob[]>([]);

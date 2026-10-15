@@ -236,7 +236,7 @@ export default function HomeV2() {
           <p className="mt-3 text-lg text-moss/80">
             Teste grátis com seu cargo. Assine só se as vagas fizerem sentido.
           </p>
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 md:max-w-2xl">
             {RR_PLANS.map((plan) => (
               <div
                 key={plan.id}
