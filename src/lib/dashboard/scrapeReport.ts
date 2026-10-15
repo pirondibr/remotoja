@@ -1,9 +1,11 @@
 import { classifyCargoMatch } from "@/lib/dashboard/jobMatch";
 import type {
   DashboardJob,
+  PortalOriginStat,
   PortalScrapeStat,
   ScrapeReport,
   ScrapeSummary,
+  SourceBreakdown,
   ValidationReport,
 } from "@/lib/dashboard/types";
 
@@ -25,8 +27,17 @@ function emptyPortal(portal: string, error?: string | null): PortalScrapeStat {
     indecisos: 0,
     invalid_links: 0,
     validated_ok: 0,
+    sources: [],
     error: error || null,
   };
+}
+
+function sortedBreakdown(counts: Map<string, number>): SourceBreakdown[] {
+  return [...counts.entries()]
+    .map(([source, count]) => ({ source, count }))
+    .sort(
+      (a, b) => b.count - a.count || a.source.localeCompare(b.source)
+    );
 }
 
 function itemKey(item: {
@@ -81,6 +92,13 @@ export function buildScrapeReport(input: {
 
   const scrapeKey = (job: DashboardJob) =>
     (job.scrape || job.source || "unknown").toLowerCase();
+  const sourceKey = (job: DashboardJob) =>
+    (job.source || job.scrape || "unknown").toLowerCase();
+
+  /** scrape → source → count */
+  const sourcesByScrape = new Map<string, Map<string, number>>();
+  /** source → scrape → count (agregado total por portal de origem) */
+  const scrapesBySource = new Map<string, Map<string, number>>();
 
   for (const job of input.allJobs) {
     const key = scrapeKey(job);
@@ -91,6 +109,20 @@ export function buildScrapeReport(input: {
     else if (tier === "relacionado") row.relacionado += 1;
     else row.fora += 1;
     if (job.remote) row.remotas += 1;
+
+    const src = sourceKey(job);
+    if (!sourcesByScrape.has(key)) sourcesByScrape.set(key, new Map());
+    const srcMap = sourcesByScrape.get(key)!;
+    srcMap.set(src, (srcMap.get(src) || 0) + 1);
+
+    if (!scrapesBySource.has(src)) scrapesBySource.set(src, new Map());
+    const scrapeMap = scrapesBySource.get(src)!;
+    scrapeMap.set(key, (scrapeMap.get(key) || 0) + 1);
+  }
+
+  for (const [key, srcMap] of sourcesByScrape) {
+    if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
+    byPortal.get(key)!.sources = sortedBreakdown(srcMap);
   }
 
   for (const job of input.keptJobs) {
@@ -152,6 +184,20 @@ export function buildScrapeReport(input: {
         a.portal.localeCompare(b.portal)
     );
 
+  const by_source: PortalOriginStat[] = [...scrapesBySource.entries()]
+    .map(([source, scrapeMap]) => {
+      const scrapes = sortedBreakdown(scrapeMap);
+      return {
+        source,
+        count: scrapes.reduce((s, x) => s + x.count, 0),
+        scrapes,
+      };
+    })
+    .filter((p) => p.source !== "unknown")
+    .sort(
+      (a, b) => b.count - a.count || a.source.localeCompare(b.source)
+    );
+
   let exato = 0;
   let relacionado = 0;
   let fora = 0;
@@ -178,6 +224,7 @@ export function buildScrapeReport(input: {
   return {
     summary,
     portals,
+    by_source,
     updated_at: new Date().toISOString(),
   };
 }
@@ -189,6 +236,10 @@ export function extractScrapeReport(
   if (!raw || typeof raw !== "object") return null;
   const report = raw as ScrapeReport;
   if (!Array.isArray(report.portals)) return null;
+  for (const p of report.portals) {
+    if (!Array.isArray(p.sources)) p.sources = [];
+  }
+  if (!Array.isArray(report.by_source)) report.by_source = [];
   if (!report.summary) {
     // Relatórios antigos sem summary
     const validasSum = report.portals.reduce(

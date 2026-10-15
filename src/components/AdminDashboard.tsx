@@ -41,10 +41,23 @@ const PORTAL_LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
   indeed: "Indeed",
   google_vagas: "Google Vagas",
+  gupy: "Gupy",
+  remotar: "Remotar",
+  infojobs: "InfoJobs",
+  programathor: "Programathor",
 };
 
 function portalLabel(key: string) {
   return PORTAL_LABELS[key.toLowerCase()] || key;
+}
+
+function sourcesTip(
+  sources: Array<{ source: string; count: number }> | undefined
+): string {
+  if (!sources?.length) return "Sem distribuição de portal";
+  return sources
+    .map((s) => `${portalLabel(s.source)} ${s.count}`)
+    .join(" · ");
 }
 
 type SearchesPayload = {
@@ -386,8 +399,9 @@ export function AdminDashboard() {
                             <p className="mb-2 text-xs font-semibold text-moss/60">
                               Por scrape —{" "}
                               <span className="font-normal">
-                                Válidas = cargo ok + remoto + link ok + não FP
-                                (só após análise).
+                                Portais = origem real (hover no scrape). Válidas
+                                = cargo ok + remoto + link ok + não FP (após
+                                análise).
                               </span>
                             </p>
                             {portals.length === 0 ? (
@@ -401,6 +415,9 @@ export function AdminDashboard() {
                                   <tr>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Scrape
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Portais
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       No portal
@@ -440,13 +457,22 @@ export function AdminDashboard() {
                                       key={p.portal}
                                       className="border-t border-moss/10"
                                     >
-                                      <td className="py-1.5 pr-3 font-medium text-ink">
+                                      <td
+                                        className="py-1.5 pr-3 font-medium text-ink"
+                                        title={sourcesTip(p.sources)}
+                                      >
                                         {portalLabel(p.portal)}
                                         {p.error ? (
                                           <span className="ml-1 text-amber-700">
                                             (erro)
                                           </span>
                                         ) : null}
+                                      </td>
+                                      <td
+                                        className="py-1.5 pr-3 text-moss/80"
+                                        title={sourcesTip(p.sources)}
+                                      >
+                                        {sourcesTip(p.sources)}
                                       </td>
                                       <td className="py-1.5 pr-3 font-medium">
                                         {(
@@ -483,6 +509,23 @@ export function AdminDashboard() {
                                   ))}
                                 </tbody>
                               </table>
+                            )}
+                            {(feed.scrape_report?.by_source?.length || 0) >
+                              0 && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <span className="w-full text-[11px] font-semibold uppercase tracking-wide text-moss/50">
+                                  Portal origem (agregado)
+                                </span>
+                                {feed.scrape_report!.by_source!.map((row) => (
+                                  <span
+                                    key={row.source}
+                                    title={`Scrapes: ${sourcesTip(row.scrapes)}`}
+                                    className="rounded-full border border-moss/15 bg-cream px-2.5 py-1 text-[11px] font-medium text-moss"
+                                  >
+                                    {portalLabel(row.source)} · {row.count}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </td>
                         </tr>

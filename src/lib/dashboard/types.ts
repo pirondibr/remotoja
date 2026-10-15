@@ -46,8 +46,15 @@ export type PortalFetchResult = {
   available?: number;
 };
 
-/** Métricas por portal para o admin decidir qualidade / corte. */
+/** Contagem de um portal de origem (`job.source`) dentro de um scrape. */
+export type SourceBreakdown = {
+  source: string;
+  count: number;
+};
+
+/** Métricas por scrape (fetcher) para o admin decidir qualidade / corte. */
 export type PortalScrapeStat = {
+  /** Nome do scrape/fetcher (catho, remotar, google_vagas…). */
   portal: string;
   /**
    * Total no portal (ex.: 11.000 na Catho).
@@ -73,6 +80,11 @@ export type PortalScrapeStat = {
   indecisos: number;
   invalid_links: number;
   validated_ok: number;
+  /**
+   * Distribuição do portal de origem (`job.source`) neste scrape.
+   * Ex.: Remotar → [{ source: "gupy", count: 15 }, { source: "remotar", count: 5 }].
+   */
+  sources: SourceBreakdown[];
   error?: string | null;
 };
 
@@ -91,9 +103,20 @@ export type ScrapeSummary = {
   validas: number | null;
 };
 
+/** Agregado por portal de origem somando todos os scrapes. */
+export type PortalOriginStat = {
+  source: string;
+  count: number;
+  /** De quais scrapes vieram essas vagas. */
+  scrapes: SourceBreakdown[];
+};
+
 export type ScrapeReport = {
   summary: ScrapeSummary;
+  /** Linhas fixas por scrape (fetcher). */
   portals: PortalScrapeStat[];
+  /** Agregado por portal de origem (Gupy, Catho…), independente do scrape. */
+  by_source?: PortalOriginStat[];
   updated_at: string;
   /** Análise de cargo usou OpenRouter (admin). */
   cargo_llm?: boolean;

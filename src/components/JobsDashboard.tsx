@@ -55,6 +55,29 @@ function scrapeKeyOf(job: { scrape?: string | null; source?: string }): string {
   return (job.scrape || job.source || "").toLowerCase();
 }
 
+function formatSourceBreakdown(
+  sources: Array<{ source: string; count: number }> | undefined | null,
+  max = 3
+): { short: string; full: string; mixed: boolean } {
+  const list = [...(sources || [])].sort(
+    (a, b) => b.count - a.count || a.source.localeCompare(b.source)
+  );
+  if (list.length === 0) {
+    return { short: "—", full: "Sem distribuição de portal", mixed: false };
+  }
+  const full = list
+    .map((s) => `${formatSource(s.source)} ${s.count}`)
+    .join(" · ");
+  const short =
+    list.length <= max
+      ? full
+      : `${list
+          .slice(0, max)
+          .map((s) => `${formatSource(s.source)} ${s.count}`)
+          .join(" · ")} +${list.length - max}`;
+  return { short, full, mixed: list.length > 1 };
+}
+
 export function JobsDashboard() {
   const searchParams = useSearchParams();
   const roleFromUrl = searchParams.get("role") || searchParams.get("q") || "";
@@ -507,10 +530,11 @@ export function JobsDashboard() {
             {scrapeReport.portals.length > 0 && (
               <div className="overflow-x-auto rounded-2xl border border-moss/15 bg-white p-4">
                 <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
-                  Scrape por portal
+                  Por scrape
                 </p>
                 <p className="mt-1 text-[11px] text-moss/55">
-                  Clique no portal para revisar as vagas puxadas e as tags.
+                  Linha = scraper. Coluna Portais = origem real das vagas (passe o
+                  mouse no scrape ou nos portais). Clique no scrape para revisar.
                   {scrapeReport.cargo_llm
                     ? " · Cargo/remoto via OpenRouter (LLM barato)."
                     : scrapeReport.cargo_llm_error
@@ -521,6 +545,7 @@ export function JobsDashboard() {
                   <thead className="text-moss/55 uppercase tracking-wide">
                     <tr>
                       <th className="py-1.5 pr-3 font-semibold">Scrape</th>
+                      <th className="py-1.5 pr-3 font-semibold">Portais</th>
                       <th className="py-1.5 pr-3 font-semibold">No portal</th>
                       <th className="py-1.5 pr-3 font-semibold">Cap 20</th>
                       <th className="py-1.5 pr-3 font-semibold">Exato</th>
@@ -538,6 +563,7 @@ export function JobsDashboard() {
                     {scrapeReport.portals.map((p) => {
                       const key = p.portal.toLowerCase();
                       const active = portalFilter === key;
+                      const dist = formatSourceBreakdown(p.sources);
                       return (
                         <tr
                           key={p.portal}
@@ -548,15 +574,31 @@ export function JobsDashboard() {
                           <td className="py-1.5 pr-3 font-medium">
                             <button
                               type="button"
+                              title={`Distribuição por portal: ${dist.full}`}
                               onClick={() =>
                                 selectPortal(active ? null : key)
                               }
-                              className={`text-left underline-offset-2 hover:underline ${
+                              className={`group relative text-left underline-offset-2 hover:underline ${
                                 active ? "text-forest" : "text-ink"
                               }`}
                             >
                               {formatSource(p.portal)}
+                              <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-max max-w-xs rounded-lg border border-moss/20 bg-ink px-2.5 py-1.5 text-[11px] font-normal normal-case tracking-normal text-cream shadow-lg group-hover:block">
+                                {dist.full}
+                              </span>
                             </button>
+                          </td>
+                          <td
+                            className="py-1.5 pr-3 text-moss/80"
+                            title={dist.full}
+                          >
+                            <span
+                              className={
+                                dist.mixed ? "font-medium text-ink" : undefined
+                              }
+                            >
+                              {dist.short}
+                            </span>
                           </td>
                           <td className="py-1.5 pr-3 font-medium">
                             {(p.available ?? p.found).toLocaleString("pt-BR")}
@@ -588,6 +630,40 @@ export function JobsDashboard() {
                     })}
                   </tbody>
                 </table>
+
+                {(scrapeReport.by_source?.length || 0) > 0 && (
+                  <div className="mt-4 border-t border-moss/10 pt-3">
+                    <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+                      Por portal (origem agregada)
+                    </p>
+                    <p className="mt-1 text-[11px] text-moss/55">
+                      Soma das vagas com esse portal de origem em todos os
+                      scrapes (ex.: Gupy via Remotar + scrape Gupy).
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {scrapeReport.by_source!.map((row) => {
+                        const scrapesTip = row.scrapes
+                          .map(
+                            (s) =>
+                              `${formatSource(s.source)} ${s.count}`
+                          )
+                          .join(" · ");
+                        return (
+                          <span
+                            key={row.source}
+                            title={`Vindo de: ${scrapesTip}`}
+                            className="group relative cursor-default rounded-full border border-moss/15 bg-cream px-3 py-1 text-xs font-medium text-moss"
+                          >
+                            {formatSource(row.source)} · {row.count}
+                            <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-max max-w-xs rounded-lg border border-moss/20 bg-ink px-2.5 py-1.5 text-[11px] font-normal text-cream shadow-lg group-hover:block">
+                              Scrapes: {scrapesTip}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
