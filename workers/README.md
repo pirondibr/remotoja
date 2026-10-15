@@ -1,46 +1,57 @@
-# Workers (Render)
+# Workers RemotoJá
 
-Scrapers e jobs de agregação de vagas rodam aqui — **não na Vercel**.
+Dois grupos separados de propósito:
 
-## Por quê Render?
+| Grupo | Pasta | Quando | Fontes |
+|-------|--------|--------|--------|
+| **Demo / funil** | `workers/scraper/` | Antes de pagar (landing, `/final`, `/onboard`) | Só Google Jobs via **DataForSEO** |
+| **Dashboard pago** | `workers/dashboard/` | Depois de pagar (`/app`) | Gupy + Indeed + Google Vagas (ScrapingBee) + futuros |
 
-- Cron e background workers sem timeout curto de serverless
-- Processos longos (scan de portais / ATS)
-- Bom encaixe com Postgres gerenciado
+Doc detalhada do dashboard: [`dashboard/COMO-FUNCIONA.md`](dashboard/COMO-FUNCIONA.md)
 
-## Serviços planejados
-
-| Serviço | Tipo Render | Função |
-|---------|-------------|--------|
-| `scraper-cron` | Cron Job | Varredura periódica dos portais |
-| `match-worker` | Background Worker | Matching sob demanda / fila |
-| `db` | Postgres | Vagas, preferências, assinaturas |
-
-## Estrutura
-
-```
-workers/
-  scraper/
-    google_jobs.py  # Google Vagas via DataForSEO (BR)
-    placeholder.py
-  requirements.txt
-  README.md
-```
-
-## Google Vagas (DataForSEO)
-
-Scraping direto do Google Jobs é bloqueado por CAPTCHA. Usamos a API oficial DataForSEO:
+## Demo (funil)
 
 ```bash
-# na raiz do repo
-cp .env.example .env   # preencha DATAFORSEO_USER / DATAFORSEO_PASS
-python -m workers.scraper.google_jobs --keyword "vagas de seo home office"
+python -m workers.scraper.google_jobs --role SEO
 # ou: npm run scrape:google-jobs
 ```
 
-Gera `data/demo_jobs.json` e `src/data/demo-jobs.json` (landing + funil).
+## Dashboard (multi-portal)
 
-## Deploy
+```bash
+# só Gupy (grátis, sem chave)
+python -m workers.dashboard.gupy SEO
 
-Blueprint em `/render.yaml` na raiz do monorepo. A landing Next.js sobe na **Vercel**; estes serviços no **Render**.  
-**Não ative o cron ainda** se não quiser cobrança extra — rode localmente por enquanto.
+# Indeed (precisa SCRAPINGBEE_API_KEY ou TINYFISH_API_KEY)
+python -m workers.dashboard.indeed SEO --provider tinyfish
+
+# Google Vagas ScrapingBee (SCRAPINGBEE_API_KEY)
+python -m workers.dashboard.google_vagas SEO --scrolls 2
+
+# pipeline completa + merge
+python -m workers.dashboard.run_all SEO --skip-google   # se ainda sem ScrapingBee
+python -m workers.dashboard.merge --write-app
+```
+
+Saídas em `workers/dashboard/output/*.json` (merged no final).
+
+### Próximos portais (sem base ainda)
+
+LinkedIn · InfoJobs · Catho · Remotar · Programathor
+
+## Env
+
+Na raiz (`.env` — não commitado):
+
+```
+DATAFORSEO_USER=
+DATAFORSEO_PASS=
+SCRAPINGBEE_API_KEY=
+TINYFISH_API_KEY=
+SERPAPI_KEY=
+```
+
+## Render
+
+Cron/workers longos ficam no Render (`render.yaml`). Landing na Vercel.  
+Não ligue o cron pago até validar os scrapers localmente.
