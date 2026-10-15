@@ -106,7 +106,7 @@ export default function HomeV2() {
             <div className="animate-rise-delay-2 mt-8 max-w-xl">
               <HomeSearch id="busca" />
               <p className="mt-4 text-xs text-sand/55">
-                Grátis para testar · sem cadastro · sem cartão
+                Começa pelo funil · grátis para testar · sem cartão
               </p>
             </div>
           </div>
@@ -219,12 +219,12 @@ export default function HomeV2() {
               </li>
             ))}
           </ol>
-          <a
-            href="#busca"
+          <Link
+            href="/onboard"
             className="mt-12 inline-flex rounded-full bg-ink px-7 py-3.5 text-base font-bold text-cream transition hover:bg-forest"
           >
-            Testar com meu cargo
-          </a>
+            Montar meu feed
+          </Link>
         </div>
       </section>
 
@@ -307,7 +307,7 @@ export default function HomeV2() {
             Veja agora quantas vagas remotas existem para você.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-sand/75">
-            Digite seu cargo e veja a prévia grátis.
+            Responda algumas perguntas e veja vagas remotas para o seu perfil.
           </p>
           <div className="mt-8 text-left">
             <HomeSearch id="busca-final" />
@@ -327,12 +327,12 @@ export default function HomeV2() {
 
       {/* Mobile sticky CTA */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-ink/95 p-3 backdrop-blur md:hidden">
-        <a
-          href="#busca"
+        <Link
+          href="/onboard"
           className="flex w-full items-center justify-center rounded-full bg-lime px-6 py-3.5 text-base font-bold text-ink"
         >
-          Ver vagas grátis
-        </a>
+          Montar meu feed
+        </Link>
       </div>
     </main>
   );

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { OnboardWizard } from "@/components/OnboardWizard";
 
 export const metadata: Metadata = {
@@ -8,5 +9,15 @@ export const metadata: Metadata = {
 };
 
 export default function OnboardPage() {
-  return <OnboardWizard />;
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-mesh flex min-h-screen items-center justify-center text-cream">
+          Carregando…
+        </div>
+      }
+    >
+      <OnboardWizard />
+    </Suspense>
+  );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
 import {
   formatJobAgo,
@@ -14,8 +15,21 @@ import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { BrandMark } from "./BrandMark";
 
 const FALLBACK_MATCHES = getDemoJobs(5);
+const ROLE_STORAGE_KEY = "remotoja_onboard_role";
+
+function readPrefillRole(fromUrl: string | null): string {
+  if (fromUrl && fromUrl.trim().length >= 2) return fromUrl.trim();
+  try {
+    const stored = sessionStorage.getItem(ROLE_STORAGE_KEY);
+    if (stored && stored.trim().length >= 2) return stored.trim();
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
 
 export function OnboardWizard() {
+  const searchParams = useSearchParams();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
   const [draft, setDraft] = useState("");
@@ -25,9 +39,18 @@ export function OnboardWizard() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [jobsSource, setJobsSource] = useState<"live" | "fallback" | "idle">("idle");
+  const [prefillRole] = useState(() =>
+    readPrefillRole(searchParams.get("role")),
+  );
 
   const step = FUNNEL_STEPS[index];
   const isLast = index === FUNNEL_STEPS.length - 1;
+
+  useEffect(() => {
+    if (step.id !== "role" || !prefillRole) return;
+    if (typeof answers.role === "string" && answers.role.trim()) return;
+    setDraft(prefillRole);
+  }, [step.id, prefillRole, answers.role]);
 
   const role =
     (typeof answers.role === "string" && answers.role) ||

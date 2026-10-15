@@ -12,6 +12,8 @@ const POPULAR_ROLES = [
   "Dados",
 ];
 
+const ROLE_STORAGE_KEY = "remotoja_onboard_role";
+
 export function HomeSearch({
   id,
   autoFocus = false,
@@ -23,16 +25,26 @@ export function HomeSearch({
   const [role, setRole] = useState("");
   const [pending, setPending] = useState(false);
 
-  function go(value: string) {
-    const trimmed = value.trim();
-    if (trimmed.length < 2) return;
+  function go(value?: string) {
+    const trimmed = (value ?? role).trim();
     setPending(true);
-    router.push(`/final/v2?role=${encodeURIComponent(trimmed)}`);
+
+    if (trimmed.length >= 2) {
+      try {
+        sessionStorage.setItem(ROLE_STORAGE_KEY, trimmed);
+      } catch {
+        /* ignore */
+      }
+      router.push(`/onboard?role=${encodeURIComponent(trimmed)}`);
+      return;
+    }
+
+    router.push("/onboard");
   }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
-    go(role);
+    go();
   }
 
   return (
@@ -55,10 +67,10 @@ export function HomeSearch({
         />
         <button
           type="submit"
-          disabled={pending || role.trim().length < 2}
+          disabled={pending}
           className="rounded-xl bg-lime px-6 py-3.5 text-base font-bold text-ink transition hover:bg-mint disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {pending ? "Buscando…" : "Ver vagas grátis"}
+          {pending ? "Abrindo…" : "Começar"}
         </button>
       </form>
 
