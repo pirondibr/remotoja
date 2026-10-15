@@ -1209,12 +1209,10 @@ export function JobsDashboard() {
                           <p className="mt-0.5 text-sm text-moss/70">
                             {job.company}
                           </p>
-                          {(job.salary || job.experience || job.education) && (
-                            <ul className="mt-2 space-y-0.5 text-sm text-moss/75">
-                              {job.salary && <li>{job.salary}</li>}
-                              {job.experience && <li>{job.experience}</li>}
-                              {job.education && <li>{job.education}</li>}
-                            </ul>
+                          {job.salary && (
+                            <p className="mt-2 text-sm font-medium text-moss/80">
+                              {job.salary}
+                            </p>
                           )}
                           <div className="mt-3 flex flex-wrap gap-2">
                             {inspect && (

@@ -39,12 +39,11 @@ export type ValidateRemoteStats = {
 };
 
 function withDetails(job: DashboardJob, html: string): DashboardJob {
+  // Só salário no card — experiência/escolaridade vinham truncadas como "descrição".
   const details = extractJobDetailsFromText(html);
   return {
     ...job,
     salary: job.salary || details.salary,
-    experience: job.experience || details.experience,
-    education: job.education || details.education,
   };
 }
 
