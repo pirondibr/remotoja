@@ -18,12 +18,25 @@ function emptyPortal(portal: string, error?: string | null): PortalScrapeStat {
     relacionado: 0,
     fora: 0,
     remotas: 0,
+    validas: null,
     checked: 0,
     false_positives: 0,
     invalid_links: 0,
     validated_ok: 0,
     error: error || null,
   };
+}
+
+function itemKey(item: {
+  title: string;
+  company: string;
+  scrape?: string | null;
+  source: string;
+}): string {
+  return `${(item.scrape || item.source || "").toLowerCase()}|${item.title}|${item.company}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 export function tagJobsWithMatch(
@@ -81,6 +94,11 @@ export function buildScrapeReport(input: {
     byPortal.get(key)!.kept += 1;
   }
 
+  const hasAnalysis = Boolean(
+    input.validation?.items?.some((i) => i.status !== "skipped")
+  );
+  const validatedKeys = new Set<string>();
+
   for (const item of input.validation?.items || []) {
     if (item.status === "skipped") continue;
     const key = (item.scrape || item.source || "unknown").toLowerCase();
@@ -89,7 +107,34 @@ export function buildScrapeReport(input: {
     row.checked += 1;
     if (item.status === "false_positive") row.false_positives += 1;
     else if (item.status === "invalid_link") row.invalid_links += 1;
-    else if (item.status === "validated") row.validated_ok += 1;
+    else if (item.status === "validated") {
+      row.validated_ok += 1;
+      validatedKeys.add(itemKey(item));
+    }
+  }
+
+  // Válidas = no feed (exato/rel) + passou double-check (remoto+link+não FP)
+  let validasTotal = 0;
+  if (hasAnalysis) {
+    for (const row of byPortal.values()) {
+      row.validas = 0;
+    }
+    for (const job of input.keptJobs) {
+      const tier = job.match_tier;
+      if (tier !== "exato" && tier !== "relacionado") continue;
+      const portal = scrapeKey(job);
+      const key = itemKey({
+        title: job.title,
+        company: job.company,
+        scrape: job.scrape,
+        source: job.source,
+      });
+      if (!validatedKeys.has(key)) continue;
+      validasTotal += 1;
+      if (!byPortal.has(portal)) byPortal.set(portal, emptyPortal(portal));
+      const row = byPortal.get(portal)!;
+      row.validas = (row.validas || 0) + 1;
+    }
   }
 
   const portals = [...byPortal.values()]
@@ -116,6 +161,7 @@ export function buildScrapeReport(input: {
     cargo_ok: exato + relacionado,
     remotas,
     no_feed: input.keptJobs.length,
+    validas: hasAnalysis ? validasTotal : null,
   };
 
   return {
@@ -134,6 +180,11 @@ export function extractScrapeReport(
   if (!Array.isArray(report.portals)) return null;
   if (!report.summary) {
     // Relatórios antigos sem summary
+    const validasSum = report.portals.reduce(
+      (s, p) => s + (typeof p.validas === "number" ? p.validas : p.validated_ok || 0),
+      0
+    );
+    const hadAnalysis = report.portals.some((p) => (p.checked || 0) > 0);
     report.summary = {
       encontradas: report.portals.reduce((s, p) => s + (p.found || 0), 0),
       exato: report.portals.reduce((s, p) => s + (p.exato || 0), 0),
@@ -142,9 +193,19 @@ export function extractScrapeReport(
       cargo_ok: 0,
       remotas: report.portals.reduce((s, p) => s + (p.remotas || 0), 0),
       no_feed: report.portals.reduce((s, p) => s + (p.kept || 0), 0),
+      validas: hadAnalysis ? validasSum : null,
     };
     report.summary.cargo_ok =
       report.summary.exato + report.summary.relacionado;
+  } else if (report.summary.validas === undefined) {
+    const hadAnalysis = report.portals.some((p) => (p.checked || 0) > 0);
+    report.summary.validas = hadAnalysis
+      ? report.portals.reduce(
+          (s, p) =>
+            s + (typeof p.validas === "number" ? p.validas : p.validated_ok || 0),
+          0
+        )
+      : null;
   }
   return report;
 }

@@ -47,6 +47,11 @@ export type PortalScrapeStat = {
   relacionado: number;
   fora: number;
   remotas: number;
+  /**
+   * Cargo exato/relacionado + remoto + link ok + não FP.
+   * Só preenchido após análise (double-check); senão null.
+   */
+  validas: number | null;
   /** Quantas passaram pelo double-check (top N da análise). */
   checked: number;
   false_positives: number;
@@ -66,6 +71,8 @@ export type ScrapeSummary = {
   remotas: number;
   /** Entraram no feed do membro (hoje: não-fora). */
   no_feed: number;
+  /** Válidas (cargo ok + remoto + link + não FP). null sem análise. */
+  validas: number | null;
 };
 
 export type ScrapeReport = {

@@ -294,7 +294,7 @@ export function AdminDashboard() {
                         <tr className="border-b border-moss/10 bg-cream/50">
                           <td colSpan={5} className="px-3 py-3">
                             {summary && (
-                              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                                 <div className="rounded-xl bg-white px-3 py-2">
                                   <p className="text-lg font-bold text-ink">
                                     {summary.encontradas}
@@ -321,6 +321,19 @@ export function AdminDashboard() {
                                   </p>
                                 </div>
                                 <div className="rounded-xl bg-white px-3 py-2">
+                                  <p className="text-lg font-bold text-forest">
+                                    {summary.validas == null
+                                      ? "—"
+                                      : summary.validas}
+                                  </p>
+                                  <p className="text-[11px] text-moss/60">
+                                    Vagas válidas
+                                    {summary.validas == null
+                                      ? " (análise)"
+                                      : ""}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl bg-white px-3 py-2">
                                   <p className="text-lg font-bold text-ink">
                                     {summary.no_feed}
                                   </p>
@@ -333,9 +346,8 @@ export function AdminDashboard() {
                             <p className="mb-2 text-xs font-semibold text-moss/60">
                               Por scrape —{" "}
                               <span className="font-normal">
-                                método de coleta (ex.: Google Vagas). O portal
-                                da vaga (Gupy/LinkedIn/…) aparece no card da
-                                inspeção.
+                                Válidas = cargo ok + remoto + link ok + não FP
+                                (só após análise).
                               </span>
                             </p>
                             {portals.length === 0 ? (
@@ -367,6 +379,9 @@ export function AdminDashboard() {
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Pegamos
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Válidas
                                     </th>
                                     <th className="py-1.5 font-semibold">
                                       Falso +
@@ -401,6 +416,9 @@ export function AdminDashboard() {
                                         {p.remotas ?? 0}
                                       </td>
                                       <td className="py-1.5 pr-3">{p.kept}</td>
+                                      <td className="py-1.5 pr-3 font-semibold text-forest">
+                                        {p.validas == null ? "—" : p.validas}
+                                      </td>
                                       <td className="py-1.5 text-amber-800">
                                         {p.checked
                                           ? p.false_positives

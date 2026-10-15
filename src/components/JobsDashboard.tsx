@@ -266,7 +266,7 @@ export function JobsDashboard() {
         {inspect && scrapeReport && !loading && (
           <div className="mt-4 space-y-3">
             {scrapeReport.summary && (
-              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-moss/15 bg-white p-4 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-moss/15 bg-white p-4 sm:grid-cols-5">
                 <div>
                   <p className="text-2xl font-bold text-ink">
                     {scrapeReport.summary.encontradas}
@@ -278,18 +278,9 @@ export function JobsDashboard() {
                     {scrapeReport.summary.cargo_ok}
                   </p>
                   <p className="text-xs text-moss/60">
-                    Cargo ok ·{" "}
-                    <span className="text-forest">
-                      {scrapeReport.summary.exato} exato
-                    </span>
-                    {" · "}
-                    <span className="text-moss">
-                      {scrapeReport.summary.relacionado} rel.
-                    </span>
-                    {" · "}
-                    <span className="text-amber-800">
-                      {scrapeReport.summary.fora} fora
-                    </span>
+                    Cargo · {scrapeReport.summary.exato}e /{" "}
+                    {scrapeReport.summary.relacionado}r /{" "}
+                    {scrapeReport.summary.fora}f
                   </p>
                 </div>
                 <div>
@@ -299,10 +290,23 @@ export function JobsDashboard() {
                   <p className="text-xs text-moss/60">Vagas remotas</p>
                 </div>
                 <div>
+                  <p className="text-2xl font-bold text-forest">
+                    {scrapeReport.summary.validas == null
+                      ? "—"
+                      : scrapeReport.summary.validas}
+                  </p>
+                  <p className="text-xs text-moss/60">
+                    Vagas válidas
+                    {scrapeReport.summary.validas == null
+                      ? " (rode análise)"
+                      : ""}
+                  </p>
+                </div>
+                <div>
                   <p className="text-2xl font-bold text-ink">
                     {scrapeReport.summary.no_feed}
                   </p>
-                  <p className="text-xs text-moss/60">No feed (exato+rel.)</p>
+                  <p className="text-xs text-moss/60">No feed</p>
                 </div>
               </div>
             )}
@@ -322,6 +326,7 @@ export function JobsDashboard() {
                       <th className="py-1.5 pr-3 font-semibold">Fora</th>
                       <th className="py-1.5 pr-3 font-semibold">Remotas</th>
                       <th className="py-1.5 pr-3 font-semibold">Pegamos</th>
+                      <th className="py-1.5 pr-3 font-semibold">Válidas</th>
                       <th className="py-1.5 pr-3 font-semibold">Falso +</th>
                       <th className="py-1.5 font-semibold">Link</th>
                     </tr>
@@ -342,6 +347,9 @@ export function JobsDashboard() {
                         </td>
                         <td className="py-1.5 pr-3">{p.remotas ?? 0}</td>
                         <td className="py-1.5 pr-3">{p.kept}</td>
+                        <td className="py-1.5 pr-3 font-semibold text-forest">
+                          {p.validas == null ? "—" : p.validas}
+                        </td>
                         <td className="py-1.5 pr-3 text-amber-800">
                           {p.checked ? p.false_positives : "—"}
                         </td>
