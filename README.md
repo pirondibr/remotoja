@@ -34,6 +34,10 @@ npm run dev
 1. **Vercel** — conecte este repo; root = pasta do Next.js; build padrão `next build`.
 2. **Render** — use o Blueprint `render.yaml` para o cron de scrapers (placeholder por enquanto).
 
+## Portal membro (MVP)
+
+Após o funil `/final/v2`, **Ver todas as vagas** abre `/app?role=...` (dash liberado sem checkout).
+
 ## Google Vagas (demo)
 
 ```bash

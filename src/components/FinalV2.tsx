@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { RR_PLANS } from "@/lib/rrPlans";
 import type { DemoJob } from "@/lib/demoJobs";
+import { saveJobSession } from "@/lib/jobSession";
 
 function companyInitial(name: string) {
   return (name.trim()[0] || "?").toUpperCase();
@@ -143,6 +144,7 @@ function JobCard({
 }
 
 export function FinalV2() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") || searchParams.get("q") || "";
 
@@ -187,6 +189,7 @@ export function FinalV2() {
       const data = await res.json();
       const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
       setJobs(list);
+      saveJobSession(trimmed, list);
       if (data.error && list.length === 0) setError("Não encontramos vagas agora. Tente outro cargo.");
     } catch {
       setError("Não encontramos vagas agora. Tente outro cargo.");
@@ -209,6 +212,13 @@ export function FinalV2() {
 
   function openPaywall() {
     setPhase("paywall");
+  }
+
+  /** MVP: dash liberado sem checkout. */
+  function openMemberDash() {
+    const nextRole = role.trim() || "SEO";
+    saveJobSession(nextRole, jobs);
+    router.push(`/app?role=${encodeURIComponent(nextRole)}`);
   }
 
   return (
@@ -346,7 +356,7 @@ export function FinalV2() {
 
             <button
               type="button"
-              onClick={openPaywall}
+              onClick={openMemberDash}
               className="mt-6 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint"
             >
               Ver todas as vagas
@@ -457,11 +467,7 @@ export function FinalV2() {
 
             <button
               type="button"
-              onClick={() =>
-                alert(
-                  `Checkout em breve — plano selecionado: ${selectedPlan}. (fase de testes)`
-                )
-              }
+              onClick={openMemberDash}
               className="mt-5 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint"
             >
               🔑 Acessar todas as vagas
