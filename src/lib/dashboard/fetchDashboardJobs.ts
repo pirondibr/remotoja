@@ -175,8 +175,7 @@ export async function fetchDashboardJobs(
         cost_usd: r.cost_usd,
         detail: r.error
           ? `${r.error}${r.jobs.length ? ` · ${r.jobs.length} vagas` : ""}`
-          : `${r.jobs.length} vagas PT (cap) · available ${r.available}` +
-            (r.droppedEn ? ` · −${r.droppedEn} EN` : ""),
+          : `${r.jobs.length} vagas PT (cap) · available ${r.available} · −${r.droppedEn} EN`,
         meta: {
           found: r.jobs.length,
           available: r.available,
@@ -185,16 +184,18 @@ export async function fetchDashboardJobs(
         },
       });
     }
-    if (droppedEnTotal > 0) {
-      log.add({
-        id: "filter_pt",
-        label: "Filtro português",
-        ms: 0,
-        ok: true,
-        detail: `${droppedEnTotal} vagas em inglês removidas (todos os scrapes)`,
-        meta: { dropped_en: droppedEnTotal },
-      });
-    }
+    // Sempre no log (mesmo com 0) — senão parece que o filtro não rodou.
+    log.add({
+      id: "filter_pt",
+      label: "Filtro português",
+      ms: 0,
+      ok: true,
+      detail:
+        droppedEnTotal > 0
+          ? `${droppedEnTotal} vagas em inglês removidas (todos os scrapes)`
+          : "ativo · nenhuma vaga EN removida nesta rodada",
+      meta: { dropped_en: droppedEnTotal, active: true },
+    });
     log.add({
       id: "scrape_all",
       label: "Scrapers (paralelo)",
