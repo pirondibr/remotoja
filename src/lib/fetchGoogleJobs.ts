@@ -47,7 +47,7 @@ function normalizeItem(item: RawItem): DemoJob | null {
   const company = (item.employer_name || "").trim();
   if (!title || !company) return null;
   const location = (item.location || "Brasil").trim();
-  const source = (item.source_name || "").replace(/^via\s+/i, "").trim() || "Google Vagas";
+  const source = (item.source_name || "").replace(/^via\s+/i, "").trim() || "Remoto";
   return {
     title,
     company,

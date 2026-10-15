@@ -10,7 +10,7 @@ export async function fetchGoogleDashboard(term: string): Promise<DashboardJob[]
   });
   return result.jobs.map((job) => ({
     ...job,
-    source: job.source || "google_vagas",
+    source: job.source || "Remoto",
     job_id: job.job_id ? `gjobs-${job.job_id}` : job.job_id,
   }));
 }

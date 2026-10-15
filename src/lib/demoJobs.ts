@@ -37,9 +37,12 @@ export function formatJobMeta(job: DemoJob): string {
 }
 
 export function formatJobAgo(job: DemoJob): string {
-  return job.posted || "Google Vagas";
+  return job.posted || "Recente";
 }
 
 export function formatJobBadge(job: DemoJob): string {
-  return job.source || "Google Vagas";
+  const source = (job.source || "").trim();
+  if (!source) return "Remoto";
+  if (/google\s*vagas?/i.test(source)) return "Remoto";
+  return source;
 }

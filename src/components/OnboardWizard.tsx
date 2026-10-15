@@ -4,18 +4,24 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
-import {
-  formatJobAgo,
-  formatJobBadge,
-  formatJobMeta,
-  getDemoJobs,
-  type DemoJob,
-} from "@/lib/demoJobs";
+import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { BrandMark } from "./BrandMark";
 
 const FALLBACK_MATCHES = getDemoJobs(5);
 const ROLE_STORAGE_KEY = "remotoja_onboard_role";
+
+function companyInitial(name: string) {
+  return (name.trim()[0] || "?").toUpperCase();
+}
+
+function postedLabel(job: DemoJob): string {
+  return job.posted || "Recente";
+}
+
+function isOffLinkedIn(source: string) {
+  return !source.toLowerCase().includes("linkedin");
+}
 
 function readPrefillRole(fromUrl: string | null): string {
   if (fromUrl && fromUrl.trim().length >= 2) return fromUrl.trim();
@@ -280,17 +286,32 @@ export function OnboardWizard() {
                     key={`${job.company}-${job.title}-${job.job_id || job.source}`}
                     className="rounded-2xl border border-white/10 bg-white/5 p-4"
                   >
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="rounded-full bg-lime/15 px-2.5 py-0.5 text-xs font-medium text-lime">
-                        {formatJobBadge(job)}
-                      </span>
-                      <span className="text-xs text-sand/50">
-                        {formatJobAgo(job)}
-                      </span>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
+                        {companyInitial(job.company)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate font-semibold text-cream">
+                          {job.title}
+                        </h3>
+                        <p className="truncate text-sm text-sand/55">
+                          {job.company}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {isOffLinkedIn(job.source) && (
+                            <span className="rounded-full bg-lime/20 px-2.5 py-1 text-[11px] font-semibold text-lime">
+                              Fora do LinkedIn
+                            </span>
+                          )}
+                          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
+                            {postedLabel(job)}
+                          </span>
+                          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
+                            100% remoto
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="font-semibold text-cream">{job.title}</h3>
-                    <p className="text-sm text-sand/70">{job.company}</p>
-                    <p className="mt-1 text-sm text-sand/55">{formatJobMeta(job)}</p>
                   </article>
                 ))
               )}

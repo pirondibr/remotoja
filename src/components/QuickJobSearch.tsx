@@ -80,7 +80,7 @@ export function QuickJobSearch() {
         </div>
 
         <h1 className="font-[family-name:var(--font-display)] text-3xl leading-tight font-bold md:text-4xl">
-          Busca direta no Google Vagas
+          Busca rápida de vagas remotas
         </h1>
         <p className="mt-3 text-base text-sand/75">
           Sem questionário. Digite o cargo e pesquise — ideal para testes.
@@ -129,7 +129,7 @@ export function QuickJobSearch() {
         <div className="mt-10 flex-1 space-y-3 pb-8">
           {loading && (
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-              <p className="font-medium">Buscando no Google Vagas…</p>
+              <p className="font-medium">Buscando vagas remotas…</p>
               <p className="mt-2 text-sm text-sand/60">{query}</p>
               <p className="mt-1 text-xs text-sand/45">Leva ~10–30s</p>
             </div>
