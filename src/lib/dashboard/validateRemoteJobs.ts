@@ -1,4 +1,5 @@
 import { fetchHtml, UA } from "@/lib/dashboard/common";
+import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
 import type {
   DashboardJob,
   ValidationItem,
@@ -13,6 +14,7 @@ const REMOTE_RE =
 const CONCURRENCY = 5;
 const FETCH_TIMEOUT_MS = 8000;
 const VALIDATE_LIMIT = 20;
+const ENRICH_LIMIT = 50;
 
 function pageLooksRemote(text: string): boolean {
   return REMOTE_RE.test(text);
@@ -23,6 +25,16 @@ function jobMetaLooksRemote(job: DashboardJob): boolean {
     .join(" ")
     .trim();
   return pageLooksRemote(blob);
+}
+
+function withDetails(job: DashboardJob, html: string): DashboardJob {
+  const details = extractJobDetailsFromText(html);
+  return {
+    ...job,
+    salary: job.salary || details.salary,
+    experience: job.experience || details.experience,
+    education: job.education || details.education,
+  };
 }
 
 async function probeUrl(
@@ -70,22 +82,26 @@ async function mapPool<T, R>(
 }
 
 /**
- * Valida as primeiras N vagas: link abre + página menciona remoto/home office.
- * As demais passam sem checagem (skipped).
+ * - Top 20: valida link + remoto; remove inválidas/falso positivo; enriquece detalhes.
+ * - Top 21–50: só enriquece salário/experiência/escolaridade (não remove).
+ * - Demais: passam sem fetch.
  */
 export async function validateRemoteJobs(
   jobs: DashboardJob[],
-  limit = VALIDATE_LIMIT
+  validateLimit = VALIDATE_LIMIT,
+  enrichLimit = ENRICH_LIMIT
 ): Promise<{ jobs: DashboardJob[]; validation: ValidationReport }> {
-  const head = jobs.slice(0, limit);
-  const tail = jobs.slice(limit);
+  const toFetch = jobs.slice(0, Math.max(validateLimit, enrichLimit));
+  const untouched = jobs.slice(toFetch.length);
 
-  const headResults = await mapPool(
-    head,
+  const fetched = await mapPool(
+    toFetch,
     CONCURRENCY,
     async (
-      job
+      job,
+      index
     ): Promise<{ job: DashboardJob | null; item: ValidationItem }> => {
+      const mustValidate = index < validateLimit;
       const url = (job.source_url || "").trim();
       const base = {
         title: job.title,
@@ -95,20 +111,21 @@ export async function validateRemoteJobs(
       };
 
       if (!url) {
+        if (mustValidate) {
+          return {
+            job: null,
+            item: { ...base, status: "invalid_link", reason: "sem URL" },
+          };
+        }
         return {
-          job: null,
-          item: {
-            ...base,
-            status: "invalid_link",
-            reason: "sem URL",
-          },
+          job,
+          item: { ...base, status: "skipped", reason: "sem URL (enrich)" },
         };
       }
 
-      // Atalho: metadados já deixam claro que é remoto
-      if (jobMetaLooksRemote(job)) {
-        const probe = await probeUrl(url);
-        if (!probe.ok) {
+      const probe = await probeUrl(url);
+      if (!probe.ok) {
+        if (mustValidate) {
           return {
             job: null,
             item: {
@@ -122,25 +139,28 @@ export async function validateRemoteJobs(
           job,
           item: {
             ...base,
-            status: "validated",
-            reason: "metadados + link ok",
+            status: "skipped",
+            reason: "link falhou no enrich",
           },
         };
       }
 
-      const probe = await probeUrl(url);
-      if (!probe.ok) {
+      const enriched = withDetails(job, probe.text);
+
+      if (!mustValidate) {
         return {
-          job: null,
+          job: enriched,
           item: {
             ...base,
-            status: "invalid_link",
-            reason: probe.reason || "link não abriu",
+            status: "skipped",
+            reason: "enrich only",
           },
         };
       }
 
-      if (!pageLooksRemote(probe.text)) {
+      const remoteOk =
+        jobMetaLooksRemote(enriched) || pageLooksRemote(probe.text);
+      if (!remoteOk) {
         return {
           job: null,
           item: {
@@ -152,55 +172,60 @@ export async function validateRemoteJobs(
       }
 
       return {
-        job: { ...job, remote: true },
+        job: { ...enriched, remote: true },
         item: {
           ...base,
           status: "validated",
-          reason: "página menciona remoto",
+          reason: "remoto ok + detalhes",
         },
       };
     }
   );
 
-  const keptHead: DashboardJob[] = [];
+  const kept: DashboardJob[] = [];
   const items: ValidationItem[] = [];
   let validated = 0;
   let falsePositives = 0;
   let invalidLinks = 0;
+  let skipped = 0;
 
-  for (const result of headResults) {
+  for (let i = 0; i < fetched.length; i++) {
+    const result = fetched[i];
     items.push(result.item);
     if (result.item.status === "validated") {
       validated += 1;
-      if (result.job) keptHead.push(result.job);
+      if (result.job) kept.push(result.job);
     } else if (result.item.status === "false_positive") {
       falsePositives += 1;
     } else if (result.item.status === "invalid_link") {
       invalidLinks += 1;
+    } else {
+      skipped += 1;
+      if (result.job) kept.push(result.job);
     }
   }
 
-  for (const job of tail) {
+  kept.push(...untouched);
+  for (const job of untouched) {
     items.push({
       title: job.title,
       company: job.company,
       source: job.source,
       source_url: job.source_url || null,
       status: "skipped",
-      reason: `fora do top ${limit}`,
+      reason: `fora do top ${enrichLimit}`,
     });
+    skipped += 1;
   }
-
-  const kept = [...keptHead, ...tail];
 
   return {
     jobs: kept,
     validation: {
-      checked: head.length,
+      checked: Math.min(jobs.length, validateLimit),
       validated,
       false_positives: falsePositives,
       invalid_links: invalidLinks,
-      skipped: tail.length,
+      skipped,
       kept: kept.length,
       items,
     },

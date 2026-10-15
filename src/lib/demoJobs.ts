@@ -8,6 +8,8 @@ export type DemoJob = {
   source_url?: string | null;
   contract_type?: string | null;
   salary?: string | null;
+  experience?: string | null;
+  education?: string | null;
   posted?: string | null;
   job_id?: string | null;
   remote?: boolean;

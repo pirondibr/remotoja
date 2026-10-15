@@ -1,4 +1,5 @@
 import { cleanText, fetchHtml, slugify } from "@/lib/dashboard/common";
+import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
 import type { DashboardJob } from "@/lib/dashboard/types";
 
 function buildUrl(term: string): string {
@@ -68,6 +69,8 @@ export async function fetchInfoJobs(term: string): Promise<DashboardJob[]> {
       ? href
       : `https://www.infojobs.com.br${href}`;
 
+    const details = extractJobDetailsFromText(part);
+
     out.push({
       title,
       company,
@@ -76,6 +79,9 @@ export async function fetchInfoJobs(term: string): Promise<DashboardJob[]> {
       source_url: url,
       job_id: `infojobs-${id}`,
       remote: true,
+      salary: details.salary,
+      experience: details.experience,
+      education: details.education,
     });
   }
   return out;

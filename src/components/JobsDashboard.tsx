@@ -199,7 +199,7 @@ export function JobsDashboard() {
           </button>
         </form>
 
-        {(inspect || sourceBreakdown.length > 0) && !loading && (
+        {inspect && sourceBreakdown.length > 0 && !loading && (
           <div className="mt-4 flex flex-wrap gap-2">
             {sourceBreakdown.map(([name, count]) => (
               <span
@@ -212,10 +212,10 @@ export function JobsDashboard() {
           </div>
         )}
 
-        {validation && (
+        {inspect && validation && (
           <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
             <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
-              Validação das 20 primeiras
+              Validação das 20 primeiras (só admin)
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
@@ -239,7 +239,7 @@ export function JobsDashboard() {
                 <p className="text-xs text-moss/60">exibidas no feed</p>
               </div>
             </div>
-            {inspect && validation.items?.length > 0 && (
+            {validation.items?.length > 0 && (
               <details className="mt-4">
                 <summary className="cursor-pointer text-xs font-semibold text-moss/70">
                   Ver detalhe por vaga checada
@@ -268,7 +268,7 @@ export function JobsDashboard() {
                 </ul>
               </details>
             )}
-            {inspect && Object.keys(sources).length > 0 && (
+            {Object.keys(sources).length > 0 && (
               <p className="mt-3 text-[11px] text-moss/50">
                 Contagem bruta por scraper:{" "}
                 {Object.entries(sources)
@@ -328,10 +328,19 @@ export function JobsDashboard() {
                           <p className="mt-0.5 text-sm text-moss/70">
                             {job.company}
                           </p>
+                          {(job.salary || job.experience || job.education) && (
+                            <ul className="mt-2 space-y-0.5 text-sm text-moss/75">
+                              {job.salary && <li>{job.salary}</li>}
+                              {job.experience && <li>{job.experience}</li>}
+                              {job.education && <li>{job.education}</li>}
+                            </ul>
+                          )}
                           <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
-                              {formatSource(job.source)}
-                            </span>
+                            {inspect && (
+                              <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
+                                {formatSource(job.source)}
+                              </span>
+                            )}
                             {notOnLinkedIn && (
                               <span className="rounded-full bg-lime/25 px-2.5 py-1 text-[11px] font-semibold text-moss">
                                 Fora do LinkedIn
@@ -343,21 +352,6 @@ export function JobsDashboard() {
                             <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] text-moss/80">
                               100% remoto
                             </span>
-                            {job.location && (
-                              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] text-moss/80">
-                                {job.location}
-                              </span>
-                            )}
-                            {job.contract_type && (
-                              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] text-moss/80">
-                                {job.contract_type}
-                              </span>
-                            )}
-                            {job.salary && (
-                              <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-medium text-moss">
-                                {job.salary}
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>

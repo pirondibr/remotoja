@@ -95,7 +95,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 52,
     headline: "Não é (só) você.",
     subheadline:
-      "Uma fatia grande das vagas remotas no Brasil nunca chega ao LinkedIn. Fica em Gupy, carreiras internas e portais nichados.",
+      "Uma fatia grande das vagas remotas no Brasil nunca chega ao LinkedIn. Fica em Gupy, paginas de carreiras internas e portais nichados.",
     bullets: [
       "~1/3 das vagas nunca vão para o LinkedIn",
       "Quem aplica cedo compete com bem menos gente",
