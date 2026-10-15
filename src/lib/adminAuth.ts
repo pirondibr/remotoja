@@ -46,12 +46,8 @@ export function isValidAdminToken(token: string | undefined | null): boolean {
 }
 
 export async function isAdminAuthenticated(): Promise<boolean> {
-  try {
-    const jar = await cookies();
-    return isValidAdminToken(jar.get(COOKIE)?.value);
-  } catch {
-    return false;
-  }
+  // MVP: painel aberto sem senha (reativar cookie + ADMIN_SECRET depois)
+  return true;
 }
 
 export function adminCookieOptions(token: string) {

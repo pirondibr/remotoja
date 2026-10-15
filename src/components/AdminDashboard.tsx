@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
 type JobPreview = { title: string; company: string; source?: string };
 
@@ -38,34 +38,27 @@ function formatWhen(iso: string) {
 }
 
 export function AdminDashboard() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [password, setPassword] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
   const [data, setData] = useState<SearchesPayload | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/searches?limit=50");
-      if (res.status === 401) {
-        setAuthed(false);
+      const json = (await res.json()) as SearchesPayload;
+      if (!res.ok) {
+        setError(json.error || "Falha ao carregar");
         setData(null);
         return;
       }
-      const json = (await res.json()) as SearchesPayload;
-      if (!res.ok) {
-        setLoginError(json.error || "Falha ao carregar");
-        setAuthed(false);
-        return;
-      }
-      setAuthed(true);
       setData(json);
     } catch {
-      setLoginError("Falha de rede");
-      setAuthed(false);
+      setError("Falha de rede");
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -75,32 +68,13 @@ export function AdminDashboard() {
     void load();
   }, [load]);
 
-  async function onLogin(event: FormEvent) {
-    event.preventDefault();
-    setLoginError(null);
-    const res = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setLoginError(json.error || "Senha incorreta");
-      return;
-    }
-    setPassword("");
-    await load();
-  }
-
-  async function onLogout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    setAuthed(false);
-    setData(null);
-  }
-
   async function resetCache(kind: "demo" | "paid") {
     const label = kind === "demo" ? "demo" : "pago";
-    if (!window.confirm(`Resetar cache de vagas do ${label}? A próxima busca busca de novo nas APIs.`)) {
+    if (
+      !window.confirm(
+        `Resetar cache de vagas do ${label}? A próxima busca busca de novo nas APIs.`
+      )
+    ) {
       return;
     }
     setResetMsg(null);
@@ -118,42 +92,10 @@ export function AdminDashboard() {
     await load();
   }
 
-  if (authed === null) {
+  if (loading && !data) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center text-sm text-moss/70">
         Carregando…
-      </div>
-    );
-  }
-
-  if (!authed) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16">
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-ink">
-          Admin RemotoJá
-        </h1>
-        <p className="mt-2 text-sm text-moss/70">
-          Entre com a senha do painel para ver leads e resetar caches.
-        </p>
-        <form onSubmit={onLogin} className="mt-6 space-y-3">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="ADMIN_SECRET"
-            className="w-full rounded-xl border border-moss/15 bg-white px-4 py-3 text-sm outline-none focus:border-moss/40"
-            autoFocus
-          />
-          {loginError && (
-            <p className="text-xs text-red-700">{loginError}</p>
-          )}
-          <button
-            type="submit"
-            className="w-full rounded-xl bg-ink px-4 py-3 text-sm font-bold text-cream hover:bg-forest"
-          >
-            Entrar
-          </button>
-        </form>
       </div>
     );
   }
@@ -174,6 +116,7 @@ export function AdminDashboard() {
           {data?.warning && (
             <p className="mt-1 text-xs text-amber-800">{data.warning}</p>
           )}
+          {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -197,13 +140,6 @@ export function AdminDashboard() {
             className="rounded-xl bg-sand px-3 py-2 text-xs font-semibold text-moss hover:bg-mint/40"
           >
             Atualizar
-          </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-xl px-3 py-2 text-xs font-medium text-moss/60 hover:text-ink"
-          >
-            Sair
           </button>
         </div>
       </div>
@@ -230,7 +166,8 @@ export function AdminDashboard() {
             {(data?.rows || []).length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-moss/50">
-                  Nenhuma pesquisa ainda. Abra o funil com UTMs (ex.: ?utm_source=meta&role=SEO).
+                  Nenhuma pesquisa ainda. Abra o funil com UTMs (ex.:
+                  ?utm_source=meta&role=SEO).
                 </td>
               </tr>
             )}
@@ -272,7 +209,8 @@ export function AdminDashboard() {
                             </span>
                           </li>
                         ))}
-                        {(!row.jobs_preview || row.jobs_preview.length === 0) && (
+                        {(!row.jobs_preview ||
+                          row.jobs_preview.length === 0) && (
                           <li className="text-moss/50">Sem snapshot</li>
                         )}
                       </ul>
