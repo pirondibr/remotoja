@@ -80,10 +80,15 @@ function mergeBatch(
   }
 }
 
+/** Meta antes do filtro PT — 1 página guest (~25) costuma bastar pro cap 20. */
+const LINKEDIN_RAW_TARGET = PORTAL_FETCH_LIMIT * 2;
+
 /**
  * LinkedIn remoto BR.
- * Guest API direto costuma tomar 429 em IP de datacenter (Vercel) —
- * aí cai no ScrapingBee na mesma URL guest (HTML estático, sem JS).
+ * Guest em IP de datacenter (Vercel) costuma 429 ou devolver poucas cards e
+ * abortar na 2ª página — nesse caso completamos com ScrapingBee na mesma URL
+ * guest (HTML estático, sem JS). Antes o Bee só rodava se guest = 0 absoluto,
+ * então "4 vagas e 429" ficava travado em 4.
  */
 export async function fetchLinkedIn(term: string): Promise<PortalFetchResult> {
   const seen = new Set<string>();
@@ -98,30 +103,36 @@ export async function fetchLinkedIn(term: string): Promise<PortalFetchResult> {
       const batch = parseCards(html);
       if (!batch.length) break;
       mergeBatch(batch, seen, out);
-      if (out.length >= PORTAL_FETCH_LIMIT * 3) break;
+      if (out.length >= LINKEDIN_RAW_TARGET) break;
     }
   } catch (err) {
     guestError = err instanceof Error ? err.message : String(err);
   }
 
-  if (out.length === 0) {
+  const needBee =
+    out.length < PORTAL_FETCH_LIMIT ||
+    (Boolean(guestError) && out.length < LINKEDIN_RAW_TARGET);
+
+  if (needBee) {
     if (!process.env.SCRAPINGBEE_API_KEY) {
-      throw new Error(
-        guestError
-          ? `LinkedIn guest falhou (${guestError}) e SCRAPINGBEE_API_KEY ausente`
-          : "LinkedIn guest vazio e SCRAPINGBEE_API_KEY ausente"
-      );
-    }
-    // Guest HTML via Bee — sem render_js (endpoint já devolve cards).
-    // 1 página (~25) basta pro cap; 2ª só se a 1ª vier curta.
-    for (let page = 0; page < 2; page++) {
-      const html = await fetchScrapingBee(guestUrl(term, page * 25), {
-        render_js: "false",
-      });
-      const batch = parseCards(html);
-      if (!batch.length) break;
-      mergeBatch(batch, seen, out);
-      if (out.length >= PORTAL_FETCH_LIMIT) break;
+      if (out.length === 0) {
+        throw new Error(
+          guestError
+            ? `LinkedIn guest falhou (${guestError}) e SCRAPINGBEE_API_KEY ausente`
+            : "LinkedIn guest vazio e SCRAPINGBEE_API_KEY ausente"
+        );
+      }
+      // Mantém o pouco que o guest trouxe.
+    } else {
+      for (let page = 0; page < 2; page++) {
+        const html = await fetchScrapingBee(guestUrl(term, page * 25), {
+          render_js: "false",
+        });
+        const batch = parseCards(html);
+        if (!batch.length) break;
+        mergeBatch(batch, seen, out);
+        if (out.length >= LINKEDIN_RAW_TARGET) break;
+      }
     }
   }
 
