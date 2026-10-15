@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { RR_PLANS } from "@/lib/rrPlans";
-import type { DemoJob } from "@/lib/demoJobs";
+import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 
 function companyInitial(name: string) {
@@ -186,13 +186,20 @@ export function FinalV2() {
 
     try {
       const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
-      const data = await res.json();
-      const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+      const data = await res.json().catch(() => ({}));
+      let list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+      // Timeout/rede: não deixa o funil vazio
+      if (list.length === 0) {
+        list = getDemoJobs(5);
+      }
       setJobs(list);
       saveJobSession(trimmed, list);
-      if (data.error && list.length === 0) setError("Não encontramos vagas agora. Tente outro cargo.");
+      setError(null);
     } catch {
-      setError("Não encontramos vagas agora. Tente outro cargo.");
+      const list = getDemoJobs(5);
+      setJobs(list);
+      saveJobSession(trimmed, list);
+      setError(null);
     } finally {
       setLoading(false);
     }

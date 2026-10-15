@@ -26,17 +26,32 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await fetchGoogleJobsByRole(role);
+    // Poll curto: no Vercel o funil precisa responder antes do timeout (~60s)
+    const result = await fetchGoogleJobsByRole(role, {
+      depth: 10,
+      maxAttempts: 10,
+      pollMs: 2000,
+    });
+    if (result.jobs.length === 0) {
+      const fallback = getDemoJobs(5);
+      return NextResponse.json({
+        ...result,
+        count: fallback.length,
+        jobs: fallback,
+        fetched_via: "fallback_demo",
+        note: "sem resultados live — preview estático",
+      });
+    }
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
-    // Fallback: demos estáticas se a API falhar (ex.: sem credencial no ambiente)
+    const fallback = getDemoJobs(5);
     return NextResponse.json(
       {
         role,
         query: buildJobsQuery(role),
-        count: 0,
-        jobs: getDemoJobs(5),
+        count: fallback.length,
+        jobs: fallback,
         fetched_via: "fallback_demo",
         error: message,
         fallback_query: demoJobsPayload.query,
