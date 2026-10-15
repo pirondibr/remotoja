@@ -1,6 +1,8 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
+import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 
 type JobPreview = { title: string; company: string; source?: string };
 
@@ -18,10 +20,20 @@ type SearchRow = {
   jobs_preview: JobPreview[];
 };
 
+type PaidFeed = {
+  role: string;
+  jobs_count: number;
+  sources: Record<string, number | string>;
+  validation: ValidationReport | null;
+  updated_at: string;
+  href: string;
+};
+
 type SearchesPayload = {
   rows: SearchRow[];
   total: number;
   cache: { demo: number; paid: number };
+  paid_feeds?: PaidFeed[];
   warning?: string;
   error?: string;
 };
@@ -43,6 +55,7 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [paidRole, setPaidRole] = useState("SEO");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +103,13 @@ export function AdminDashboard() {
     }
     setResetMsg(`Cache ${label} limpo (${json.deleted ?? 0} chaves).`);
     await load();
+  }
+
+  function openPaidFeed(event: FormEvent) {
+    event.preventDefault();
+    const role = paidRole.trim();
+    if (role.length < 2) return;
+    window.location.href = `/app?role=${encodeURIComponent(role)}&inspect=1`;
   }
 
   if (loading && !data) {
@@ -150,7 +170,75 @@ export function AdminDashboard() {
         </p>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-moss/10 bg-white">
+      {/* PAID FEED ACCESS */}
+      <section className="mt-8 rounded-2xl border border-moss/10 bg-white p-5">
+        <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-ink">
+          Feed pago (inspeção)
+        </h2>
+        <p className="mt-1 text-sm text-moss/70">
+          Abre a mesma página do membro, com origem de cada vaga e relatório de
+          validação (remoto / link inválido / falso positivo).
+        </p>
+        <form
+          onSubmit={openPaidFeed}
+          className="mt-4 flex flex-col gap-2 sm:flex-row"
+        >
+          <input
+            value={paidRole}
+            onChange={(e) => setPaidRole(e.target.value)}
+            placeholder="Cargo, ex.: gestor de trafego"
+            className="flex-1 rounded-xl border border-moss/15 bg-cream/50 px-4 py-2.5 text-sm outline-none focus:border-moss/40"
+          />
+          <button
+            type="submit"
+            className="rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-cream hover:bg-forest"
+          >
+            Abrir feed pago
+          </button>
+        </form>
+
+        {(data?.paid_feeds || []).length > 0 && (
+          <div className="mt-5 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-moss/10 text-xs uppercase tracking-wide text-moss/60">
+                <tr>
+                  <th className="py-2 pr-3 font-semibold">Cargo</th>
+                  <th className="py-2 pr-3 font-semibold">Vagas</th>
+                  <th className="py-2 pr-3 font-semibold">Validação</th>
+                  <th className="py-2 pr-3 font-semibold">Atualizado</th>
+                  <th className="py-2 font-semibold" />
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.paid_feeds || []).map((feed) => (
+                  <tr key={feed.role} className="border-b border-moss/5">
+                    <td className="py-2.5 pr-3 font-medium">{feed.role}</td>
+                    <td className="py-2.5 pr-3">{feed.jobs_count}</td>
+                    <td className="py-2.5 pr-3 text-xs text-moss/70">
+                      {feed.validation
+                        ? `ok ${feed.validation.validated} · falso ${feed.validation.false_positives} · link ${feed.validation.invalid_links}`
+                        : "sem relatório"}
+                    </td>
+                    <td className="py-2.5 pr-3 text-xs text-moss/60">
+                      {formatWhen(feed.updated_at)}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <Link
+                        href={feed.href}
+                        className="text-xs font-semibold text-forest hover:underline"
+                      >
+                        Abrir →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <div className="mt-8 overflow-x-auto rounded-2xl border border-moss/10 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-moss/10 bg-cream/80 text-xs uppercase tracking-wide text-moss/60">
             <tr>
@@ -189,15 +277,24 @@ export function AdminDashboard() {
                     {row.cached ? "sim" : "live"}
                   </td>
                   <td className="max-w-[180px] truncate px-3 py-3 text-xs text-moss/60">
-                    {row.utm_campaign || "—"}
+                    {row.utm_campaign || "-"}
                   </td>
                 </tr>
                 {expanded === row.id && (
                   <tr className="border-b border-moss/10 bg-cream/40">
                     <td colSpan={6} className="px-4 py-3">
-                      <p className="text-xs font-semibold text-moss/60">
-                        Vagas mostradas no demo
-                      </p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-moss/60">
+                          Vagas mostradas no demo
+                        </p>
+                        <Link
+                          href={`/app?role=${encodeURIComponent(row.role)}&inspect=1`}
+                          className="text-xs font-semibold text-forest hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Abrir feed pago deste cargo →
+                        </Link>
+                      </div>
                       <ul className="mt-2 space-y-1 text-sm">
                         {(row.jobs_preview || []).map((job, i) => (
                           <li key={`${row.id}-${i}`}>

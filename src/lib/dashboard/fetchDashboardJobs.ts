@@ -7,6 +7,7 @@ import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchProgramathor } from "@/lib/dashboard/programathor";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
+import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
 
 type Fetcher = {
@@ -97,12 +98,15 @@ export async function fetchDashboardJobs(
     }
   }
 
-  const jobs = dedupeJobs(merged);
+  const deduped = dedupeJobs(merged);
+  const { jobs, validation } = await validateRemoteJobs(deduped, 20);
+
   return {
     role: term,
     count: jobs.length,
     jobs,
     fetched_via: "dashboard_multi",
     sources,
+    validation,
   };
 }

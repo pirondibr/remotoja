@@ -8,7 +8,7 @@ export type CachedJobsRow = {
   role_key: string;
   jobs: DemoJob[];
   fetched_via: string | null;
-  sources: Record<string, number | string> | null;
+  sources: Record<string, number | string | object> | null;
   updated_at: string;
 };
 
@@ -31,7 +31,8 @@ export async function getCachedJobs(
   return {
     ...row,
     jobs: (Array.isArray(row.jobs) ? row.jobs : []) as DemoJob[],
-    sources: (row.sources as Record<string, number | string> | null) ?? null,
+    sources:
+      (row.sources as Record<string, number | string | object> | null) ?? null,
   };
 }
 
@@ -40,7 +41,7 @@ export async function setCachedJobs(input: {
   role: string;
   jobs: DemoJob[];
   fetched_via?: string | null;
-  sources?: Record<string, number | string> | null;
+  sources?: Record<string, number | string | object> | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
   await ensureSchema();
@@ -53,7 +54,7 @@ export async function setCachedJobs(input: {
       ${roleKey},
       ${sql.json(input.jobs ?? [])},
       ${input.fetched_via ?? null},
-      ${input.sources ? sql.json(input.sources) : null},
+      ${input.sources ? sql.json(input.sources as never) : null},
       now()
     )
     ON CONFLICT (kind, role_key) DO UPDATE SET
@@ -98,4 +99,37 @@ export async function cacheStats(): Promise<{
     if (row.kind === "paid") out.paid = Number(row.count);
   }
   return out;
+}
+
+export async function listPaidCacheEntries(limit = 30): Promise<
+  Array<{
+    role_key: string;
+    jobs_count: number;
+    sources: Record<string, number | string | object> | null;
+    fetched_via: string | null;
+    updated_at: string;
+  }>
+> {
+  if (!hasDatabase()) return [];
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      role_key,
+      jsonb_array_length(jobs) AS jobs_count,
+      sources,
+      fetched_via,
+      updated_at
+    FROM job_cache
+    WHERE kind = 'paid'
+    ORDER BY updated_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as unknown as Array<{
+    role_key: string;
+    jobs_count: number;
+    sources: Record<string, number | string | object> | null;
+    fetched_via: string | null;
+    updated_at: string;
+  }>;
 }

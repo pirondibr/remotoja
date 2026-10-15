@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
 import { type DemoJob } from "@/lib/demoJobs";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
-import { saveJobSession } from "@/lib/jobSession";
 import { BrandMark } from "./BrandMark";
 
 const ROLE_STORAGE_KEY = "remotoja_onboard_role";
@@ -170,7 +169,6 @@ export function OnboardWizard() {
       draft.trim() ||
       prefillRole.trim() ||
       "SEO";
-    saveJobSession(nextRole, matches);
     router.push(`/app?role=${encodeURIComponent(nextRole)}`);
   }
 
@@ -240,16 +238,24 @@ export function OnboardWizard() {
           )}
 
           {step.kind === "value" && (
-            <ul className="mt-8 space-y-3">
-              {step.bullets?.map((bullet) => (
-                <li
-                  key={bullet}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sand/90"
-                >
-                  {bullet}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-8">
+              <p className="mb-4 text-xs font-semibold tracking-[0.14em] text-sand/45 uppercase">
+                Só um contexto · nada para selecionar
+              </p>
+              <ul className="space-y-4 border-l-2 border-lime/40 pl-5">
+                {step.bullets?.map((bullet) => (
+                  <li key={bullet} className="relative text-[15px] leading-relaxed text-sand/90">
+                    <span
+                      aria-hidden
+                      className="absolute -left-[1.55rem] top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-lime text-[10px] font-bold text-ink"
+                    >
+                      ✓
+                    </span>
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {(step.kind === "single" || step.kind === "multi") && (

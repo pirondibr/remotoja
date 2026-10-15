@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import type { DemoJob } from "@/lib/demoJobs";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
+import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 
 function companyInitial(name: string) {
   return (name.trim()[0] || "?").toUpperCase();
@@ -15,9 +16,28 @@ function postedLabel(job: DemoJob) {
   return job.posted || "Recente";
 }
 
+function formatSource(source: string) {
+  const raw = (source || "").trim();
+  if (!raw) return "Portal";
+  const map: Record<string, string> = {
+    google_vagas: "Google Vagas",
+    gupy: "Gupy",
+    linkedin: "LinkedIn",
+    indeed: "Indeed",
+    catho: "Catho",
+    infojobs: "InfoJobs",
+    remotar: "Remotar",
+    programathor: "Programathor",
+  };
+  const key = raw.toLowerCase();
+  if (map[key]) return map[key];
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 export function JobsDashboard() {
   const searchParams = useSearchParams();
   const roleFromUrl = searchParams.get("role") || searchParams.get("q") || "";
+  const inspect = searchParams.get("inspect") === "1";
 
   const [role, setRole] = useState(roleFromUrl);
   const [draft, setDraft] = useState(roleFromUrl);
@@ -25,54 +45,64 @@ export function JobsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [sources, setSources] = useState<Record<string, number | string>>({});
+  const [validation, setValidation] = useState<ValidationReport | null>(null);
 
-  const loadJobs = useCallback(async (nextRole: string, preferCache = true) => {
-    const trimmed = nextRole.trim();
-    if (trimmed.length < 2) {
-      setLoading(false);
-      setError("Informe um cargo para buscar vagas.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setRole(trimmed);
-    setDraft(trimmed);
-
-    if (preferCache) {
-      const cached = loadJobSession(trimmed);
-      if (cached && cached.jobs.length > 0) {
-        setJobs(cached.jobs);
+  const loadJobs = useCallback(
+    async (nextRole: string, preferCache = true) => {
+      const trimmed = nextRole.trim();
+      if (trimmed.length < 2) {
         setLoading(false);
+        setError("Informe um cargo para buscar vagas.");
         return;
       }
-    }
 
-    try {
-      const res = await fetch(
-        `/api/dashboard/jobs?role=${encodeURIComponent(trimmed)}`
-      );
-      const data = await res.json();
-      const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
-      setJobs(list);
-      saveJobSession(trimmed, list);
-      if (list.length === 0) {
-        setError(
-          data.error ||
-            "Nenhuma vaga encontrada para esse cargo. Tente outro termo."
-        );
+      setLoading(true);
+      setError(null);
+      setRole(trimmed);
+      setDraft(trimmed);
+
+      // Prefetch visual só se já veio do feed pago (não da prévia do funil)
+      if (preferCache && !inspect) {
+        const cached = loadJobSession(trimmed);
+        if (cached && cached.jobs.length > 0) {
+          setJobs(cached.jobs);
+        }
       }
-    } catch {
-      setError("Falha ao carregar vagas. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+
+      try {
+        const res = await fetch(
+          `/api/dashboard/jobs?role=${encodeURIComponent(trimmed)}${
+            inspect || !preferCache ? "&fresh=1" : ""
+          }`
+        );
+        const data = await res.json();
+        const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+        setJobs(list);
+        setSources(
+          data.sources && typeof data.sources === "object" ? data.sources : {}
+        );
+        setValidation(data.validation || null);
+        saveJobSession(trimmed, list);
+        if (list.length === 0) {
+          setError(
+            data.error ||
+              "Nenhuma vaga encontrada para esse cargo. Tente outro termo."
+          );
+        }
+      } catch {
+        setError("Falha ao carregar vagas. Tente novamente.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [inspect]
+  );
 
   useEffect(() => {
     const initial = roleFromUrl.trim() || "SEO";
-    void loadJobs(initial, true);
-  }, [roleFromUrl, loadJobs]);
+    void loadJobs(initial, !inspect);
+  }, [roleFromUrl, loadJobs, inspect]);
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -81,9 +111,19 @@ export function JobsDashboard() {
       (job) =>
         job.title.toLowerCase().includes(q) ||
         job.company.toLowerCase().includes(q) ||
-        (job.location || "").toLowerCase().includes(q)
+        (job.location || "").toLowerCase().includes(q) ||
+        (job.source || "").toLowerCase().includes(q)
     );
   }, [jobs, filter]);
+
+  const sourceBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const job of jobs) {
+      const label = formatSource(job.source);
+      counts[label] = (counts[label] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [jobs]);
 
   function onSearch(event: FormEvent) {
     event.preventDefault();
@@ -99,14 +139,23 @@ export function JobsDashboard() {
           </Link>
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full bg-mint/30 px-2.5 py-1 text-[11px] font-semibold text-moss sm:inline">
-              Membro · MVP
+              {inspect ? "Admin · inspeção" : "Membro · MVP"}
             </span>
-            <Link
-              href="/final/v2"
-              className="text-xs font-medium text-moss/70 hover:text-ink"
-            >
-              ← Funil teste
-            </Link>
+            {inspect ? (
+              <Link
+                href="/admin"
+                className="text-xs font-medium text-moss/70 hover:text-ink"
+              >
+                ← Admin
+              </Link>
+            ) : (
+              <Link
+                href="/final/v2"
+                className="text-xs font-medium text-moss/70 hover:text-ink"
+              >
+                ← Funil teste
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -120,8 +169,8 @@ export function JobsDashboard() {
               <span className="text-moss">{role || "seu cargo"}</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm text-moss/70">
-              Feed com as vagas que encontramos. Clique em candidatar para abrir
-              a página da empresa.
+              Feed com as vagas que encontramos. Cada card mostra o portal de
+              origem. Clique em candidatar para abrir a página da empresa.
             </p>
           </div>
           {!loading && (
@@ -150,11 +199,91 @@ export function JobsDashboard() {
           </button>
         </form>
 
+        {(inspect || sourceBreakdown.length > 0) && !loading && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {sourceBreakdown.map(([name, count]) => (
+              <span
+                key={name}
+                className="rounded-full border border-moss/15 bg-white px-3 py-1 text-xs font-medium text-moss"
+              >
+                {name} · {count}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {validation && (
+          <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
+            <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+              Validação das 20 primeiras
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <p className="text-2xl font-bold text-ink">{validation.validated}</p>
+                <p className="text-xs text-moss/60">validadas (remoto ok)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-ink">
+                  {validation.false_positives}
+                </p>
+                <p className="text-xs text-moss/60">falso positivos</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-ink">
+                  {validation.invalid_links}
+                </p>
+                <p className="text-xs text-moss/60">links inválidos</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-ink">{validation.kept}</p>
+                <p className="text-xs text-moss/60">exibidas no feed</p>
+              </div>
+            </div>
+            {inspect && validation.items?.length > 0 && (
+              <details className="mt-4">
+                <summary className="cursor-pointer text-xs font-semibold text-moss/70">
+                  Ver detalhe por vaga checada
+                </summary>
+                <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-xs text-moss/80">
+                  {validation.items
+                    .filter((item) => item.status !== "skipped")
+                    .map((item, i) => (
+                      <li key={`${item.title}-${i}`}>
+                        <span
+                          className={
+                            item.status === "validated"
+                              ? "font-semibold text-forest"
+                              : item.status === "false_positive"
+                                ? "font-semibold text-amber-700"
+                                : "font-semibold text-red-700"
+                          }
+                        >
+                          {item.status}
+                        </span>
+                        {" · "}
+                        {item.title} · {formatSource(item.source)}
+                        {item.reason ? ` · ${item.reason}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </details>
+            )}
+            {inspect && Object.keys(sources).length > 0 && (
+              <p className="mt-3 text-[11px] text-moss/50">
+                Contagem bruta por scraper:{" "}
+                {Object.entries(sources)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(" · ")}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="mt-4">
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtrar nesta lista (título, empresa…)"
+            placeholder="Filtrar nesta lista (título, empresa, portal…)"
             className="w-full rounded-xl border border-moss/10 bg-white px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
         </div>
@@ -162,10 +291,10 @@ export function JobsDashboard() {
         {loading && (
           <div className="mt-10 rounded-2xl border border-moss/10 bg-white p-10 text-center">
             <p className="font-semibold">
-              Procurando vagas em diversos portais e empresas…
+              Procurando vagas e validando se são remotas de verdade…
             </p>
             <p className="mt-2 text-sm text-moss/60">
-              Isso pode levar alguns segundos
+              Isso pode levar até cerca de um minuto
             </p>
           </div>
         )}
@@ -200,6 +329,9 @@ export function JobsDashboard() {
                             {job.company}
                           </p>
                           <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
+                              {formatSource(job.source)}
+                            </span>
                             {notOnLinkedIn && (
                               <span className="rounded-full bg-lime/25 px-2.5 py-1 text-[11px] font-semibold text-moss">
                                 Fora do LinkedIn
