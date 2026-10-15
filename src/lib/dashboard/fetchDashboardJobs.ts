@@ -4,8 +4,10 @@ import { fetchGoogleDashboard } from "@/lib/dashboard/google";
 import { fetchGupy } from "@/lib/dashboard/gupy";
 import { fetchIndeed } from "@/lib/dashboard/indeed";
 import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
+import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
 import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import { filterPortugueseJobs } from "@/lib/dashboard/languageFilter";
 import {
   AnalysisLogBuilder,
   BEE_PREMIUM_JS_CREDITS,
@@ -38,12 +40,18 @@ type Fetcher = {
   beeCredits?: number;
 };
 
-/** LinkedIn e Programathor pausados por enquanto (código permanece nos módulos). */
+/** Programathor pausado. LinkedIn ativo + filtro PT em todos os scrapes. */
 const FETCHERS: Fetcher[] = [
   { name: "gupy", run: fetchGupy, timeoutMs: 12000 },
   { name: "remotar", run: fetchRemotar, timeoutMs: 12000 },
   { name: "infojobs", run: fetchInfoJobs, timeoutMs: 12000 },
   { name: "catho", run: fetchCatho, timeoutMs: 22000 },
+  {
+    name: "linkedin",
+    run: fetchLinkedIn,
+    timeoutMs: 45000,
+    beeCredits: BEE_PREMIUM_JS_CREDITS, // só se cair no fallback Bee
+  },
   {
     name: "indeed",
     run: fetchIndeed,
@@ -90,6 +98,7 @@ async function runOne(
   error?: string;
   ms: number;
   cost_usd: number;
+  droppedEn: number;
 }> {
   const t0 = Date.now();
   try {
@@ -101,6 +110,7 @@ async function runOne(
         error: "skipped: sem SCRAPINGBEE_API_KEY",
         ms: Date.now() - t0,
         cost_usd: 0,
+        droppedEn: 0,
       };
     }
     const raw = await withTimeout(
@@ -109,9 +119,13 @@ async function runOne(
       fetcher.name
     );
     const { jobs: all, available } = asPortalResult(raw);
-    const jobs = all.slice(0, PORTAL_FETCH_LIMIT);
+    // Português em todos os portais (principalmente corta inglês do LinkedIn/Remotar).
+    const { kept: ptJobs, dropped: droppedEn } = filterPortugueseJobs(all);
+    const jobs = ptJobs.slice(0, PORTAL_FETCH_LIMIT);
+    // Bee: Indeed sempre; LinkedIn só se usou fallback (heuristic: veio vazio do guest = raro).
+    // Cobramos crédito Bee só para indeed (linkedin guest é grátis na maioria).
     const cost_usd =
-      jobs.length > 0 && fetcher.beeCredits
+      jobs.length > 0 && fetcher.name === "indeed" && fetcher.beeCredits
         ? beeCreditUsd(fetcher.beeCredits)
         : 0;
     return {
@@ -120,6 +134,7 @@ async function runOne(
       available: Math.max(available ?? 0, all.length),
       ms: Date.now() - t0,
       cost_usd,
+      droppedEn,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -130,6 +145,7 @@ async function runOne(
       error: message,
       ms: Date.now() - t0,
       cost_usd: 0,
+      droppedEn: 0,
     };
   }
 }
@@ -146,7 +162,9 @@ export async function fetchDashboardJobs(
   const scrapeTotalMs = Date.now() - scrapeStarted;
 
   if (log) {
+    let droppedEnTotal = 0;
     for (const r of results) {
+      droppedEnTotal += r.droppedEn;
       log.add({
         id: `scrape_${r.name}`,
         label: `Scrape · ${r.name}`,
@@ -155,12 +173,24 @@ export async function fetchDashboardJobs(
         cost_usd: r.cost_usd,
         detail: r.error
           ? `${r.error}${r.jobs.length ? ` · ${r.jobs.length} vagas` : ""}`
-          : `${r.jobs.length} vagas (cap) · available ${r.available}`,
+          : `${r.jobs.length} vagas PT (cap) · available ${r.available}` +
+            (r.droppedEn ? ` · −${r.droppedEn} EN` : ""),
         meta: {
           found: r.jobs.length,
           available: r.available,
+          dropped_en: r.droppedEn,
           error: r.error || null,
         },
+      });
+    }
+    if (droppedEnTotal > 0) {
+      log.add({
+        id: "filter_pt",
+        label: "Filtro português",
+        ms: 0,
+        ok: true,
+        detail: `${droppedEnTotal} vagas em inglês removidas (todos os scrapes)`,
+        meta: { dropped_en: droppedEnTotal },
       });
     }
     log.add({
@@ -200,6 +230,7 @@ export async function fetchDashboardJobs(
         "indeed",
         "infojobs",
         "remotar",
+        "linkedin",
         "google_vagas",
       ].includes(result.name);
       merged.push(
