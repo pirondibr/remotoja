@@ -37,10 +37,10 @@ def _build_url(query: str) -> str:
     )
 
 
-def _js_scenario(scrolls: int) -> str:
-    steps: list[dict] = []
+def _js_scenario(scrolls: int) -> dict:
+    instructions: list[dict] = [{"wait": 3000}]
     for _ in range(max(scrolls, 0)):
-        steps.append(
+        instructions.append(
             {
                 "evaluate": (
                     "(() => { const cards = document.querySelectorAll('.EimVGf'); "
@@ -49,8 +49,8 @@ def _js_scenario(scrolls: int) -> str:
                 )
             }
         )
-        steps.append({"wait": 2500})
-    return json.dumps(steps)
+        instructions.append({"wait": 2500})
+    return {"instructions": instructions}
 
 
 def _fetch_scrapingbee(url: str, *, scrolls: int) -> str:
@@ -67,11 +67,17 @@ def _fetch_scrapingbee(url: str, *, scrolls: int) -> str:
         "render_js": "true",
         "stealth_proxy": "true",
         "wait": "5000",
-        "js_scenario": _js_scenario(scrolls),
+        "js_scenario": json.dumps(_js_scenario(scrolls), separators=(",", ":")),
     }
     api = "https://app.scrapingbee.com/api/v1/?" + urllib.parse.urlencode(params)
-    return get(api, timeout=120)
-
+    try:
+        return get(api, timeout=120)
+    except RuntimeError as exc:
+        # Não vazar api_key no stderr
+        msg = str(exc)
+        if key in msg:
+            msg = msg.replace(key, "***")
+        raise RuntimeError(msg) from None
 
 def _fix_mojibake(text: str) -> str:
     try:
@@ -128,26 +134,66 @@ def _parse_cards(html: str) -> list[dict]:
     return unique
 
 
+def _fetch_dataforseo(term: str, *, depth: int = 10) -> list[dict]:
+    """Fallback estável (mesma API do demo)."""
+    from workers.scraper.google_jobs import build_jobs_query, fetch_google_jobs
+
+    keyword = build_jobs_query(term)
+    raw = fetch_google_jobs(keyword, depth=depth)
+    out: list[dict] = []
+    for item in raw:
+        out.append(
+            job(
+                id=f"gjobs-{item.get('job_id') or quote(item.get('title', ''))[:20]}",
+                source=SOURCE,
+                title=item.get("title") or "",
+                company=item.get("company") or "",
+                location=item.get("location") or "Brasil",
+                remote=bool(item.get("remote", True)),
+                model="Remoto",
+                contract=item.get("contract_type"),
+                posted=(item.get("posted") or None),
+                url=item.get("source_url") or _build_url(item.get("title") or term),
+                snippet=None,
+            )
+        )
+    return out
+
+
 def fetch_google_vagas(
     term: str,
     *,
     queries: list[str] | None = None,
     scrolls: int = 3,
+    provider: str = "auto",
 ) -> list[dict]:
+    provider = provider.lower()
     if not queries:
         queries = [f"vagas de {term} remoto", f"vagas de {term} home office"]
     all_jobs: list[dict] = []
     seen: set[str] = set()
-    for q in queries:
-        url = _build_url(q)
-        html = _fetch_scrapingbee(url, scrolls=scrolls)
-        RAW_DIR.mkdir(parents=True, exist_ok=True)
-        (RAW_DIR / "google_last.html").write_text(html, encoding="utf-8")
-        for item in _parse_cards(html):
-            if item["id"] in seen:
-                continue
-            seen.add(item["id"])
-            all_jobs.append(item)
+
+    if provider in {"auto", "scrapingbee"}:
+        for q in queries:
+            try:
+                url = _build_url(q)
+                html = _fetch_scrapingbee(url, scrolls=scrolls)
+                RAW_DIR.mkdir(parents=True, exist_ok=True)
+                (RAW_DIR / "google_last.html").write_text(html, encoding="utf-8")
+                for item in _parse_cards(html):
+                    if item["id"] in seen:
+                        continue
+                    seen.add(item["id"])
+                    all_jobs.append(item)
+            except Exception as exc:
+                print(f"scrapingbee falhou ({q}): {exc}", file=sys.stderr)
+        if all_jobs or provider == "scrapingbee":
+            return all_jobs
+
+    if provider in {"auto", "dataforseo"}:
+        print("→ Google Vagas via DataForSEO (fallback)", file=sys.stderr)
+        return _fetch_dataforseo(term)
+
     return all_jobs
 
 
@@ -157,17 +203,29 @@ def main() -> None:
     parser.add_argument("term", help="Cargo base, ex: SEO")
     parser.add_argument("--scrolls", type=int, default=3)
     parser.add_argument(
+        "--provider",
+        default="auto",
+        choices=["auto", "scrapingbee", "dataforseo"],
+    )
+    parser.add_argument(
         "--q",
         default="",
         help='Consultas custom separadas por |  ex: "vagas seo remoto|vagas seo home office"',
     )
     args = parser.parse_args()
     queries = [x.strip() for x in args.q.split("|") if x.strip()] or None
-    jobs = fetch_google_vagas(args.term, queries=queries, scrolls=args.scrolls)
+    jobs = fetch_google_vagas(
+        args.term, queries=queries, scrolls=args.scrolls, provider=args.provider
+    )
     path = save(
         "google_vagas",
         jobs,
-        meta={"term": args.term, "scrolls": args.scrolls, "queries": queries},
+        meta={
+            "term": args.term,
+            "scrolls": args.scrolls,
+            "queries": queries,
+            "provider": args.provider,
+        },
     )
     print(json.dumps({"count": len(jobs), "path": str(path)}, ensure_ascii=False, indent=2))
     for item in jobs[:5]:

@@ -5,7 +5,7 @@ Dois grupos separados de propósito:
 | Grupo | Pasta | Quando | Fontes |
 |-------|--------|--------|--------|
 | **Demo / funil** | `workers/scraper/` | Antes de pagar (landing, `/final`, `/onboard`) | Só Google Jobs via **DataForSEO** |
-| **Dashboard pago** | `workers/dashboard/` | Depois de pagar (`/app`) | Gupy + Indeed + Google Vagas (ScrapingBee) + futuros |
+| **Dashboard pago** | `workers/dashboard/` | Depois de pagar (`/app`) | Gupy + Indeed + LinkedIn + Google Vagas + futuros |
 
 Doc detalhada do dashboard: [`dashboard/COMO-FUNCIONA.md`](dashboard/COMO-FUNCIONA.md)
 
@@ -22,22 +22,25 @@ python -m workers.scraper.google_jobs --role SEO
 # só Gupy (grátis, sem chave)
 python -m workers.dashboard.gupy SEO
 
-# Indeed (precisa SCRAPINGBEE_API_KEY ou TINYFISH_API_KEY)
+# Indeed (SCRAPINGBEE_API_KEY ou TINYFISH_API_KEY)
 python -m workers.dashboard.indeed SEO --provider tinyfish
 
-# Google Vagas ScrapingBee (SCRAPINGBEE_API_KEY)
+# LinkedIn (guest API; fallback ScrapingBee)
+python -m workers.dashboard.linkedin SEO
+
+# Google Vagas ScrapingBee
 python -m workers.dashboard.google_vagas SEO --scrolls 2
 
 # pipeline completa + merge
-python -m workers.dashboard.run_all SEO --skip-google   # se ainda sem ScrapingBee
+python -m workers.dashboard.run_all SEO
 python -m workers.dashboard.merge --write-app
 ```
 
 Saídas em `workers/dashboard/output/*.json` (merged no final).
 
-### Próximos portais (sem base ainda)
+### Próximos portais
 
-LinkedIn · InfoJobs · Catho · Remotar · Programathor
+InfoJobs · Catho · Remotar · Programathor
 
 ## Env
 

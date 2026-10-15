@@ -96,7 +96,8 @@ def get(url: str, *, headers: dict[str, str] | None = None, timeout: int = 45) -
             return resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code} em {url}: {body[:300]}") from exc
+        safe_url = re.sub(r"(api_key|X-API-Key)=[^&]+", r"\1=***", url, flags=re.I)
+        raise RuntimeError(f"HTTP {exc.code} em {safe_url}: {body[:300]}") from exc
 
 
 def save(name: str, jobs: list[dict], *, meta: dict | None = None) -> Path:

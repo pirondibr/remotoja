@@ -10,7 +10,9 @@
     "scrape:google-jobs": "python -m workers.scraper.google_jobs",
     "scrape:role": "python -m workers.scraper.google_jobs --role",
     "scrape:dashboard": "python -m workers.dashboard.run_all",
-    "scrape:gupy": "python -m workers.dashboard.gupy"
+    "scrape:gupy": "python -m workers.dashboard.gupy",
+    "scrape:linkedin": "python -m workers.dashboard.linkedin",
+    "scrape:indeed": "python -m workers.dashboard.indeed"
   },
   "dependencies": {
     "next": "16.4.1",
