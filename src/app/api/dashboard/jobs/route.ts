@@ -3,17 +3,22 @@ import { hasMemberAccess, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
-import { rankJobsForFeed, termMatches } from "@/lib/dashboard/common";
+import { rankJobsForFeed } from "@/lib/dashboard/common";
+import { classifyCargoMatch } from "@/lib/dashboard/jobMatch";
 import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
 import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJob } from "@/lib/dashboard/types";
 
 function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
-  const filtered = jobs.filter((job) =>
-    termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)
+  const tagged = (jobs as DashboardJob[]).map((job) => ({
+    ...job,
+    match_tier: job.match_tier || classifyCargoMatch(job, role),
+  }));
+  const filtered = tagged.filter(
+    (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
   );
-  return rankJobsForFeed(filtered as DashboardJob[], role) as DemoJob[];
+  return rankJobsForFeed(filtered, role) as DemoJob[];
 }
 
 export const maxDuration = 60;

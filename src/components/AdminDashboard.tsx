@@ -240,8 +240,7 @@ export function AdminDashboard() {
               <tbody>
                 {(data?.paid_feeds || []).map((feed) => {
                   const portals = feed.scrape_report?.portals || [];
-                  const found = portals.reduce((s, p) => s + p.found, 0);
-                  const kept = portals.reduce((s, p) => s + p.kept, 0);
+                  const summary = feed.scrape_report?.summary;
                   const fps = portals.reduce(
                     (s, p) => s + (p.false_positives || 0),
                     0
@@ -260,13 +259,13 @@ export function AdminDashboard() {
                         <td className="py-2.5 pr-3 font-medium">{feed.role}</td>
                         <td className="py-2.5 pr-3">{feed.jobs_count}</td>
                         <td className="py-2.5 pr-3 text-xs text-moss/70">
-                          {portals.length > 0
-                            ? `achou ${found} · pegou ${kept}${
-                                feed.validation
-                                  ? ` · FP ${fps}`
-                                  : " · sem análise"
+                          {summary
+                            ? `${summary.encontradas} achou · cargo ${summary.exato}/${summary.relacionado}/${summary.fora} · remoto ${summary.remotas}${
+                                feed.validation ? ` · FP ${fps}` : ""
                               }`
-                            : "sem scrape_report ainda"}
+                            : portals.length > 0
+                              ? "relatório antigo — rode análise/cache de novo"
+                              : "sem scrape_report ainda"}
                         </td>
                         <td className="py-2.5 pr-3 text-xs text-moss/60">
                           {formatWhen(feed.updated_at)}
@@ -294,12 +293,48 @@ export function AdminDashboard() {
                       {open && (
                         <tr className="border-b border-moss/10 bg-cream/50">
                           <td colSpan={5} className="px-3 py-3">
+                            {summary && (
+                              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                <div className="rounded-xl bg-white px-3 py-2">
+                                  <p className="text-lg font-bold text-ink">
+                                    {summary.encontradas}
+                                  </p>
+                                  <p className="text-[11px] text-moss/60">
+                                    Vagas encontradas
+                                  </p>
+                                </div>
+                                <div className="rounded-xl bg-white px-3 py-2">
+                                  <p className="text-lg font-bold text-ink">
+                                    {summary.exato}/{summary.relacionado}/
+                                    {summary.fora}
+                                  </p>
+                                  <p className="text-[11px] text-moss/60">
+                                    Cargo (exato / rel. / fora)
+                                  </p>
+                                </div>
+                                <div className="rounded-xl bg-white px-3 py-2">
+                                  <p className="text-lg font-bold text-ink">
+                                    {summary.remotas}
+                                  </p>
+                                  <p className="text-[11px] text-moss/60">
+                                    Vagas remotas
+                                  </p>
+                                </div>
+                                <div className="rounded-xl bg-white px-3 py-2">
+                                  <p className="text-lg font-bold text-ink">
+                                    {summary.no_feed}
+                                  </p>
+                                  <p className="text-[11px] text-moss/60">
+                                    No feed
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                             <p className="mb-2 text-xs font-semibold text-moss/60">
-                              Detalhe por portal —{" "}
+                              Por portal —{" "}
                               <span className="font-normal">
-                                Encontradas = scraper trouxe · Pegamos = ficaram
-                                no feed após filtro · FP = falso positivo na
-                                análise
+                                Encontradas / Exato / Relacionado / Fora /
+                                Remotas / Pegamos no feed
                               </span>
                             </p>
                             {portals.length === 0 ? (
@@ -318,84 +353,60 @@ export function AdminDashboard() {
                                       Encontradas
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
+                                      Exato
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Relac.
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Fora
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Remotas
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
                                       Pegamos
                                     </th>
-                                    <th className="py-1.5 pr-3 font-semibold">
-                                      Checadas
-                                    </th>
-                                    <th className="py-1.5 pr-3 font-semibold">
-                                      OK
-                                    </th>
-                                    <th className="py-1.5 pr-3 font-semibold">
-                                      Falso +
-                                    </th>
-                                    <th className="py-1.5 pr-3 font-semibold">
-                                      Link ruim
-                                    </th>
                                     <th className="py-1.5 font-semibold">
-                                      Aproveit.
+                                      Falso +
                                     </th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {portals.map((p) => {
-                                    const rate =
-                                      p.found > 0
-                                        ? Math.round((p.kept / p.found) * 100)
-                                        : null;
-                                    const fpRate =
-                                      p.checked > 0
-                                        ? Math.round(
-                                            (p.false_positives / p.checked) *
-                                              100
-                                          )
-                                        : null;
-                                    return (
-                                      <tr
-                                        key={p.portal}
-                                        className="border-t border-moss/10"
-                                      >
-                                        <td className="py-1.5 pr-3 font-medium text-ink">
-                                          {portalLabel(p.portal)}
-                                          {p.error ? (
-                                            <span className="ml-1 text-amber-700">
-                                              (erro)
-                                            </span>
-                                          ) : null}
-                                        </td>
-                                        <td className="py-1.5 pr-3">{p.found}</td>
-                                        <td className="py-1.5 pr-3">{p.kept}</td>
-                                        <td className="py-1.5 pr-3">
-                                          {p.checked || "—"}
-                                        </td>
-                                        <td className="py-1.5 pr-3 text-forest">
-                                          {p.validated_ok || "—"}
-                                        </td>
-                                        <td className="py-1.5 pr-3 text-amber-800">
-                                          {p.checked
-                                            ? `${p.false_positives}${
-                                                fpRate != null
-                                                  ? ` (${fpRate}%)`
-                                                  : ""
-                                              }`
-                                            : "—"}
-                                        </td>
-                                        <td className="py-1.5 pr-3 text-red-700">
-                                          {p.checked
-                                            ? p.invalid_links
-                                            : "—"}
-                                        </td>
-                                        <td className="py-1.5 text-moss/70">
-                                          {rate != null ? `${rate}%` : "—"}
-                                          {p.error ? (
-                                            <span className="mt-0.5 block text-[10px] text-amber-700">
-                                              {p.error.slice(0, 80)}
-                                            </span>
-                                          ) : null}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
+                                  {portals.map((p) => (
+                                    <tr
+                                      key={p.portal}
+                                      className="border-t border-moss/10"
+                                    >
+                                      <td className="py-1.5 pr-3 font-medium text-ink">
+                                        {portalLabel(p.portal)}
+                                        {p.error ? (
+                                          <span className="ml-1 text-amber-700">
+                                            (erro)
+                                          </span>
+                                        ) : null}
+                                      </td>
+                                      <td className="py-1.5 pr-3">{p.found}</td>
+                                      <td className="py-1.5 pr-3 text-forest">
+                                        {p.exato ?? 0}
+                                      </td>
+                                      <td className="py-1.5 pr-3">
+                                        {p.relacionado ?? 0}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-amber-800">
+                                        {p.fora ?? 0}
+                                      </td>
+                                      <td className="py-1.5 pr-3">
+                                        {p.remotas ?? 0}
+                                      </td>
+                                      <td className="py-1.5 pr-3">{p.kept}</td>
+                                      <td className="py-1.5 text-amber-800">
+                                        {p.checked
+                                          ? p.false_positives
+                                          : "—"}
+                                      </td>
+                                    </tr>
+                                  ))}
                                 </tbody>
                               </table>
                             )}

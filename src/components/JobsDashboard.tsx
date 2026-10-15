@@ -263,55 +263,97 @@ export function JobsDashboard() {
           </button>
         </form>
 
-        {inspect && scrapeReport && scrapeReport.portals.length > 0 && !loading && (
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-moss/15 bg-white p-4">
-            <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
-              Scrape por portal
-            </p>
-            <p className="mt-1 text-[11px] text-moss/55">
-              Encontradas = o portal devolveu · Pegamos = entraram no feed após
-              filtro · FP só aparece depois da análise
-            </p>
-            <table className="mt-3 min-w-full text-left text-xs">
-              <thead className="text-moss/55 uppercase tracking-wide">
-                <tr>
-                  <th className="py-1.5 pr-3 font-semibold">Portal</th>
-                  <th className="py-1.5 pr-3 font-semibold">Encontradas</th>
-                  <th className="py-1.5 pr-3 font-semibold">Pegamos</th>
-                  <th className="py-1.5 pr-3 font-semibold">Aproveit.</th>
-                  <th className="py-1.5 pr-3 font-semibold">Checadas</th>
-                  <th className="py-1.5 pr-3 font-semibold">Falso +</th>
-                  <th className="py-1.5 font-semibold">Link ruim</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scrapeReport.portals.map((p) => {
-                  const rate =
-                    p.found > 0
-                      ? Math.round((p.kept / p.found) * 100)
-                      : null;
-                  return (
-                    <tr key={p.portal} className="border-t border-moss/10">
-                      <td className="py-1.5 pr-3 font-medium">
-                        {formatSource(p.portal)}
-                      </td>
-                      <td className="py-1.5 pr-3">{p.found}</td>
-                      <td className="py-1.5 pr-3">{p.kept}</td>
-                      <td className="py-1.5 pr-3">
-                        {rate != null ? `${rate}%` : "—"}
-                      </td>
-                      <td className="py-1.5 pr-3">{p.checked || "—"}</td>
-                      <td className="py-1.5 pr-3 text-amber-800">
-                        {p.checked ? p.false_positives : "—"}
-                      </td>
-                      <td className="py-1.5 text-red-700">
-                        {p.checked ? p.invalid_links : "—"}
-                      </td>
+        {inspect && scrapeReport && !loading && (
+          <div className="mt-4 space-y-3">
+            {scrapeReport.summary && (
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-moss/15 bg-white p-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-2xl font-bold text-ink">
+                    {scrapeReport.summary.encontradas}
+                  </p>
+                  <p className="text-xs text-moss/60">Vagas encontradas</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-ink">
+                    {scrapeReport.summary.cargo_ok}
+                  </p>
+                  <p className="text-xs text-moss/60">
+                    Cargo ok ·{" "}
+                    <span className="text-forest">
+                      {scrapeReport.summary.exato} exato
+                    </span>
+                    {" · "}
+                    <span className="text-moss">
+                      {scrapeReport.summary.relacionado} rel.
+                    </span>
+                    {" · "}
+                    <span className="text-amber-800">
+                      {scrapeReport.summary.fora} fora
+                    </span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-ink">
+                    {scrapeReport.summary.remotas}
+                  </p>
+                  <p className="text-xs text-moss/60">Vagas remotas</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-ink">
+                    {scrapeReport.summary.no_feed}
+                  </p>
+                  <p className="text-xs text-moss/60">No feed (exato+rel.)</p>
+                </div>
+              </div>
+            )}
+
+            {scrapeReport.portals.length > 0 && (
+              <div className="overflow-x-auto rounded-2xl border border-moss/15 bg-white p-4">
+                <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+                  Scrape por portal
+                </p>
+                <table className="mt-3 min-w-full text-left text-xs">
+                  <thead className="text-moss/55 uppercase tracking-wide">
+                    <tr>
+                      <th className="py-1.5 pr-3 font-semibold">Portal</th>
+                      <th className="py-1.5 pr-3 font-semibold">Encontradas</th>
+                      <th className="py-1.5 pr-3 font-semibold">Exato</th>
+                      <th className="py-1.5 pr-3 font-semibold">Relac.</th>
+                      <th className="py-1.5 pr-3 font-semibold">Fora</th>
+                      <th className="py-1.5 pr-3 font-semibold">Remotas</th>
+                      <th className="py-1.5 pr-3 font-semibold">Pegamos</th>
+                      <th className="py-1.5 pr-3 font-semibold">Falso +</th>
+                      <th className="py-1.5 font-semibold">Link</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {scrapeReport.portals.map((p) => (
+                      <tr key={p.portal} className="border-t border-moss/10">
+                        <td className="py-1.5 pr-3 font-medium">
+                          {formatSource(p.portal)}
+                        </td>
+                        <td className="py-1.5 pr-3">{p.found}</td>
+                        <td className="py-1.5 pr-3 text-forest">
+                          {p.exato ?? 0}
+                        </td>
+                        <td className="py-1.5 pr-3">{p.relacionado ?? 0}</td>
+                        <td className="py-1.5 pr-3 text-amber-800">
+                          {p.fora ?? 0}
+                        </td>
+                        <td className="py-1.5 pr-3">{p.remotas ?? 0}</td>
+                        <td className="py-1.5 pr-3">{p.kept}</td>
+                        <td className="py-1.5 pr-3 text-amber-800">
+                          {p.checked ? p.false_positives : "—"}
+                        </td>
+                        <td className="py-1.5 text-red-700">
+                          {p.checked ? p.invalid_links : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -474,6 +516,23 @@ export function JobsDashboard() {
                             {inspect && (
                               <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
                                 {formatSource(job.source)}
+                              </span>
+                            )}
+                            {inspect && job.match_tier && (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  job.match_tier === "exato"
+                                    ? "bg-forest/15 text-forest"
+                                    : job.match_tier === "relacionado"
+                                      ? "bg-sand text-moss"
+                                      : "bg-amber-100 text-amber-900"
+                                }`}
+                              >
+                                {job.match_tier === "exato"
+                                  ? "Exato"
+                                  : job.match_tier === "relacionado"
+                                    ? "Relacionado"
+                                    : "Fora"}
                               </span>
                             )}
                             {notOnLinkedIn && (

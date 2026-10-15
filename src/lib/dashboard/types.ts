@@ -42,6 +42,10 @@ export type PortalScrapeStat = {
   found: number;
   /** Vagas que entramos no feed (após filtro de termo + dedupe). */
   kept: number;
+  exato: number;
+  relacionado: number;
+  fora: number;
+  remotas: number;
   /** Quantas passaram pelo double-check (top N da análise). */
   checked: number;
   false_positives: number;
@@ -50,7 +54,21 @@ export type PortalScrapeStat = {
   error?: string | null;
 };
 
+export type ScrapeSummary = {
+  /** Total após dedupe (todas as portas). */
+  encontradas: number;
+  exato: number;
+  relacionado: number;
+  fora: number;
+  /** Soma exato + relacionado (cargo utilizável). */
+  cargo_ok: number;
+  remotas: number;
+  /** Entraram no feed do membro (hoje: não-fora). */
+  no_feed: number;
+};
+
 export type ScrapeReport = {
+  summary: ScrapeSummary;
   portals: PortalScrapeStat[];
   updated_at: string;
 };

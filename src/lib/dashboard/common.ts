@@ -192,15 +192,24 @@ export function postedTimestamp(posted: string | null | undefined): number {
   return 0;
 }
 
+function tierRank(tier: string | null | undefined): number {
+  if (tier === "exato") return 2;
+  if (tier === "relacionado") return 1;
+  return 0;
+}
+
 /**
- * Ordena feed: 1) termo no título, 2) data mais recente.
- * Sem data conhecida fica depois das que têm data.
+ * Ordena feed: 1) match do cargo (exato > relacionado), 2) termo no título, 3) data.
  */
 export function rankJobsForFeed(
   jobs: DashboardJob[],
   term: string
 ): DashboardJob[] {
   return [...jobs].sort((a, b) => {
+    const tierA = tierRank(a.match_tier);
+    const tierB = tierRank(b.match_tier);
+    if (tierB !== tierA) return tierB - tierA;
+
     const titleA = titleMatchScore(a.title, term);
     const titleB = titleMatchScore(b.title, term);
     if (titleB !== titleA) return titleB - titleA;

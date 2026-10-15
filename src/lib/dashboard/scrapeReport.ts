@@ -1,65 +1,122 @@
+import { classifyCargoMatch } from "@/lib/dashboard/jobMatch";
 import type {
+  DashboardJob,
   PortalScrapeStat,
   ScrapeReport,
+  ScrapeSummary,
   ValidationReport,
 } from "@/lib/dashboard/types";
-import type { DashboardJob } from "@/lib/dashboard/types";
+
+export { classifyCargoMatch };
+
+function emptyPortal(portal: string, error?: string | null): PortalScrapeStat {
+  return {
+    portal,
+    found: 0,
+    kept: 0,
+    exato: 0,
+    relacionado: 0,
+    fora: 0,
+    remotas: 0,
+    checked: 0,
+    false_positives: 0,
+    invalid_links: 0,
+    validated_ok: 0,
+    error: error || null,
+  };
+}
+
+export function tagJobsWithMatch(
+  jobs: DashboardJob[],
+  term: string
+): DashboardJob[] {
+  return jobs.map((job) => ({
+    ...job,
+    match_tier: classifyCargoMatch(job, term),
+  }));
+}
 
 export function buildScrapeReport(input: {
-  /** Contagem bruta por fetcher (nome do portal). */
   foundByPortal: Record<string, number>;
-  /** Erros por portal. */
   errorsByPortal: Record<string, string>;
-  /** Jobs que ficaram no feed após filtro. */
+  /** Todas as vagas dedupeadas (já com match_tier). */
+  allJobs: DashboardJob[];
+  /** Vagas que vão para o feed. */
   keptJobs: DashboardJob[];
   validation?: ValidationReport | null;
 }): ScrapeReport {
-  const keptByPortal: Record<string, number> = {};
-  for (const job of input.keptJobs) {
-    const key = (job.source || "unknown").toLowerCase();
-    keptByPortal[key] = (keptByPortal[key] || 0) + 1;
+  const byPortal = new Map<string, PortalScrapeStat>();
+
+  for (const [portal, found] of Object.entries(input.foundByPortal)) {
+    byPortal.set(
+      portal,
+      emptyPortal(portal, input.errorsByPortal[portal] || null)
+    );
+    const row = byPortal.get(portal)!;
+    row.found = found;
   }
 
-  const checkedBy: Record<string, number> = {};
-  const fpBy: Record<string, number> = {};
-  const invalidBy: Record<string, number> = {};
-  const okBy: Record<string, number> = {};
+  for (const [portal, err] of Object.entries(input.errorsByPortal)) {
+    if (!byPortal.has(portal)) byPortal.set(portal, emptyPortal(portal, err));
+    else byPortal.get(portal)!.error = err;
+  }
+
+  for (const job of input.allJobs) {
+    const key = (job.source || "unknown").toLowerCase();
+    if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
+    const row = byPortal.get(key)!;
+    const tier = job.match_tier || "fora";
+    if (tier === "exato") row.exato += 1;
+    else if (tier === "relacionado") row.relacionado += 1;
+    else row.fora += 1;
+    if (job.remote) row.remotas += 1;
+  }
+
+  for (const job of input.keptJobs) {
+    const key = (job.source || "unknown").toLowerCase();
+    if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
+    byPortal.get(key)!.kept += 1;
+  }
 
   for (const item of input.validation?.items || []) {
     if (item.status === "skipped") continue;
     const key = (item.source || "unknown").toLowerCase();
-    checkedBy[key] = (checkedBy[key] || 0) + 1;
-    if (item.status === "false_positive") {
-      fpBy[key] = (fpBy[key] || 0) + 1;
-    } else if (item.status === "invalid_link") {
-      invalidBy[key] = (invalidBy[key] || 0) + 1;
-    } else if (item.status === "validated") {
-      okBy[key] = (okBy[key] || 0) + 1;
-    }
+    if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
+    const row = byPortal.get(key)!;
+    row.checked += 1;
+    if (item.status === "false_positive") row.false_positives += 1;
+    else if (item.status === "invalid_link") row.invalid_links += 1;
+    else if (item.status === "validated") row.validated_ok += 1;
   }
 
-  const portalKeys = new Set([
-    ...Object.keys(input.foundByPortal),
-    ...Object.keys(keptByPortal),
-    ...Object.keys(checkedBy),
-    ...Object.keys(input.errorsByPortal),
-  ]);
-
-  const portals: PortalScrapeStat[] = [...portalKeys]
-    .filter((p) => !p.endsWith("_warning") && p !== "unknown")
-    .map((portal) => ({
-      portal,
-      found: input.foundByPortal[portal] || 0,
-      kept: keptByPortal[portal] || 0,
-      checked: checkedBy[portal] || 0,
-      false_positives: fpBy[portal] || 0,
-      invalid_links: invalidBy[portal] || 0,
-      validated_ok: okBy[portal] || 0,
-      error: input.errorsByPortal[portal] || null,
-    }))
+  const portals = [...byPortal.values()]
+    .filter((p) => !p.portal.endsWith("_warning") && p.portal !== "unknown")
     .sort((a, b) => b.found - a.found || a.portal.localeCompare(b.portal));
 
+  let exato = 0;
+  let relacionado = 0;
+  let fora = 0;
+  let remotas = 0;
+  for (const job of input.allJobs) {
+    const tier = job.match_tier || "fora";
+    if (tier === "exato") exato += 1;
+    else if (tier === "relacionado") relacionado += 1;
+    else fora += 1;
+    if (job.remote) remotas += 1;
+  }
+
+  const summary: ScrapeSummary = {
+    encontradas: input.allJobs.length,
+    exato,
+    relacionado,
+    fora,
+    cargo_ok: exato + relacionado,
+    remotas,
+    no_feed: input.keptJobs.length,
+  };
+
   return {
+    summary,
     portals,
     updated_at: new Date().toISOString(),
   };
@@ -72,5 +129,19 @@ export function extractScrapeReport(
   if (!raw || typeof raw !== "object") return null;
   const report = raw as ScrapeReport;
   if (!Array.isArray(report.portals)) return null;
+  if (!report.summary) {
+    // Relatórios antigos sem summary
+    report.summary = {
+      encontradas: report.portals.reduce((s, p) => s + (p.found || 0), 0),
+      exato: report.portals.reduce((s, p) => s + (p.exato || 0), 0),
+      relacionado: report.portals.reduce((s, p) => s + (p.relacionado || 0), 0),
+      fora: report.portals.reduce((s, p) => s + (p.fora || 0), 0),
+      cargo_ok: 0,
+      remotas: report.portals.reduce((s, p) => s + (p.remotas || 0), 0),
+      no_feed: report.portals.reduce((s, p) => s + (p.kept || 0), 0),
+    };
+    report.summary.cargo_ok =
+      report.summary.exato + report.summary.relacionado;
+  }
   return report;
 }

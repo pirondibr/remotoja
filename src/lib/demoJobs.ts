@@ -15,6 +15,8 @@ export type DemoJob = {
   job_id?: string | null;
   remote?: boolean;
   snippet?: string | null;
+  /** Alinhamento com o cargo pesquisado (feed pago / admin). */
+  match_tier?: "exato" | "relacionado" | "fora" | null;
 };
 
 export type DemoJobsPayload = {

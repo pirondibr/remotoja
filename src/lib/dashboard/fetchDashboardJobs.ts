@@ -1,4 +1,4 @@
-import { dedupeJobs, rankJobsForFeed, termMatches } from "@/lib/dashboard/common";
+import { dedupeJobs, rankJobsForFeed } from "@/lib/dashboard/common";
 import { fetchCatho } from "@/lib/dashboard/catho";
 import { fetchGoogleDashboard } from "@/lib/dashboard/google";
 import { fetchGupy } from "@/lib/dashboard/gupy";
@@ -7,7 +7,10 @@ import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchProgramathor } from "@/lib/dashboard/programathor";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
-import { buildScrapeReport } from "@/lib/dashboard/scrapeReport";
+import {
+  buildScrapeReport,
+  tagJobsWithMatch,
+} from "@/lib/dashboard/scrapeReport";
 import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
 
@@ -110,22 +113,27 @@ export async function fetchDashboardJobs(
     }
   }
 
-  // Portais (ex.: Remotar) às vezes devolvem vagas fora do cargo — filtra pelo termo
+  // Dedupe + classifica cargo (exato / relacionado / fora)
+  const allTagged = tagJobsWithMatch(dedupeJobs(merged), term);
+
+  // Feed do membro: só cargo exato ou relacionado (fora fica só no relatório)
   const relevant = rankJobsForFeed(
-    dedupeJobs(merged).filter((job) => {
-      const blob = `${job.title} ${job.snippet || ""} ${job.company}`;
-      return termMatches(blob, term);
-    }),
+    allTagged.filter(
+      (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
+    ),
     term
   );
 
+  const scrapeBase = {
+    foundByPortal,
+    errorsByPortal,
+    allJobs: allTagged,
+    keptJobs: relevant,
+  };
+
   // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
   if (!options.validate) {
-    const scrape_report = buildScrapeReport({
-      foundByPortal,
-      errorsByPortal,
-      keptJobs: relevant,
-    });
+    const scrape_report = buildScrapeReport(scrapeBase);
     sources._scrape_report = scrape_report;
     return {
       role: term,
@@ -140,10 +148,7 @@ export async function fetchDashboardJobs(
   const { jobs, validation } = await validateRemoteJobs(relevant);
   const ranked = rankJobsForFeed(jobs, term);
   const scrape_report = buildScrapeReport({
-    foundByPortal,
-    errorsByPortal,
-    // "kept" = o que entraria no feed do membro (antes do corte da análise)
-    keptJobs: relevant,
+    ...scrapeBase,
     validation,
   });
   sources._scrape_report = scrape_report;
