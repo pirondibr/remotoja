@@ -37,6 +37,16 @@ function formatSource(source: string) {
     infojobs: "InfoJobs",
     remotar: "Remotar",
     programathor: "Programathor",
+    jooble: "Jooble",
+    glassdoor: "Glassdoor",
+    vagas_com: "Vagas.com",
+    trampos: "Trampos",
+    geekhunter: "GeekHunter",
+    kenoby: "Kenoby",
+    greenhouse: "Greenhouse",
+    lever: "Lever",
+    workable: "Workable",
+    company_site: "Site da empresa",
   };
   const key = raw.toLowerCase();
   if (map[key]) return map[key];

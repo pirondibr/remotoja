@@ -119,6 +119,57 @@ export function hostNeedsStealthProxy(url: string): boolean {
   }
 }
 
+/**
+ * Infere o portal de origem a partir da URL da vaga (agregadores: Remotar, Google…).
+ * Retorna chave estável (gupy, linkedin, catho…) ou null se for o próprio agregador / desconhecido.
+ */
+export function inferPortalFromUrl(url: string | null | undefined): string | null {
+  const raw = (url || "").trim();
+  if (!raw) return null;
+  try {
+    const host = new URL(raw).hostname.replace(/^www\./i, "").toLowerCase();
+    if (!host) return null;
+    if (host.includes("gupy.io") || host.includes("gupy.com")) return "gupy";
+    if (host.includes("linkedin.com")) return "linkedin";
+    if (host.includes("catho.com")) return "catho";
+    if (host.includes("infojobs")) return "infojobs";
+    if (host.includes("indeed.")) return "indeed";
+    if (host.includes("programathor")) return "programathor";
+    if (host.includes("jooble.")) return "jooble";
+    if (host.includes("glassdoor.")) return "glassdoor";
+    if (host.includes("vagas.com")) return "vagas_com";
+    if (host.includes("trampos.co")) return "trampos";
+    if (host.includes("geekhunter")) return "geekhunter";
+    if (host.includes("quiron") || host.includes("kenoby")) return "kenoby";
+    if (host.includes("greenhouse.io")) return "greenhouse";
+    if (host.includes("lever.co")) return "lever";
+    if (host.includes("workable.com")) return "workable";
+    if (host.includes("remotar.com")) return "remotar";
+    if (host.includes("google.") && host.includes("jobs")) return "google_vagas";
+    // Domínio próprio da empresa (carreira.xxx) — marca como company_site
+    if (
+      host.startsWith("jobs.") ||
+      host.startsWith("careers.") ||
+      host.startsWith("carreiras.") ||
+      host.includes("myworkdayjobs.com") ||
+      host.includes("boards.eu.greenhouse")
+    ) {
+      return "company_site";
+    }
+    // Host genérico: usa o 2º nível como rótulo curto
+    const parts = host.split(".");
+    if (parts.length >= 2) {
+      const base = parts[parts.length - 2];
+      if (base && base.length >= 3 && base !== "com" && base !== "org") {
+        return base;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Jooble/Cloudflare: premium proxy sozinho devolve challenge; stealth+JS passou no teste. */
 export async function fetchScrapingBeeStealth(
   targetUrl: string

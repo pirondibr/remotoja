@@ -1,4 +1,8 @@
-import { cleanText, slugify } from "@/lib/dashboard/common";
+import {
+  cleanText,
+  inferPortalFromUrl,
+  slugify,
+} from "@/lib/dashboard/common";
 import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
@@ -91,14 +95,17 @@ export async function fetchRemotar(term: string): Promise<PortalFetchResult> {
       `${typeText} ${title}`
     );
     const location = cityState || (looksRemote && !looksHybrid ? "Remoto" : "");
+    const external = (row.externalLink || "").trim() || null;
+    const remotarPage = `https://remotar.com.br/job/${id}/${companySlug}/${titleSlug}`;
+    // Remotar é agregador: portal de origem = host do externalLink (Gupy, LinkedIn…).
+    const origin = inferPortalFromUrl(external);
     out.push({
       title,
       company,
       location: location || "Brasil",
-      source: "remotar",
-      source_url:
-        row.externalLink ||
-        `https://remotar.com.br/job/${id}/${companySlug}/${titleSlug}`,
+      source: origin && origin !== "remotar" ? origin : "remotar",
+      scrape: "remotar",
+      source_url: external || remotarPage,
       company_logo: remotarLogo(row),
       salary: remotarSalary(row),
       posted: (row.createdAt || "").slice(0, 10) || null,
@@ -106,6 +113,7 @@ export async function fetchRemotar(term: string): Promise<PortalFetchResult> {
       // Não assumir remoto: a validação da página decide de verdade
       remote: looksRemote && !looksHybrid,
       snippet: cleanText(row.subtitle || row.description || "", 220) || null,
+      from_remote_filter: true,
     });
   }
   return {

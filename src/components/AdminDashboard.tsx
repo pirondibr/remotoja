@@ -41,6 +41,10 @@ const PORTAL_LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
   indeed: "Indeed",
   google_vagas: "Google Vagas",
+  jooble: "Jooble",
+  glassdoor: "Glassdoor",
+  vagas_com: "Vagas.com",
+  company_site: "Site da empresa",
 };
 
 function portalLabel(key: string) {
