@@ -105,6 +105,88 @@ export async function fetchScrapingBee(
   });
 }
 
+const CLOUDFLARE_RE =
+  /just a moment|cf-browser-verification|attention required|enable javascript and cookies/i;
+
+/** Jooble/Cloudflare: premium proxy sozinho devolve challenge; stealth+JS passou no teste. */
+export async function fetchScrapingBeeStealth(
+  targetUrl: string
+): Promise<string> {
+  const key = process.env.SCRAPINGBEE_API_KEY?.trim();
+  if (!key) throw new Error("SCRAPINGBEE_API_KEY não configurada");
+  const params = new URLSearchParams({
+    api_key: key,
+    url: targetUrl,
+    country_code: "br",
+    stealth_proxy: "true",
+    render_js: "true",
+  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 70000);
+  try {
+    const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(
+        `ScrapingBee stealth HTTP ${res.status} em ${targetUrl.split("?")[0]}`
+      );
+    }
+    if (CLOUDFLARE_RE.test(text.slice(0, 4000))) {
+      throw new Error("ScrapingBee stealth ainda em Cloudflare challenge");
+    }
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function looksBlocked(statusOrMsg: string, body = ""): boolean {
+  if (/HTTP\s*403|HTTP\s*429|bloquead|timeout|aborted/i.test(statusOrMsg)) {
+    return true;
+  }
+  if (CLOUDFLARE_RE.test(body.slice(0, 4000))) return true;
+  return false;
+}
+
+/**
+ * Fetch para double-check: direto → se 403/CF, ScrapingBee stealth+JS.
+ * TinyFish fetch também bloqueia Jooble (bot_blocked); não usar aqui.
+ */
+export async function fetchHtmlForValidation(
+  url: string,
+  options?: { timeoutMs?: number }
+): Promise<{ text: string; via: "direct" | "scrapingbee_stealth" }> {
+  try {
+    const text = await fetchHtml(url, {
+      timeoutMs: options?.timeoutMs ?? 12000,
+      headers: {
+        "User-Agent": UA,
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    if (text.trim().length < 40) {
+      throw new Error("página vazia ou bloqueada");
+    }
+    if (CLOUDFLARE_RE.test(text.slice(0, 4000))) {
+      throw new Error("Cloudflare challenge (direct)");
+    }
+    return { text, via: "direct" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!process.env.SCRAPINGBEE_API_KEY?.trim() || !looksBlocked(message)) {
+      throw err instanceof Error ? err : new Error(message);
+    }
+    const text = await fetchScrapingBeeStealth(url);
+    if (!text || text.trim().length < 40) {
+      throw new Error("página vazia via ScrapingBee stealth");
+    }
+    return { text, via: "scrapingbee_stealth" };
+  }
+}
+
 /** Cargos não-dev: portais às vezes misturam vagas de programador na busca. */
 const NON_DEV_ROLE =
   /^(seo|sem|as[oa]|conte[uú]do|copy|redator|social|m[ií]dias?|marketing|designer|ux|ui|produto|product|gestor|gest[aã]o|rh|recrut)/i;

@@ -1,4 +1,4 @@
-import { fetchHtml, UA } from "@/lib/dashboard/common";
+import { fetchHtmlForValidation } from "@/lib/dashboard/common";
 import { assessRemotePage } from "@/lib/dashboard/assessRemotePage";
 import { assessRemoteWithLlm } from "@/lib/dashboard/llmJobAnalysis";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
@@ -11,8 +11,9 @@ import type {
 
 export type { ValidationItem, ValidationReport, ValidationStatus } from "@/lib/dashboard/types";
 
-const CONCURRENCY = 5;
-const FETCH_TIMEOUT_MS = 10000;
+/** Menor concorrência: fallback stealth do Bee é lento/caro. */
+const CONCURRENCY = 3;
+const FETCH_TIMEOUT_MS = 12000;
 /** Double-check rigoroso nas primeiras N (usuário pediu foco nas 10). */
 const VALIDATE_LIMIT = 10;
 const ENRICH_LIMIT = 50;
@@ -29,22 +30,15 @@ function withDetails(job: DashboardJob, html: string): DashboardJob {
 
 async function probeUrl(
   url: string
-): Promise<{ ok: boolean; text: string; reason?: string }> {
+): Promise<{ ok: boolean; text: string; reason?: string; via?: string }> {
   try {
-    const text = await fetchHtml(url, {
+    const { text, via } = await fetchHtmlForValidation(url, {
       timeoutMs: FETCH_TIMEOUT_MS,
-      headers: {
-        "User-Agent": UA,
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-      },
     });
-    if (!text || text.trim().length < 40) {
-      return { ok: false, text: "", reason: "página vazia ou bloqueada" };
-    }
-    return { ok: true, text };
+    return { ok: true, text, via };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, text: "", reason: message.slice(0, 120) };
+    return { ok: false, text: "", reason: message.slice(0, 160) };
   }
 }
 
