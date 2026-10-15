@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Manrope, Syne } from "next/font/google";
+import { AttributionBoot } from "@/components/AttributionBoot";
 import "./globals.css";
 
 const display = Syne({
@@ -33,7 +35,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={`${display.variable} ${body.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <Suspense fallback={null}>
+          <AttributionBoot />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

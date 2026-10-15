@@ -5,6 +5,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { RR_PLANS } from "@/lib/rrPlans";
+import {
+  captureAttributionFromUrl,
+  loadAttribution,
+} from "@/lib/attribution";
 import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 
@@ -175,6 +179,30 @@ export function FinalV2() {
 
   const headlineTime = useMemo(() => freshestPostedLabel(jobs), [jobs]);
 
+  async function logLead(
+    trimmed: string,
+    list: DemoJob[],
+    cached: boolean
+  ) {
+    const attr = loadAttribution() || {};
+    try {
+      await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: trimmed,
+          channel: "demo",
+          jobs_shown: list.slice(0, 20),
+          cached,
+          ...attr,
+        }),
+        keepalive: true,
+      });
+    } catch {
+      // não bloqueia o funil
+    }
+  }
+
   async function runSearch(value: string) {
     const trimmed = value.trim();
     if (trimmed.length < 2) return;
@@ -195,15 +223,21 @@ export function FinalV2() {
       setJobs(list);
       saveJobSession(trimmed, list);
       setError(null);
+      void logLead(trimmed, list, Boolean(data.cached));
     } catch {
       const list = getDemoJobs(5);
       setJobs(list);
       saveJobSession(trimmed, list);
       setError(null);
+      void logLead(trimmed, list, false);
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    captureAttributionFromUrl(searchParams);
+  }, [searchParams]);
 
   useEffect(() => {
     if (initialRole.trim().length > 1) {

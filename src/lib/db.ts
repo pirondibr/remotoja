@@ -1,0 +1,78 @@
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+
+export type Sql = NeonQueryFunction<false, false>;
+
+let sqlSingleton: Sql | null = null;
+let schemaReady: Promise<void> | null = null;
+
+export function hasDatabase(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
+export function getSql(): Sql {
+  const url = process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error("DATABASE_URL não configurada");
+  }
+  if (!sqlSingleton) {
+    sqlSingleton = neon(url);
+  }
+  return sqlSingleton;
+}
+
+export async function ensureSchema(): Promise<void> {
+  if (!hasDatabase()) return;
+  if (!schemaReady) {
+    schemaReady = (async () => {
+      const sql = getSql();
+      await sql`
+        CREATE TABLE IF NOT EXISTS job_cache (
+          kind text NOT NULL,
+          role_key text NOT NULL,
+          jobs jsonb NOT NULL DEFAULT '[]'::jsonb,
+          fetched_via text,
+          sources jsonb,
+          updated_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (kind, role_key)
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS lead_searches (
+          id uuid PRIMARY KEY,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          role text NOT NULL,
+          channel text NOT NULL DEFAULT 'demo',
+          utm_source text,
+          utm_medium text,
+          utm_campaign text,
+          utm_content text,
+          utm_term text,
+          fbclid text,
+          gclid text,
+          referrer text,
+          jobs_shown jsonb NOT NULL DEFAULT '[]'::jsonb,
+          jobs_count int NOT NULL DEFAULT 0,
+          cached boolean NOT NULL DEFAULT false,
+          user_agent text
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS lead_searches_created_at_idx
+        ON lead_searches (created_at DESC)
+      `;
+    })().catch((err) => {
+      schemaReady = null;
+      throw err;
+    });
+  }
+  await schemaReady;
+}
+
+export function normalizeRoleKey(role: string): string {
+  return role
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
