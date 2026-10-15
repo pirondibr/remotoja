@@ -54,7 +54,7 @@ export async function GET(request: Request) {
         sources: portalSources,
         validation,
         updated_at: entry.updated_at,
-        href: `/api/admin/open-feed?role=${encodeURIComponent(entry.role_key)}&inspect=1&validate=1`,
+        href: `/api/admin/open-feed?role=${encodeURIComponent(entry.role_key)}&mode=cache`,
       };
     });
 

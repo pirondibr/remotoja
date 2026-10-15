@@ -48,8 +48,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const bypassCache = searchParams.get("fresh") === "1";
-  /** Double-check remoto/link: só sob demanda (admin inspect). */
+  /** Double-check remoto/link: só sob demanda (admin análise). */
   const validate = searchParams.get("validate") === "1";
+  /** Admin: só o que o usuário viu — não refaz scrapers. */
+  const cacheOnly = searchParams.get("cache_only") === "1";
 
   if (role.length < 2) {
     return NextResponse.json(
@@ -59,28 +61,61 @@ export async function GET(request: Request) {
   }
 
   // Cache do membro nunca exige validate. Validate sempre busca live.
-  if (!bypassCache && !validate && hasDatabase()) {
-    try {
-      const cached = await getCachedJobs("paid", role);
-      if (cached && cached.jobs.length > 0) {
-        const jobs = filterByRole(cached.jobs as DemoJob[], role);
-        // Cache antigo misturado (ex.: SEO com vagas de programador) → força live
-        if (jobs.length === 0) {
-          // segue live
-        } else {
+  if ((!bypassCache && !validate) || cacheOnly) {
+    if (hasDatabase()) {
+      try {
+        const cached = await getCachedJobs("paid", role);
+        if (cached && cached.jobs.length > 0) {
+          const jobs = filterByRole(cached.jobs as DemoJob[], role);
+          if (jobs.length === 0 && !cacheOnly) {
+            // Cache antigo misturado → força live (exceto cache_only)
+          } else {
+            return NextResponse.json({
+              role,
+              count: jobs.length,
+              jobs,
+              fetched_via: cached.fetched_via || "cache_paid",
+              sources: sourcesWithoutValidation(cached.sources),
+              validation: extractValidation(cached.sources),
+              cached: true,
+              cache_updated_at: cached.updated_at,
+            });
+          }
+        }
+        if (cacheOnly) {
           return NextResponse.json({
             role,
-            count: jobs.length,
-            jobs,
-            fetched_via: cached.fetched_via || "cache_paid",
-            sources: sourcesWithoutValidation(cached.sources),
+            count: 0,
+            jobs: [],
+            fetched_via: "cache_paid",
+            sources: {},
             cached: true,
-            cache_updated_at: cached.updated_at,
+            error: "Sem cache pago para esse cargo ainda. O usuário ainda não gerou feed, ou o cache foi resetado.",
           });
         }
+      } catch {
+        if (cacheOnly) {
+          return NextResponse.json(
+            {
+              role,
+              count: 0,
+              jobs: [],
+              error: "Falha ao ler cache pago",
+              cached: true,
+            },
+            { status: 500 }
+          );
+        }
+        // segue live
       }
-    } catch {
-      // segue live
+    } else if (cacheOnly) {
+      return NextResponse.json({
+        role,
+        count: 0,
+        jobs: [],
+        error: "DATABASE_URL não configurada",
+        cached: true,
+      });
     }
   }
 

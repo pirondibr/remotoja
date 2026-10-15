@@ -36,6 +36,18 @@ export function JobsDashboard() {
   const searchParams = useSearchParams();
   const roleFromUrl = searchParams.get("role") || searchParams.get("q") || "";
   const inspect = searchParams.get("inspect") === "1";
+  const modeParam = (searchParams.get("mode") || "").toLowerCase();
+  const cacheOnly =
+    searchParams.get("cache_only") === "1" || modeParam === "cache";
+  const analyze =
+    searchParams.get("validate") === "1" || modeParam === "analyze";
+  const adminMode = inspect
+    ? cacheOnly
+      ? "cache"
+      : analyze
+        ? "analyze"
+        : "cache"
+    : null;
 
   const [role, setRole] = useState(roleFromUrl);
   const [draft, setDraft] = useState(roleFromUrl);
@@ -45,6 +57,7 @@ export function JobsDashboard() {
   const [filter, setFilter] = useState("");
   const [sources, setSources] = useState<Record<string, number | string>>({});
   const [validation, setValidation] = useState<ValidationReport | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
   const loadJobs = useCallback(
     async (
@@ -67,8 +80,9 @@ export function JobsDashboard() {
       setJobs([]);
       setSources({});
       setValidation(null);
+      setFromCache(false);
 
-      if (preferCache && !inspect) {
+      if (preferCache && !inspect && !analyze) {
         const cached = loadJobSession(trimmed);
         if (
           cached &&
@@ -88,9 +102,14 @@ export function JobsDashboard() {
 
       try {
         const params = new URLSearchParams({ role: trimmed });
-        // Sempre fresh ao trocar cargo: não reaproveita cache de outro termo
-        if (!preferCache || inspect) params.set("fresh", "1");
-        if (inspect) params.set("validate", "1");
+        if (cacheOnly) {
+          params.set("cache_only", "1");
+        } else if (analyze) {
+          params.set("fresh", "1");
+          params.set("validate", "1");
+        } else if (!preferCache) {
+          params.set("fresh", "1");
+        }
         const res = await fetch(`/api/dashboard/jobs?${params}`, { signal });
         if (signal?.aborted) return;
         const data = await res.json();
@@ -100,7 +119,10 @@ export function JobsDashboard() {
           data.sources && typeof data.sources === "object" ? data.sources : {}
         );
         setValidation(data.validation || null);
-        saveJobSession(trimmed, list);
+        setFromCache(Boolean(data.cached));
+        if (!cacheOnly && !analyze) {
+          saveJobSession(trimmed, list);
+        }
         if (list.length === 0) {
           setError(
             data.error ||
@@ -114,15 +136,17 @@ export function JobsDashboard() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [inspect]
+    [inspect, cacheOnly, analyze]
   );
 
   useEffect(() => {
     const initial = roleFromUrl.trim() || "SEO";
     const controller = new AbortController();
-    void loadJobs(initial, !inspect, controller.signal);
+    // Admin cache: só cache. Admin análise: live. Membro: preferCache.
+    const preferCache = adminMode === "analyze" ? false : true;
+    void loadJobs(initial, preferCache, controller.signal);
     return () => controller.abort();
-  }, [roleFromUrl, loadJobs, inspect]);
+  }, [roleFromUrl, loadJobs, adminMode]);
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -159,7 +183,11 @@ export function JobsDashboard() {
           </Link>
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full bg-mint/30 px-2.5 py-1 text-[11px] font-semibold text-moss sm:inline">
-              {inspect ? "Admin · inspeção" : "Membro · MVP"}
+              {adminMode === "cache"
+                ? "Admin · cache (visão do usuário)"
+                : adminMode === "analyze"
+                  ? "Admin · análise ao vivo"
+                  : "Membro · MVP"}
             </span>
             {inspect ? (
               <Link
@@ -189,9 +217,17 @@ export function JobsDashboard() {
               <span className="text-moss">{role || "seu cargo"}</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm text-moss/70">
-              Feed com as vagas que encontramos. Cada card mostra o portal de
-              origem. Clique em candidatar para abrir a página da empresa.
+              {adminMode === "cache"
+                ? "Mesmo feed em cache que o membro vê — sem refazer scrapers."
+                : adminMode === "analyze"
+                  ? "Busca ao vivo nos portais + double-check de remoto/link."
+                  : "Feed com as vagas que encontramos. Cada card mostra o portal de origem."}
             </p>
+            {inspect && fromCache && !loading && (
+              <p className="mt-1 text-xs font-medium text-forest">
+                Servindo do cache pago
+              </p>
+            )}
           </div>
           {!loading && (
             <p className="text-sm font-semibold text-moss">
@@ -323,12 +359,16 @@ export function JobsDashboard() {
         {loading && (
           <div className="mt-10 rounded-2xl border border-moss/10 bg-white p-10 text-center">
             <p className="font-semibold">
-              {inspect
+              {adminMode === "analyze"
                 ? "Agregando portais e rodando double-check (admin)…"
-                : "Procurando vagas em diversos portais…"}
+                : adminMode === "cache"
+                  ? "Carregando cache pago…"
+                  : "Procurando vagas em diversos portais…"}
             </p>
             <p className="mt-2 text-sm text-moss/60">
-              Isso pode levar alguns segundos
+              {adminMode === "cache"
+                ? "Leitura rápida do que o usuário já viu"
+                : "Isso pode levar alguns segundos"}
             </p>
           </div>
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 
 type JobPreview = { title: string; company: string; source?: string };
@@ -105,20 +105,14 @@ export function AdminDashboard() {
     await load();
   }
 
-  function openPaidFeed(event: FormEvent) {
-    event.preventDefault();
+  function openPaidFeed(mode: "cache" | "analyze") {
     const role = paidRole.trim();
     if (role.length < 2) return;
-    // Bypass do gate de membro: seta cookie de inspeção e abre relatório
-    window.location.href = `/api/admin/open-feed?role=${encodeURIComponent(role)}&inspect=1&validate=1`;
+    window.location.href = feedHref(role, mode);
   }
 
-  function inspectHref(role: string, validate = true) {
-    const q = new URLSearchParams({
-      role,
-      inspect: "1",
-      validate: validate ? "1" : "0",
-    });
+  function feedHref(role: string, mode: "cache" | "analyze") {
+    const q = new URLSearchParams({ role, mode });
     return `/api/admin/open-feed?${q}`;
   }
 
@@ -186,13 +180,11 @@ export function AdminDashboard() {
           Feed pago (inspeção)
         </h2>
         <p className="mt-1 text-sm text-moss/70">
-          Abre a mesma página do membro, com origem de cada vaga e relatório de
-          validação (remoto / link inválido / falso positivo).
+          <strong>Cache</strong> = o que o membro viu (rápido).{" "}
+          <strong>Análise</strong> = busca ao vivo + double-check de
+          remoto/link.
         </p>
-        <form
-          onSubmit={openPaidFeed}
-          className="mt-4 flex flex-col gap-2 sm:flex-row"
-        >
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             value={paidRole}
             onChange={(e) => setPaidRole(e.target.value)}
@@ -200,12 +192,20 @@ export function AdminDashboard() {
             className="flex-1 rounded-xl border border-moss/15 bg-cream/50 px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
           <button
-            type="submit"
-            className="rounded-xl bg-ink px-5 py-2.5 text-sm font-bold text-cream hover:bg-forest"
+            type="button"
+            onClick={() => openPaidFeed("cache")}
+            className="rounded-xl border border-moss/20 bg-white px-4 py-2.5 text-sm font-bold text-ink hover:border-moss/40"
           >
-            Abrir feed pago
+            Ver cache
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => openPaidFeed("analyze")}
+            className="rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-cream hover:bg-forest"
+          >
+            Rodar análise
+          </button>
+        </div>
 
         {(data?.paid_feeds || []).length > 0 && (
           <div className="mt-5 overflow-x-auto">
@@ -216,7 +216,7 @@ export function AdminDashboard() {
                   <th className="py-2 pr-3 font-semibold">Vagas</th>
                   <th className="py-2 pr-3 font-semibold">Validação</th>
                   <th className="py-2 pr-3 font-semibold">Atualizado</th>
-                  <th className="py-2 font-semibold" />
+                  <th className="py-2 font-semibold text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -233,12 +233,20 @@ export function AdminDashboard() {
                       {formatWhen(feed.updated_at)}
                     </td>
                     <td className="py-2.5 text-right">
-                      <Link
-                        href={inspectHref(feed.role, true)}
-                        className="text-xs font-semibold text-forest hover:underline"
-                      >
-                        Abrir →
-                      </Link>
+                      <div className="flex flex-wrap justify-end gap-3">
+                        <Link
+                          href={feedHref(feed.role, "cache")}
+                          className="text-xs font-semibold text-moss hover:underline"
+                        >
+                          Cache
+                        </Link>
+                        <Link
+                          href={feedHref(feed.role, "analyze")}
+                          className="text-xs font-semibold text-forest hover:underline"
+                        >
+                          Análise
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -297,13 +305,23 @@ export function AdminDashboard() {
                         <p className="text-xs font-semibold text-moss/60">
                           Vagas mostradas no demo
                         </p>
-                        <Link
-                          href={inspectHref(row.role, true)}
-                          className="text-xs font-semibold text-forest hover:underline"
+                        <div
+                          className="flex gap-3"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          Abrir feed pago deste cargo →
-                        </Link>
+                          <Link
+                            href={feedHref(row.role, "cache")}
+                            className="text-xs font-semibold text-moss hover:underline"
+                          >
+                            Ver cache →
+                          </Link>
+                          <Link
+                            href={feedHref(row.role, "analyze")}
+                            className="text-xs font-semibold text-forest hover:underline"
+                          >
+                            Rodar análise →
+                          </Link>
+                        </div>
                       </div>
                       <ul className="mt-2 space-y-1 text-sm">
                         {(row.jobs_preview || []).map((job, i) => (
