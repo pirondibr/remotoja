@@ -7,6 +7,11 @@ import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
 import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import {
+  AnalysisLogBuilder,
+  BEE_PREMIUM_JS_CREDITS,
+  beeCreditUsd,
+} from "@/lib/dashboard/analysisLog";
+import {
   buildScrapeReport,
   tagJobsWithMatch,
 } from "@/lib/dashboard/scrapeReport";
@@ -29,6 +34,8 @@ type Fetcher = {
   timeoutMs: number;
   /** Pula se a chave não existe. */
   requiresScrapingBee?: boolean;
+  /** Custo estimado Bee por chamada bem-sucedida (créditos). */
+  beeCredits?: number;
 };
 
 /** LinkedIn e Programathor pausados por enquanto (código permanece nos módulos). */
@@ -42,6 +49,7 @@ const FETCHERS: Fetcher[] = [
     run: fetchIndeed,
     timeoutMs: 22000,
     requiresScrapingBee: true,
+    beeCredits: BEE_PREMIUM_JS_CREDITS,
   },
   { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 55000 },
 ];
@@ -80,7 +88,10 @@ async function runOne(
   jobs: DashboardJob[];
   available: number;
   error?: string;
+  ms: number;
+  cost_usd: number;
 }> {
+  const t0 = Date.now();
   try {
     if (fetcher.requiresScrapingBee && !process.env.SCRAPINGBEE_API_KEY) {
       return {
@@ -88,6 +99,8 @@ async function runOne(
         jobs: [],
         available: 0,
         error: "skipped: sem SCRAPINGBEE_API_KEY",
+        ms: Date.now() - t0,
+        cost_usd: 0,
       };
     }
     const raw = await withTimeout(
@@ -97,14 +110,27 @@ async function runOne(
     );
     const { jobs: all, available } = asPortalResult(raw);
     const jobs = all.slice(0, PORTAL_FETCH_LIMIT);
+    const cost_usd =
+      jobs.length > 0 && fetcher.beeCredits
+        ? beeCreditUsd(fetcher.beeCredits)
+        : 0;
     return {
       name: fetcher.name,
       jobs,
       available: Math.max(available ?? 0, all.length),
+      ms: Date.now() - t0,
+      cost_usd,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { name: fetcher.name, jobs: [], available: 0, error: message };
+    return {
+      name: fetcher.name,
+      jobs: [],
+      available: 0,
+      error: message,
+      ms: Date.now() - t0,
+      cost_usd: 0,
+    };
   }
 }
 
@@ -113,7 +139,39 @@ export async function fetchDashboardJobs(
   options: FetchDashboardOptions = {}
 ): Promise<DashboardJobsPayload> {
   const term = role.trim();
+  const log = options.validate ? new AnalysisLogBuilder() : null;
+
+  const scrapeStarted = Date.now();
   const results = await Promise.all(FETCHERS.map((f) => runOne(f, term)));
+  const scrapeTotalMs = Date.now() - scrapeStarted;
+
+  if (log) {
+    for (const r of results) {
+      log.add({
+        id: `scrape_${r.name}`,
+        label: `Scrape · ${r.name}`,
+        ms: r.ms,
+        ok: !r.error || r.jobs.length > 0,
+        cost_usd: r.cost_usd,
+        detail: r.error
+          ? `${r.error}${r.jobs.length ? ` · ${r.jobs.length} vagas` : ""}`
+          : `${r.jobs.length} vagas (cap) · available ${r.available}`,
+        meta: {
+          found: r.jobs.length,
+          available: r.available,
+          error: r.error || null,
+        },
+      });
+    }
+    log.add({
+      id: "scrape_all",
+      label: "Scrapers (paralelo)",
+      ms: scrapeTotalMs,
+      ok: results.some((r) => r.jobs.length > 0),
+      cost_usd: results.reduce((s, r) => s + r.cost_usd, 0),
+      detail: `${results.filter((r) => r.jobs.length > 0).length}/${results.length} fontes com vagas`,
+    });
+  }
 
   const sources: Record<string, number | string | object> = {};
   const foundByPortal: Record<string, number> = {};
@@ -136,8 +194,6 @@ export async function fetchDashboardJobs(
         sources[`${result.name}_warning`] = result.error;
         errorsByPortal[result.name] = result.error;
       }
-      // scrape = método; source = portal exibido (Google Vagas pode ser Gupy/LinkedIn/…)
-      // Portais pagos usam filtro remoto → from_remote_filter para "indeciso"
       const fromRemoteFilter = [
         "catho",
         "gupy",
@@ -157,10 +213,8 @@ export async function fetchDashboardJobs(
     }
   }
 
-  // Dedupe + classifica cargo (regras). Na análise admin, LLM barato refina.
   let allTagged = tagJobsWithMatch(dedupeJobs(merged), term);
 
-  // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
   if (!options.validate) {
     const relevant = rankJobsForFeed(
       allTagged.filter(
@@ -186,7 +240,24 @@ export async function fetchDashboardJobs(
     };
   }
 
-  const cargoLlm = await classifyCargoWithLlm(term, allTagged);
+  const cargoLlm = await log!.timed(
+    "llm_cargo",
+    "LLM cargo (OpenRouter)",
+    () => classifyCargoWithLlm(term, allTagged),
+    (r, ms) => ({
+      ok: r.usedLlm || !r.error,
+      cost_usd: r.cost_usd,
+      detail: r.usedLlm
+        ? `${r.batches} batch · ${r.prompt_tokens}+${r.completion_tokens} tokens · ${allTagged.length} vagas`
+        : r.error || "regras (sem LLM)",
+      meta: {
+        batches: r.batches,
+        prompt_tokens: r.prompt_tokens,
+        completion_tokens: r.completion_tokens,
+        ms,
+      },
+    })
+  );
   allTagged = cargoLlm.jobs;
   if (cargoLlm.usedLlm) sources._cargo_llm = 1;
   if (cargoLlm.error) sources._cargo_llm_error = cargoLlm.error;
@@ -198,8 +269,11 @@ export async function fetchDashboardJobs(
     term
   );
 
-  const { jobs, validation } = await validateRemoteJobs(relevant);
+  const { jobs, validation, stats } = await validateRemoteJobs(relevant);
+  for (const step of stats.steps) log!.add(step);
+
   const ranked = rankJobsForFeed(jobs, term);
+  const analysis_log = log!.build();
   const scrape_report = {
     ...buildScrapeReport({
       foundByPortal,
@@ -211,6 +285,7 @@ export async function fetchDashboardJobs(
     }),
     cargo_llm: Boolean(cargoLlm.usedLlm),
     cargo_llm_error: cargoLlm.error || null,
+    analysis_log,
   };
   sources._scrape_report = scrape_report;
   sources._validation = validation;

@@ -9,6 +9,10 @@ import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+import {
+  formatMs,
+  formatUsd,
+} from "@/lib/dashboard/analysisLog";
 import type {
   ScrapeReport,
   ValidationItem,
@@ -554,6 +558,58 @@ export function JobsDashboard() {
                 </div>
               </div>
             )}
+
+            {scrapeReport.analysis_log &&
+              scrapeReport.analysis_log.steps.length > 0 && (
+                <div className="rounded-2xl border border-moss/15 bg-white p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+                        Log da análise
+                      </p>
+                      <p className="mt-1 text-[11px] text-moss/55">
+                        Etapas, tempo e custo estimado de API (OpenRouter +
+                        ScrapingBee).
+                      </p>
+                    </div>
+                    <div className="text-right text-xs">
+                      <p className="font-semibold text-ink">
+                        {formatMs(scrapeReport.analysis_log.total_ms)}
+                        <span className="mx-1.5 text-moss/40">·</span>
+                        {formatUsd(scrapeReport.analysis_log.total_cost_usd)}
+                      </p>
+                      <p className="text-[11px] text-moss/50">total</p>
+                    </div>
+                  </div>
+                  <ul className="mt-3 max-h-72 space-y-1.5 overflow-y-auto text-xs">
+                    {scrapeReport.analysis_log.steps.map((step) => (
+                      <li
+                        key={`${step.id}-${step.label}`}
+                        className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-t border-moss/10 py-1.5 first:border-t-0"
+                      >
+                        <span
+                          className={`font-semibold ${
+                            step.ok ? "text-ink" : "text-amber-800"
+                          }`}
+                        >
+                          {step.label}
+                        </span>
+                        <span className="text-moss/60">
+                          {formatMs(step.ms)}
+                        </span>
+                        <span className="font-medium text-forest">
+                          {formatUsd(step.cost_usd)}
+                        </span>
+                        {step.detail && (
+                          <span className="w-full text-[11px] text-moss/55 sm:w-auto">
+                            {step.detail}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
             {scrapeReport.portals.length > 0 && (
               <div className="overflow-x-auto rounded-2xl border border-moss/15 bg-white p-4">

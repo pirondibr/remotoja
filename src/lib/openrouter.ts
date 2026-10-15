@@ -3,6 +3,8 @@
  * Modelo padrão: Gemini 2.5 Flash Lite (~US$ 0,10 / M tokens in).
  */
 
+import { openRouterTokenUsd } from "@/lib/dashboard/analysisLog";
+
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export function getOpenRouterApiKey(): string {
@@ -24,13 +26,21 @@ export type OpenRouterMessage = {
   content: string;
 };
 
+export type OpenRouterChatResult = {
+  content: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  model: string;
+};
+
 export async function openRouterChat(input: {
   messages: OpenRouterMessage[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
-}): Promise<string> {
+}): Promise<OpenRouterChatResult> {
   const key = getOpenRouterApiKey();
   if (!key) throw new Error("OPENROUTER_API_KEY não configurada");
 
@@ -58,6 +68,7 @@ export async function openRouterChat(input: {
         temperature: input.temperature ?? 0,
         max_tokens: input.maxTokens ?? 2000,
         messages: input.messages,
+        usage: { include: true },
       }),
     });
 
@@ -70,10 +81,38 @@ export async function openRouterChat(input: {
 
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+        cost?: number;
+        total_cost?: number;
+      };
+      model?: string;
     };
     const content = data.choices?.[0]?.message?.content?.trim() || "";
     if (!content) throw new Error("OpenRouter: resposta vazia");
-    return content;
+
+    const prompt_tokens = Number(data.usage?.prompt_tokens) || 0;
+    const completion_tokens = Number(data.usage?.completion_tokens) || 0;
+    const reported =
+      typeof data.usage?.cost === "number"
+        ? data.usage.cost
+        : typeof data.usage?.total_cost === "number"
+          ? data.usage.total_cost
+          : null;
+    const cost_usd =
+      reported != null
+        ? reported
+        : openRouterTokenUsd(prompt_tokens, completion_tokens);
+
+    return {
+      content,
+      prompt_tokens,
+      completion_tokens,
+      cost_usd,
+      model: data.model || model,
+    };
   } finally {
     clearTimeout(timer);
   }

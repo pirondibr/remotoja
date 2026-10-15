@@ -1,4 +1,7 @@
 import type { DemoJob } from "@/lib/demoJobs";
+import type { AnalysisLog } from "@/lib/dashboard/analysisLog";
+
+export type { AnalysisLog, AnalysisLogStep } from "@/lib/dashboard/analysisLog";
 
 export type DashboardJob = DemoJob & {
   snippet?: string | null;
@@ -121,6 +124,8 @@ export type ScrapeReport = {
   /** Análise de cargo usou OpenRouter (admin). */
   cargo_llm?: boolean;
   cargo_llm_error?: string | null;
+  /** Etapas, tempos e custos estimados da análise. */
+  analysis_log?: AnalysisLog;
 };
 
 export type DashboardJobsPayload = {

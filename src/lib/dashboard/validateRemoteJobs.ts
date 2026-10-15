@@ -3,6 +3,11 @@ import {
   fetchScrapingBeeStealth,
   hostNeedsStealthProxy,
 } from "@/lib/dashboard/common";
+import {
+  BEE_STEALTH_JS_CREDITS,
+  beeCreditUsd,
+  type AnalysisLogStep,
+} from "@/lib/dashboard/analysisLog";
 import { assessRemotePage } from "@/lib/dashboard/assessRemotePage";
 import { assessRemoteWithLlm } from "@/lib/dashboard/llmJobAnalysis";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
@@ -17,11 +22,21 @@ export type { ValidationItem, ValidationReport, ValidationStatus } from "@/lib/d
 
 const CONCURRENCY = 4;
 const FETCH_TIMEOUT_MS = 10000;
-/** Máx. ScrapingBee stealth por análise (cada ~35s) — evita timeout da Vercel. */
-const STEALTH_BUDGET = 2;
+/** Máx. ScrapingBee stealth por análise (Jooble vai direto; ~35s cada). */
+const STEALTH_BUDGET = 3;
 /** Double-check rigoroso nas primeiras N (usuário pediu foco nas 10). */
 const VALIDATE_LIMIT = 10;
 const ENRICH_LIMIT = 50;
+
+export type ValidateRemoteStats = {
+  steps: AnalysisLogStep[];
+  direct_ok: number;
+  stealth_ok: number;
+  stealth_fail: number;
+  probe_ms: number;
+  llm_ms: number;
+  llm_cost_usd: number;
+};
 
 function withDetails(job: DashboardJob, html: string): DashboardJob {
   const details = extractJobDetailsFromText(html);
@@ -37,22 +52,11 @@ async function probeUrl(
   url: string,
   opts: { mustValidate: boolean; takeStealthSlot: () => boolean }
 ): Promise<{ ok: boolean; text: string; reason?: string; via?: string }> {
-  try {
-    const { text, via } = await fetchHtmlForValidation(url, {
-      timeoutMs: FETCH_TIMEOUT_MS,
-      allowStealth: false,
-    });
-    return { ok: true, text, via };
-  } catch (err) {
-    const directMsg = err instanceof Error ? err.message : String(err);
-    const tryStealth =
-      opts.mustValidate &&
-      hostNeedsStealthProxy(url) &&
-      Boolean(process.env.SCRAPINGBEE_API_KEY?.trim()) &&
-      opts.takeStealthSlot();
-    if (!tryStealth) {
-      return { ok: false, text: "", reason: directMsg.slice(0, 160) };
-    }
+  const jooble =
+    hostNeedsStealthProxy(url) && Boolean(process.env.SCRAPINGBEE_API_KEY?.trim());
+
+  // Jooble: vai direto no Bee stealth (direct sempre 403 Cloudflare).
+  if (jooble && opts.mustValidate && opts.takeStealthSlot()) {
     try {
       const text = await fetchScrapingBeeStealth(url);
       if (!text || text.trim().length < 40) {
@@ -60,18 +64,30 @@ async function probeUrl(
           ok: false,
           text: "",
           reason: "página vazia via ScrapingBee stealth",
+          via: "scrapingbee_stealth",
         };
       }
       return { ok: true, text, via: "scrapingbee_stealth" };
-    } catch (stealthErr) {
-      const message =
-        stealthErr instanceof Error ? stealthErr.message : String(stealthErr);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       return {
         ok: false,
         text: "",
-        reason: `${directMsg.slice(0, 80)} · stealth: ${message.slice(0, 80)}`,
+        reason: `Jooble stealth: ${message.slice(0, 140)}`,
+        via: "scrapingbee_stealth",
       };
     }
+  }
+
+  try {
+    const { text, via } = await fetchHtmlForValidation(url, {
+      timeoutMs: FETCH_TIMEOUT_MS,
+      allowStealth: false,
+    });
+    return { ok: true, text, via };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, text: "", reason: message.slice(0, 160) };
   }
 }
 
@@ -108,16 +124,26 @@ export async function validateRemoteJobs(
   jobs: DashboardJob[],
   validateLimit = VALIDATE_LIMIT,
   enrichLimit = ENRICH_LIMIT
-): Promise<{ jobs: DashboardJob[]; validation: ValidationReport }> {
+): Promise<{
+  jobs: DashboardJob[];
+  validation: ValidationReport;
+  stats: ValidateRemoteStats;
+}> {
   const toFetch = jobs.slice(0, Math.max(validateLimit, enrichLimit));
   const untouched = jobs.slice(toFetch.length);
+  const steps: AnalysisLogStep[] = [];
 
   type ProbeRow = {
     job: DashboardJob;
     index: number;
     mustValidate: boolean;
     url: string;
-    probe: { ok: boolean; text: string; reason?: string } | null;
+    probe: {
+      ok: boolean;
+      text: string;
+      reason?: string;
+      via?: string;
+    } | null;
   };
 
   const stealthBudget = { left: STEALTH_BUDGET };
@@ -127,6 +153,7 @@ export async function validateRemoteJobs(
     return true;
   };
 
+  const probeStarted = Date.now();
   const probed = await mapPool(
     toFetch,
     CONCURRENCY,
@@ -146,6 +173,37 @@ export async function validateRemoteJobs(
       return { job, index, mustValidate, url, probe };
     }
   );
+  const probe_ms = Date.now() - probeStarted;
+
+  let direct_ok = 0;
+  let stealth_ok = 0;
+  let stealth_fail = 0;
+  for (const row of probed) {
+    if (!row.probe) continue;
+    if (row.probe.via === "scrapingbee_stealth") {
+      if (row.probe.ok) stealth_ok += 1;
+      else stealth_fail += 1;
+    } else if (row.probe.ok) {
+      direct_ok += 1;
+    }
+  }
+  const stealthCost = beeCreditUsd(
+    (stealth_ok + stealth_fail) * BEE_STEALTH_JS_CREDITS
+  );
+  steps.push({
+    id: "probe_pages",
+    label: "Double-check páginas (fetch)",
+    ms: probe_ms,
+    ok: true,
+    cost_usd: stealthCost,
+    detail: `direto ok ${direct_ok} · Bee stealth ok ${stealth_ok} / fail ${stealth_fail} (Jooble direto no stealth)`,
+    meta: {
+      direct_ok,
+      stealth_ok,
+      stealth_fail,
+      bee_credits: (stealth_ok + stealth_fail) * BEE_STEALTH_JS_CREDITS,
+    },
+  });
 
   const llmCandidates: Array<{ job: DashboardJob; pageHtml: string }> = [];
   const llmIndexByProbe: number[] = [];
@@ -157,10 +215,50 @@ export async function validateRemoteJobs(
     }
   }
 
-  const llmMap =
-    hasOpenRouter() && llmCandidates.length > 0
-      ? await assessRemoteWithLlm(llmCandidates)
-      : null;
+  let llmMap: Map<
+    number,
+    import("@/lib/dashboard/assessRemotePage").RemoteAssess
+  > | null = null;
+  let llm_ms = 0;
+  let llm_cost_usd = 0;
+  if (hasOpenRouter() && llmCandidates.length > 0) {
+    const llmStarted = Date.now();
+    const llmResult = await assessRemoteWithLlm(llmCandidates);
+    llm_ms = Date.now() - llmStarted;
+    if (llmResult) {
+      llmMap = llmResult.map;
+      llm_cost_usd = llmResult.cost_usd;
+      steps.push({
+        id: "llm_remote",
+        label: "LLM modalidade remota (OpenRouter)",
+        ms: llm_ms,
+        ok: true,
+        cost_usd: llm_cost_usd,
+        detail: `${llmResult.batches} batch · ${llmResult.prompt_tokens}+${llmResult.completion_tokens} tokens · ${llmCandidates.length} páginas`,
+        meta: {
+          batches: llmResult.batches,
+          prompt_tokens: llmResult.prompt_tokens,
+          completion_tokens: llmResult.completion_tokens,
+        },
+      });
+    } else {
+      steps.push({
+        id: "llm_remote",
+        label: "LLM modalidade remota (OpenRouter)",
+        ms: llm_ms,
+        ok: false,
+        detail: "falhou — usando regras",
+      });
+    }
+  } else {
+    steps.push({
+      id: "llm_remote",
+      label: "LLM modalidade remota (OpenRouter)",
+      ms: 0,
+      ok: false,
+      detail: hasOpenRouter() ? "sem páginas para analisar" : "sem API key",
+    });
+  }
 
   const fetched: Array<{ job: DashboardJob | null; item: ValidationItem }> =
     probed.map((row) => {
@@ -284,6 +382,15 @@ export async function validateRemoteJobs(
       skipped,
       kept: kept.length,
       items,
+    },
+    stats: {
+      steps,
+      direct_ok,
+      stealth_ok,
+      stealth_fail,
+      probe_ms,
+      llm_ms,
+      llm_cost_usd,
     },
   };
 }

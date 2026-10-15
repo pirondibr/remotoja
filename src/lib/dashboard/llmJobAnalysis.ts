@@ -47,13 +47,32 @@ function asTier(raw: unknown): MatchTier | null {
 export async function classifyCargoWithLlm(
   role: string,
   jobs: DashboardJob[]
-): Promise<{ jobs: DashboardJob[]; usedLlm: boolean; error?: string }> {
+): Promise<{
+  jobs: DashboardJob[];
+  usedLlm: boolean;
+  error?: string;
+  cost_usd: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  batches: number;
+}> {
   if (!hasOpenRouter() || jobs.length === 0) {
-    return { jobs, usedLlm: false };
+    return {
+      jobs,
+      usedLlm: false,
+      cost_usd: 0,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      batches: 0,
+    };
   }
 
   const out = jobs.map((j) => ({ ...j }));
   const errors: string[] = [];
+  let cost_usd = 0;
+  let prompt_tokens = 0;
+  let completion_tokens = 0;
+  let batches = 0;
 
   for (let offset = 0; offset < out.length; offset += CARGO_BATCH) {
     const slice = out.slice(offset, offset + CARGO_BATCH);
@@ -65,7 +84,7 @@ export async function classifyCargoWithLlm(
     }));
 
     try {
-      const raw = await openRouterChat({
+      const chat = await openRouterChat({
         temperature: 0,
         maxTokens: 1600,
         messages: [
@@ -92,8 +111,12 @@ Retorne JSON array: [{"i":0,"tier":"exato"|"relacionado"|"fora","why":"curto"}]`
           },
         ],
       });
+      batches += 1;
+      cost_usd += chat.cost_usd;
+      prompt_tokens += chat.prompt_tokens;
+      completion_tokens += chat.completion_tokens;
 
-      const rows = extractJson<CargoRow[]>(raw);
+      const rows = extractJson<CargoRow[]>(chat.content);
       if (!Array.isArray(rows)) throw new Error("resposta não é array");
 
       for (const row of rows) {
@@ -119,8 +142,12 @@ Retorne JSON array: [{"i":0,"tier":"exato"|"relacionado"|"fora","why":"curto"}]`
 
   return {
     jobs: out,
-    usedLlm: errors.length < Math.ceil(out.length / CARGO_BATCH),
+    usedLlm: batches > 0 && errors.length < Math.ceil(out.length / CARGO_BATCH),
     error: errors[0],
+    cost_usd,
+    prompt_tokens,
+    completion_tokens,
+    batches,
   };
 }
 
@@ -130,10 +157,20 @@ Retorne JSON array: [{"i":0,"tier":"exato"|"relacionado"|"fora","why":"curto"}]`
  */
 export async function assessRemoteWithLlm(
   jobs: Array<{ job: DashboardJob; pageHtml: string }>
-): Promise<Map<number, RemoteAssess> | null> {
+): Promise<{
+  map: Map<number, RemoteAssess>;
+  cost_usd: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  batches: number;
+} | null> {
   if (!hasOpenRouter() || jobs.length === 0) return null;
 
   const result = new Map<number, RemoteAssess>();
+  let cost_usd = 0;
+  let prompt_tokens = 0;
+  let completion_tokens = 0;
+  let batches = 0;
 
   for (let offset = 0; offset < jobs.length; offset += REMOTE_BATCH) {
     const slice = jobs.slice(offset, offset + REMOTE_BATCH);
@@ -147,7 +184,7 @@ export async function assessRemoteWithLlm(
     }));
 
     try {
-      const raw = await openRouterChat({
+      const chat = await openRouterChat({
         temperature: 0,
         maxTokens: 1400,
         messages: [
@@ -176,8 +213,12 @@ Retorne JSON array: [{"i":0,"status":"remote"|"hybrid"|"unclear"|"invalid","why"
           },
         ],
       });
+      batches += 1;
+      cost_usd += chat.cost_usd;
+      prompt_tokens += chat.prompt_tokens;
+      completion_tokens += chat.completion_tokens;
 
-      const rows = extractJson<RemoteRow[]>(raw);
+      const rows = extractJson<RemoteRow[]>(chat.content);
       if (!Array.isArray(rows)) continue;
 
       for (const row of rows) {
@@ -218,5 +259,6 @@ Retorne JSON array: [{"i":0,"status":"remote"|"hybrid"|"unclear"|"invalid","why"
     }
   }
 
-  return result.size > 0 ? result : null;
+  if (result.size === 0) return null;
+  return { map: result, cost_usd, prompt_tokens, completion_tokens, batches };
 }
