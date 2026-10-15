@@ -205,7 +205,7 @@ export function OnboardWizard() {
                 ))}
               </div>
               <p className="text-sm text-sand/60">
-                Amado por quem busca remoto de verdade — sem spam de recrutador.
+                Amado por quem busca remoto de verdade, sem spam de recrutador.
               </p>
             </div>
           )}
@@ -262,12 +262,6 @@ export function OnboardWizard() {
                 placeholder={step.placeholder}
                 className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
               />
-              {draft.trim().length > 1 && (
-                <p className="text-xs text-sand/50">
-                  Busca no Google Vagas:{" "}
-                  <span className="text-lime">{buildJobsQuery(draft)}</span>
-                </p>
-              )}
             </div>
           )}
 
@@ -275,12 +269,9 @@ export function OnboardWizard() {
             <div className="mt-8 space-y-3">
               {jobsLoading ? (
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-                  <p className="font-medium text-cream">Buscando no Google Vagas…</p>
+                  <p className="font-medium text-cream">Buscando vagas remotas…</p>
                   <p className="mt-2 text-sm text-sand/60">
-                    Query: {liveQuery || buildJobsQuery(role)}
-                  </p>
-                  <p className="mt-1 text-xs text-sand/45">
-                    Leva ~10–30s (DataForSEO)
+                    Isso pode levar alguns segundos.
                   </p>
                 </div>
               ) : (
@@ -304,11 +295,7 @@ export function OnboardWizard() {
                 ))
               )}
               <p className="pt-2 text-center text-sm text-sand/50">
-                {jobsSource === "live"
-                  ? `Google Vagas · “${liveQuery}”`
-                  : jobsLoading
-                    ? "…"
-                    : `Fallback demo · “${liveQuery || "vagas de seo home office"}”`}
+                Prévia com vagas remotas para o seu cargo
               </p>
               {jobsError && jobsSource === "fallback" && (
                 <p className="text-center text-xs text-sand/40">{jobsError}</p>
@@ -365,7 +352,7 @@ export function OnboardWizard() {
                 type="button"
                 onClick={() =>
                   alert(
-                    "Checkout em breve — por enquanto o funil e a landing estão no ar. Próximo passo: pagamento + scrapers no Render."
+                    "Checkout em breve. Por enquanto o funil e a landing estão no ar. Próximo passo: pagamento + scrapers no Render."
                   )
                 }
                 className="w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint"

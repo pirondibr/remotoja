@@ -38,7 +38,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 5,
     headline: "Descubra vagas remotas que ainda não estão no LinkedIn",
     subheadline:
-      "Escaneamos portais, carreiras e ATS no Brasil várias vezes ao dia — para você candidatar antes da fila.",
+      "Escaneamos as páginas de carreira das empresas várias vezes ao dia para encontrar vagas remotas novas cedo, incluindo vagas que nunca chegam ao LinkedIn.",
     cta: "Continuar",
     badges: ["100% remoto", "Vagas verificadas", "Brasil + LATAM"],
   },
@@ -57,7 +57,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 22,
     headline: "Bom saber.",
     subheadline:
-      "Quem trabalha remoto no Brasil relata mais equilíbrio — e menos tempo perdido no deslocamento.",
+      "Quem trabalha remoto no Brasil relata mais equilíbrio e menos tempo perdido no deslocamento.",
     bullets: [
       "Mais controle da rotina",
       "Menos estresse de trânsito",
@@ -95,7 +95,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 52,
     headline: "Não é (só) você.",
     subheadline:
-      "Uma fatia grande das vagas remotas no Brasil nunca chega ao LinkedIn — fica em Gupy, carreiras internas e portais nichados.",
+      "Uma fatia grande das vagas remotas no Brasil nunca chega ao LinkedIn. Fica em Gupy, carreiras internas e portais nichados.",
     bullets: [
       "~1/3 das vagas nunca vão para o LinkedIn",
       "Quem aplica cedo compete com bem menos gente",
@@ -125,10 +125,10 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     headline: "De onde você está?",
     subheadline: "Mostramos vagas compatíveis com sua região e fuso",
     options: [
-      "Brasil — remoto",
-      "Brasil — aceito híbrido na minha cidade",
-      "LATAM — remoto",
-      "Mundial — remoto (inglês ok)",
+      "Brasil, remoto",
+      "Brasil, aceito híbrido na minha cidade",
+      "LATAM, remoto",
+      "Mundial, remoto (inglês ok)",
     ],
     cta: "Próximo",
   },
@@ -173,7 +173,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     kind: "matches",
     progress: 98,
     headline: "Encontramos vagas para o seu perfil",
-    subheadline: "Prévia com base nas suas respostas — o feed completo libera no plano.",
+    subheadline: "Prévia com base nas suas respostas. O feed completo libera no plano.",
     cta: "Ver meus matches",
   },
   {
@@ -182,7 +182,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 100,
     headline: "Aviso rápido",
     subheadline:
-      "Nossos scrapers rodam o tempo todo. Por isso o RemotoJá é um produto pago — você é o cliente, não as empresas.",
+      "Nossos scrapers rodam o tempo todo. Por isso o RemotoJá é um produto pago: você é o cliente, não as empresas.",
     cta: "Acessar todas as vagas",
     note: "Sem fidelidade · Cancele quando quiser · 7 dias de garantia",
   },
