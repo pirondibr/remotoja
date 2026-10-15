@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
-import { getDemoJobs, demoJobsPayload } from "@/lib/demoJobs";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 
 export const maxDuration = 60;
+
+function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
+  if (!fetchedVia) return false;
+  // Fallback antigo gravava vagas de SEO em qualquer cargo — ignora.
+  if (fetchedVia === "fallback_demo") return false;
+  return true;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -24,14 +30,18 @@ export async function GET(request: Request) {
     return NextResponse.json({
       role,
       query: buildJobsQuery(role),
-      note: "preview only — sem chamar DataForSEO",
+      note: "preview only",
     });
   }
 
   if (!bypassCache && hasDatabase()) {
     try {
       const cached = await getCachedJobs("demo", role);
-      if (cached && cached.jobs.length > 0) {
+      if (
+        cached &&
+        cached.jobs.length > 0 &&
+        isUsableDemoCache(cached.fetched_via)
+      ) {
         return NextResponse.json({
           role,
           query: buildJobsQuery(role),
@@ -55,26 +65,15 @@ export async function GET(request: Request) {
     });
 
     if (result.jobs.length === 0) {
-      const fallback = getDemoJobs(5);
-      const payload = {
-        ...result,
-        count: fallback.length,
-        jobs: fallback,
-        fetched_via: "fallback_demo",
-        note: "sem resultados live — preview estático",
+      return NextResponse.json({
+        role,
+        query: buildJobsQuery(role),
+        count: 0,
+        jobs: [],
+        fetched_via: "dataforseo_google_jobs",
+        note: "sem resultados live para este cargo",
         cached: false,
-      };
-      try {
-        await setCachedJobs({
-          kind: "demo",
-          role,
-          jobs: fallback,
-          fetched_via: "fallback_demo",
-        });
-      } catch {
-        // ignore
-      }
-      return NextResponse.json(payload);
+      });
     }
 
     try {
@@ -91,26 +90,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ ...result, cached: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
-    const fallback = getDemoJobs(5);
-    try {
-      await setCachedJobs({
-        kind: "demo",
-        role,
-        jobs: fallback,
-        fetched_via: "fallback_demo",
-      });
-    } catch {
-      // ignore
-    }
     return NextResponse.json(
       {
         role,
         query: buildJobsQuery(role),
-        count: fallback.length,
-        jobs: fallback,
-        fetched_via: "fallback_demo",
+        count: 0,
+        jobs: [],
+        fetched_via: "error",
         error: message,
-        fallback_query: demoJobsPayload.query,
         cached: false,
       },
       { status: 200 }

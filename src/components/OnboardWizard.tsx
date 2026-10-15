@@ -4,12 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
-import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
+import { type DemoJob } from "@/lib/demoJobs";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { saveJobSession } from "@/lib/jobSession";
 import { BrandMark } from "./BrandMark";
 
-const FALLBACK_MATCHES = getDemoJobs(5);
 const ROLE_STORAGE_KEY = "remotoja_onboard_role";
 
 function companyInitial(name: string) {
@@ -86,11 +85,15 @@ export function OnboardWizard() {
     if (step.kind !== "matches") return;
 
     const roleQuery =
-      (typeof answers.role === "string" && answers.role.trim()) || draft.trim();
+      (typeof answers.role === "string" && answers.role.trim()) ||
+      draft.trim() ||
+      prefillRole.trim();
     if (!roleQuery) {
-      setLiveJobs(FALLBACK_MATCHES);
-      setLiveQuery(buildJobsQuery("seo"));
+      setLiveJobs([]);
+      setLiveQuery("");
       setJobsSource("fallback");
+      setJobsError("Informe um cargo para buscar vagas.");
+      setJobsLoading(false);
       return;
     }
 
@@ -106,20 +109,25 @@ export function OnboardWizard() {
       .then(async (res) => {
         const data = await res.json();
         const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
-        if (jobs.length > 0 && data.fetched_via === "dataforseo_google_jobs") {
-          setLiveJobs(jobs.slice(0, 5));
-          setLiveQuery(data.query || buildJobsQuery(roleQuery));
-          setJobsSource("live");
+        setLiveJobs(jobs.slice(0, 5));
+        setLiveQuery(data.query || buildJobsQuery(roleQuery));
+        if (jobs.length > 0) {
+          setJobsSource(
+            data.fetched_via === "dataforseo_google_jobs" || data.cached
+              ? "live"
+              : "fallback",
+          );
         } else {
-          setLiveJobs(jobs.length > 0 ? jobs.slice(0, 5) : FALLBACK_MATCHES);
-          setLiveQuery(data.query || buildJobsQuery(roleQuery));
           setJobsSource("fallback");
-          if (data.error) setJobsError(data.error);
+          setJobsError(
+            data.error ||
+              `Não encontramos vagas remotas para “${roleQuery}” agora. Tente outro termo ou continue para o feed completo.`,
+          );
         }
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
-        setLiveJobs(FALLBACK_MATCHES);
+        setLiveJobs([]);
         setJobsSource("fallback");
         setJobsError(err instanceof Error ? err.message : "Falha na busca");
       })
@@ -128,7 +136,7 @@ export function OnboardWizard() {
       });
 
     return () => controller.abort();
-  }, [step.kind, answers.role, draft]);
+  }, [step.kind, answers.role, draft, prefillRole]);
 
   function toggleMulti(option: string) {
     const current = (answers[step.id] as string[] | undefined) ?? [];
@@ -153,13 +161,14 @@ export function OnboardWizard() {
     if (index > 0) setIndex((prev) => prev - 1);
   }
 
-  const matches = liveJobs.length > 0 ? liveJobs : FALLBACK_MATCHES;
+  const matches = liveJobs;
 
   /** MVP: libera o dash pago sem checkout. */
   function openMemberDash() {
     const nextRole =
       (typeof answers.role === "string" && answers.role.trim()) ||
       draft.trim() ||
+      prefillRole.trim() ||
       "SEO";
     saveJobSession(nextRole, matches);
     router.push(`/app?role=${encodeURIComponent(nextRole)}`);
@@ -201,7 +210,9 @@ export function OnboardWizard() {
         <div key={step.id} className="animate-rise flex flex-1 flex-col">
           <h1 className="font-[family-name:var(--font-display)] text-3xl leading-tight font-bold md:text-4xl">
             {step.kind === "matches"
-              ? `Encontramos vagas de ${role}`
+              ? matches.length > 0
+                ? `Encontramos vagas de ${role}`
+                : `Buscamos vagas de ${role}`
               : step.headline}
           </h1>
           {"subheadline" in step && step.subheadline && (
@@ -292,7 +303,7 @@ export function OnboardWizard() {
                     Isso pode levar alguns segundos.
                   </p>
                 </div>
-              ) : (
+              ) : matches.length > 0 ? (
                 matches.map((job) => (
                   <article
                     key={`${job.company}-${job.title}-${job.job_id || job.source}`}
@@ -326,12 +337,21 @@ export function OnboardWizard() {
                     </div>
                   </article>
                 ))
+              ) : (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                  <p className="font-medium text-cream">
+                    Nenhuma vaga nesta prévia
+                  </p>
+                  <p className="mt-2 text-sm text-sand/60">
+                    {jobsError ||
+                      "Continue para liberar o feed completo com todos os portais."}
+                  </p>
+                </div>
               )}
-              <p className="pt-2 text-center text-sm text-sand/50">
-                Prévia com vagas remotas para o seu cargo
-              </p>
-              {jobsError && jobsSource === "fallback" && (
-                <p className="text-center text-xs text-sand/40">{jobsError}</p>
+              {matches.length > 0 && (
+                <p className="pt-2 text-center text-sm text-sand/50">
+                  Prévia com vagas remotas para o seu cargo
+                </p>
               )}
             </div>
           )}

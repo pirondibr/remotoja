@@ -9,7 +9,7 @@ import {
   captureAttributionFromUrl,
   loadAttribution,
 } from "@/lib/attribution";
-import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
+import { type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 
 function companyInitial(name: string) {
@@ -215,21 +215,20 @@ export function FinalV2() {
     try {
       const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
       const data = await res.json().catch(() => ({}));
-      let list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
-      // Timeout/rede: não deixa o funil vazio
-      if (list.length === 0) {
-        list = getDemoJobs(5);
-      }
+      const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
       setJobs(list);
       saveJobSession(trimmed, list);
-      setError(null);
+      setError(
+        list.length === 0
+          ? data.error ||
+              `Não encontramos vagas remotas para “${trimmed}” agora.`
+          : null,
+      );
       void logLead(trimmed, list, Boolean(data.cached));
     } catch {
-      const list = getDemoJobs(5);
-      setJobs(list);
-      saveJobSession(trimmed, list);
-      setError(null);
-      void logLead(trimmed, list, false);
+      setJobs([]);
+      setError("Falha ao buscar vagas. Tente novamente.");
+      void logLead(trimmed, [], false);
     } finally {
       setLoading(false);
     }
