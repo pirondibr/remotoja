@@ -21,7 +21,8 @@ function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
   return rankJobsForFeed(filtered, role) as DemoJob[];
 }
 
-export const maxDuration = 60;
+/** Análise com scrapers + LLM + até 2 stealth Bee; 60s estourava. */
+export const maxDuration = 120;
 
 function extractValidation(
   sources: Record<string, number | string | object> | null | undefined

@@ -169,20 +169,48 @@ export function JobsDashboard() {
         }
         const res = await fetch(`/api/dashboard/jobs?${params}`, { signal });
         if (signal?.aborted) return;
-        const data = await res.json();
-        const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+        let data: Record<string, unknown> = {};
+        try {
+          data = (await res.json()) as Record<string, unknown>;
+        } catch {
+          setError(
+            res.status === 504 || res.status === 408
+              ? "A análise passou do tempo limite do servidor. Tente de novo (ou sem fresh)."
+              : `Falha ao ler resposta (${res.status}). Tente novamente.`
+          );
+          return;
+        }
+        if (!res.ok) {
+          setError(
+            typeof data.error === "string"
+              ? data.error
+              : res.status === 504
+                ? "Timeout no servidor (análise longa). Tente de novo."
+                : `Falha ao carregar vagas (${res.status}).`
+          );
+          if (!Array.isArray(data.jobs) || data.jobs.length === 0) return;
+        }
+        const list: DemoJob[] = Array.isArray(data.jobs)
+          ? (data.jobs as DemoJob[])
+          : [];
         setJobs(list);
         setSources(
-          data.sources && typeof data.sources === "object" ? data.sources : {}
+          data.sources && typeof data.sources === "object"
+            ? (data.sources as Record<string, number | string>)
+            : {}
         );
-        setValidation(data.validation || null);
+        setValidation(
+          (data.validation as ValidationReport | null | undefined) || null
+        );
         setScrapeReport(
           data.scrape_report && typeof data.scrape_report === "object"
             ? (data.scrape_report as ScrapeReport)
             : null
         );
         setPulledJobs(
-          Array.isArray(data.pulled_jobs) ? (data.pulled_jobs as DemoJob[]) : []
+          Array.isArray(data.pulled_jobs)
+            ? (data.pulled_jobs as DemoJob[])
+            : []
         );
         setFromCache(Boolean(data.cached));
         if (!cacheOnly && !analyze) {
@@ -198,7 +226,7 @@ export function JobsDashboard() {
         }
         if (list.length === 0) {
           setError(
-            data.error ||
+            (typeof data.error === "string" && data.error) ||
               "Nenhuma vaga encontrada para esse cargo. Tente outro termo."
           );
         }

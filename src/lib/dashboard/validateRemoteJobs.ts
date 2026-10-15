@@ -1,4 +1,8 @@
-import { fetchHtmlForValidation } from "@/lib/dashboard/common";
+import {
+  fetchHtmlForValidation,
+  fetchScrapingBeeStealth,
+  hostNeedsStealthProxy,
+} from "@/lib/dashboard/common";
 import { assessRemotePage } from "@/lib/dashboard/assessRemotePage";
 import { assessRemoteWithLlm } from "@/lib/dashboard/llmJobAnalysis";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
@@ -11,9 +15,10 @@ import type {
 
 export type { ValidationItem, ValidationReport, ValidationStatus } from "@/lib/dashboard/types";
 
-/** Menor concorrência: fallback stealth do Bee é lento/caro. */
-const CONCURRENCY = 3;
-const FETCH_TIMEOUT_MS = 12000;
+const CONCURRENCY = 4;
+const FETCH_TIMEOUT_MS = 10000;
+/** Máx. ScrapingBee stealth por análise (cada ~35s) — evita timeout da Vercel. */
+const STEALTH_BUDGET = 2;
 /** Double-check rigoroso nas primeiras N (usuário pediu foco nas 10). */
 const VALIDATE_LIMIT = 10;
 const ENRICH_LIMIT = 50;
@@ -29,16 +34,44 @@ function withDetails(job: DashboardJob, html: string): DashboardJob {
 }
 
 async function probeUrl(
-  url: string
+  url: string,
+  opts: { mustValidate: boolean; takeStealthSlot: () => boolean }
 ): Promise<{ ok: boolean; text: string; reason?: string; via?: string }> {
   try {
     const { text, via } = await fetchHtmlForValidation(url, {
       timeoutMs: FETCH_TIMEOUT_MS,
+      allowStealth: false,
     });
     return { ok: true, text, via };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, text: "", reason: message.slice(0, 160) };
+    const directMsg = err instanceof Error ? err.message : String(err);
+    const tryStealth =
+      opts.mustValidate &&
+      hostNeedsStealthProxy(url) &&
+      Boolean(process.env.SCRAPINGBEE_API_KEY?.trim()) &&
+      opts.takeStealthSlot();
+    if (!tryStealth) {
+      return { ok: false, text: "", reason: directMsg.slice(0, 160) };
+    }
+    try {
+      const text = await fetchScrapingBeeStealth(url);
+      if (!text || text.trim().length < 40) {
+        return {
+          ok: false,
+          text: "",
+          reason: "página vazia via ScrapingBee stealth",
+        };
+      }
+      return { ok: true, text, via: "scrapingbee_stealth" };
+    } catch (stealthErr) {
+      const message =
+        stealthErr instanceof Error ? stealthErr.message : String(stealthErr);
+      return {
+        ok: false,
+        text: "",
+        reason: `${directMsg.slice(0, 80)} · stealth: ${message.slice(0, 80)}`,
+      };
+    }
   }
 }
 
@@ -87,6 +120,13 @@ export async function validateRemoteJobs(
     probe: { ok: boolean; text: string; reason?: string } | null;
   };
 
+  const stealthBudget = { left: STEALTH_BUDGET };
+  const takeStealthSlot = () => {
+    if (stealthBudget.left <= 0) return false;
+    stealthBudget.left -= 1;
+    return true;
+  };
+
   const probed = await mapPool(
     toFetch,
     CONCURRENCY,
@@ -102,7 +142,7 @@ export async function validateRemoteJobs(
           probe: { ok: false, text: "", reason: "sem URL" },
         };
       }
-      const probe = await probeUrl(url);
+      const probe = await probeUrl(url, { mustValidate, takeStealthSlot });
       return { job, index, mustValidate, url, probe };
     }
   );

@@ -108,6 +108,17 @@ export async function fetchScrapingBee(
 const CLOUDFLARE_RE =
   /just a moment|cf-browser-verification|attention required|enable javascript and cookies/i;
 
+/** Hosts onde o fetch direto costuma cair em Cloudflare (teste Jooble 15/10). */
+const STEALTH_HOST_RE = /(?:^|\.)jooble\.org$/i;
+
+export function hostNeedsStealthProxy(url: string): boolean {
+  try {
+    return STEALTH_HOST_RE.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** Jooble/Cloudflare: premium proxy sozinho devolve challenge; stealth+JS passou no teste. */
 export async function fetchScrapingBeeStealth(
   targetUrl: string
@@ -122,7 +133,8 @@ export async function fetchScrapingBeeStealth(
     render_js: "true",
   });
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 70000);
+  // Cabe no orçamento da rota (maxDuration); 70s estourava os 60s da Vercel.
+  const timer = setTimeout(() => controller.abort(), 35000);
   try {
     const res = await fetch(`https://app.scrapingbee.com/api/v1/?${params}`, {
       signal: controller.signal,
@@ -144,7 +156,7 @@ export async function fetchScrapingBeeStealth(
 }
 
 function looksBlocked(statusOrMsg: string, body = ""): boolean {
-  if (/HTTP\s*403|HTTP\s*429|bloquead|timeout|aborted/i.test(statusOrMsg)) {
+  if (/HTTP\s*403|HTTP\s*429|bloquead|timeout|aborted|Cloudflare/i.test(statusOrMsg)) {
     return true;
   }
   if (CLOUDFLARE_RE.test(body.slice(0, 4000))) return true;
@@ -152,16 +164,17 @@ function looksBlocked(statusOrMsg: string, body = ""): boolean {
 }
 
 /**
- * Fetch para double-check: direto → se 403/CF, ScrapingBee stealth+JS.
- * TinyFish fetch também bloqueia Jooble (bot_blocked); não usar aqui.
+ * Fetch para double-check: direto → (opcional) ScrapingBee stealth+JS.
+ * Stealth só em hosts conhecidos (Jooble) e quando `allowStealth` — senão a
+ * análise inteira estoura o timeout de 60–120s da Vercel.
  */
 export async function fetchHtmlForValidation(
   url: string,
-  options?: { timeoutMs?: number }
+  options?: { timeoutMs?: number; allowStealth?: boolean }
 ): Promise<{ text: string; via: "direct" | "scrapingbee_stealth" }> {
   try {
     const text = await fetchHtml(url, {
-      timeoutMs: options?.timeoutMs ?? 12000,
+      timeoutMs: options?.timeoutMs ?? 10000,
       headers: {
         "User-Agent": UA,
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
@@ -176,7 +189,12 @@ export async function fetchHtmlForValidation(
     return { text, via: "direct" };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (!process.env.SCRAPINGBEE_API_KEY?.trim() || !looksBlocked(message)) {
+    const canStealth =
+      Boolean(options?.allowStealth) &&
+      Boolean(process.env.SCRAPINGBEE_API_KEY?.trim()) &&
+      hostNeedsStealthProxy(url) &&
+      looksBlocked(message);
+    if (!canStealth) {
       throw err instanceof Error ? err : new Error(message);
     }
     const text = await fetchScrapingBeeStealth(url);
