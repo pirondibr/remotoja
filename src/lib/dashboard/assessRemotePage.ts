@@ -19,6 +19,30 @@ const HYBRID_OR_ONSITE_RE =
 const JUNK_TITLE_RE =
   /buscas?\s+de\s+empregos?\s+relacionad|vagas?\s+relacionad|similar\s+jobs|recommended\s+jobs/i;
 
+/**
+ * Modalidade estruturada (Gupy __NEXT_DATA__, JSON-LD, etc.).
+ * Não usar só o HTML visível: SPAs guardam "Remoto" em <script>,
+ * e o i18n da página também lista "Híbrido" como label — isso gerava FP.
+ */
+const STRUCTURED_WORKPLACE_RE =
+  /"workplaceType"\s*:\s*"(remote|remoto|hybrid|h[ií]brido|on[\s_-]?site|onsite|presencial)"/i;
+
+const STRUCTURED_TELECOMMUTE_RE =
+  /jobLocationType"\s*:\s*"TELECOMMUTE"|"@type"\s*:\s*"Telecommute"/i;
+
+type StructuredModality = "remote" | "hybrid" | "onsite" | null;
+
+function structuredModality(html: string): StructuredModality {
+  const wt = html.match(STRUCTURED_WORKPLACE_RE)?.[1]?.toLowerCase() || "";
+  if (wt === "remote" || wt === "remoto") return "remote";
+  if (wt.startsWith("hybrid") || /h[ií]brid/.test(wt)) return "hybrid";
+  if (wt.includes("on") || wt.includes("site") || wt.includes("presencial")) {
+    return "onsite";
+  }
+  if (STRUCTURED_TELECOMMUTE_RE.test(html)) return "remote";
+  return null;
+}
+
 function normalize(text: string): string {
   return (text || "")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -66,6 +90,21 @@ export function assessRemotePage(
       ok: false,
       kind: "invalid_link",
       reason: "página indica vaga inválida/encerrada",
+    };
+  }
+
+  const structured = structuredModality(pageHtml);
+  if (structured === "hybrid" || structured === "onsite") {
+    return {
+      ok: false,
+      kind: "false_positive",
+      reason: "modalidade híbrida/presencial (não 100% remoto)",
+    };
+  }
+  if (structured === "remote") {
+    return {
+      ok: true,
+      reason: "modalidade remota nos dados da página (workplaceType/JSON-LD)",
     };
   }
 

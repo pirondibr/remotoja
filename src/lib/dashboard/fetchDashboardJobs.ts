@@ -4,8 +4,6 @@ import { fetchGoogleDashboard } from "@/lib/dashboard/google";
 import { fetchGupy } from "@/lib/dashboard/gupy";
 import { fetchIndeed } from "@/lib/dashboard/indeed";
 import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
-import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
-import { fetchProgramathor } from "@/lib/dashboard/programathor";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
 import {
   buildScrapeReport,
@@ -27,20 +25,19 @@ type Fetcher = {
   requiresScrapingBee?: boolean;
 };
 
+/** LinkedIn e Programathor pausados por enquanto (código permanece nos módulos). */
 const FETCHERS: Fetcher[] = [
   { name: "gupy", run: fetchGupy, timeoutMs: 12000 },
   { name: "remotar", run: fetchRemotar, timeoutMs: 12000 },
-  { name: "programathor", run: fetchProgramathor, timeoutMs: 12000 },
   { name: "infojobs", run: fetchInfoJobs, timeoutMs: 12000 },
   { name: "catho", run: fetchCatho, timeoutMs: 15000 },
-  { name: "linkedin", run: fetchLinkedIn, timeoutMs: 18000 },
   {
     name: "indeed",
     run: fetchIndeed,
     timeoutMs: 22000,
     requiresScrapingBee: true,
   },
-  { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 22000 },
+  { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 55000 },
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

@@ -48,6 +48,8 @@ export function JobsDashboard() {
     searchParams.get("cache_only") === "1" || modeParam === "cache";
   const analyze =
     searchParams.get("validate") === "1" || modeParam === "analyze";
+  const forceFresh =
+    searchParams.get("fresh") === "1" || modeParam === "analyze_fresh";
   const adminMode = inspect
     ? cacheOnly
       ? "cache"
@@ -115,8 +117,9 @@ export function JobsDashboard() {
         if (cacheOnly) {
           params.set("cache_only", "1");
         } else if (analyze) {
-          params.set("fresh", "1");
           params.set("validate", "1");
+          // Sem fresh: usa análise salva. Com fresh: reanalisa e sobrescreve.
+          if (forceFresh) params.set("fresh", "1");
         } else if (!preferCache) {
           params.set("fresh", "1");
         }
@@ -151,17 +154,16 @@ export function JobsDashboard() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [inspect, cacheOnly, analyze]
+    [inspect, cacheOnly, analyze, forceFresh]
   );
 
   useEffect(() => {
     const initial = roleFromUrl.trim() || "SEO";
     const controller = new AbortController();
-    // Admin cache: só cache. Admin análise: live. Membro: preferCache.
-    const preferCache = adminMode === "analyze" ? false : true;
-    void loadJobs(initial, preferCache, controller.signal);
+    // Admin análise: API decide cache vs live (fresh só se forceFresh).
+    void loadJobs(initial, true, controller.signal);
     return () => controller.abort();
-  }, [roleFromUrl, loadJobs, adminMode]);
+  }, [roleFromUrl, loadJobs, adminMode, forceFresh]);
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -248,7 +250,11 @@ export function JobsDashboard() {
               {adminMode === "cache"
                 ? "Admin · cache (visão do usuário)"
                 : adminMode === "analyze"
-                  ? "Admin · análise ao vivo"
+                  ? forceFresh
+                    ? "Admin · reanalisando"
+                    : fromCache
+                      ? "Admin · análise (cache)"
+                      : "Admin · análise"
                   : "Membro · MVP"}
             </span>
             {inspect ? (
@@ -282,12 +288,16 @@ export function JobsDashboard() {
               {adminMode === "cache"
                 ? "Mesmo feed em cache que o membro vê — sem refazer scrapers."
                 : adminMode === "analyze"
-                  ? "Busca ao vivo nos portais + double-check de remoto/link."
+                  ? forceFresh
+                    ? "Reanálise ao vivo: scrape + double-check (salva ao terminar)."
+                    : "Análise salva — reabre sem refazer scrapers. Use Reanalisar para atualizar."
                   : "Feed com as vagas que encontramos. Cada card mostra o portal de origem."}
             </p>
             {inspect && fromCache && !loading && (
               <p className="mt-1 text-xs font-medium text-forest">
-                Servindo do cache pago
+                {adminMode === "analyze"
+                  ? "Servindo análise em cache"
+                  : "Servindo do cache pago"}
               </p>
             )}
           </div>

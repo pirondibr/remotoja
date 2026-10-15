@@ -81,6 +81,40 @@ export async function clearCache(
   return { deleted: rows.length };
 }
 
+const ANALYZE_SOURCE_KEYS = [
+  "_validation",
+  "_analyze_jobs",
+  "_analyze_at",
+] as const;
+
+/** Remove só o relatório de análise; mantém o feed pago do membro. */
+export async function clearAnalyzeCache(
+  role: string
+): Promise<{ cleared: boolean }> {
+  if (!hasDatabase()) return { cleared: false };
+  const existing = await getCachedJobs("paid", role);
+  if (!existing) return { cleared: false };
+
+  const sources = { ...(existing.sources || {}) };
+  let changed = false;
+  for (const key of ANALYZE_SOURCE_KEYS) {
+    if (key in sources) {
+      delete sources[key];
+      changed = true;
+    }
+  }
+  if (!changed) return { cleared: false };
+
+  await setCachedJobs({
+    kind: "paid",
+    role,
+    jobs: existing.jobs,
+    fetched_via: existing.fetched_via,
+    sources,
+  });
+  return { cleared: true };
+}
+
 export async function cacheStats(): Promise<{
   demo: number;
   paid: number;

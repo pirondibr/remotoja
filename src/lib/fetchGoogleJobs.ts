@@ -77,6 +77,8 @@ export async function fetchGoogleJobsByRole(
     languageCode?: string;
     maxAttempts?: number;
     pollMs?: number;
+    /** 1 = normal (~$0.0006), 2 = high (~$0.0012). Default 1. */
+    priority?: 1 | 2;
   }
 ): Promise<GoogleJobsResult> {
   const query = buildJobsQuery(role);
@@ -85,6 +87,7 @@ export async function fetchGoogleJobsByRole(
   const languageCode = options?.languageCode ?? "pt";
   const maxAttempts = options?.maxAttempts ?? 25;
   const pollMs = options?.pollMs ?? 3000;
+  const priority = options?.priority ?? 1;
   const headers = {
     Authorization: authHeader(),
     "Content-Type": "application/json",
@@ -99,6 +102,7 @@ export async function fetchGoogleJobsByRole(
         location_code: locationCode,
         language_code: languageCode,
         depth,
+        priority,
       },
     ]),
     cache: "no-store",

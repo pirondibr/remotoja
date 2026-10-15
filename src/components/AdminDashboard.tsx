@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { ScrapeReport } from "@/lib/dashboard/types";
@@ -66,7 +67,10 @@ function formatWhen(iso: string) {
   }
 }
 
+type FeedMode = "cache" | "analyze" | "analyze_fresh" | "clear_analyze";
+
 export function AdminDashboard() {
+  const searchParams = useSearchParams();
   const [data, setData] = useState<SearchesPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +103,13 @@ export function AdminDashboard() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const cleared = searchParams.get("cleared_analyze");
+    if (cleared) {
+      setResetMsg(`Cache de análise limpo para “${cleared}”.`);
+    }
+  }, [searchParams]);
+
   async function resetCache(kind: "demo" | "paid") {
     const label = kind === "demo" ? "demo" : "pago";
     if (
@@ -123,13 +134,13 @@ export function AdminDashboard() {
     await load();
   }
 
-  function openPaidFeed(mode: "cache" | "analyze") {
+  function openPaidFeed(mode: FeedMode) {
     const role = paidRole.trim();
     if (role.length < 2) return;
     window.location.href = feedHref(role, mode);
   }
 
-  function feedHref(role: string, mode: "cache" | "analyze") {
+  function feedHref(role: string, mode: FeedMode) {
     const q = new URLSearchParams({ role, mode });
     return `/api/admin/open-feed?${q}`;
   }
@@ -198,9 +209,9 @@ export function AdminDashboard() {
           Feed pago (inspeção)
         </h2>
         <p className="mt-1 text-sm text-moss/70">
-          <strong>Cache</strong> = o que o membro viu (rápido).{" "}
-          <strong>Análise</strong> = busca ao vivo + double-check de
-          remoto/link.
+          <strong>Cache</strong> = feed do membro. <strong>Análise</strong> =
+          relatório salvo (reabre sem refazer).{" "}
+          <strong>Reanalisar</strong> = força scrape + double-check de novo.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
@@ -221,7 +232,21 @@ export function AdminDashboard() {
             onClick={() => openPaidFeed("analyze")}
             className="rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-cream hover:bg-forest"
           >
-            Rodar análise
+            Ver análise
+          </button>
+          <button
+            type="button"
+            onClick={() => openPaidFeed("analyze_fresh")}
+            className="rounded-xl border border-moss/20 bg-white px-4 py-2.5 text-sm font-bold text-forest hover:border-forest/40"
+          >
+            Reanalisar
+          </button>
+          <button
+            type="button"
+            onClick={() => openPaidFeed("clear_analyze")}
+            className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900 hover:border-amber-400"
+          >
+            Limpar análise
           </button>
         </div>
 
@@ -286,6 +311,19 @@ export function AdminDashboard() {
                               className="text-xs font-semibold text-forest hover:underline"
                             >
                               Análise
+                              {feed.validation ? " ✓" : ""}
+                            </Link>
+                            <Link
+                              href={feedHref(feed.role, "analyze_fresh")}
+                              className="text-xs font-semibold text-ink hover:underline"
+                            >
+                              Reanalisar
+                            </Link>
+                            <Link
+                              href={feedHref(feed.role, "clear_analyze")}
+                              className="text-xs font-semibold text-amber-800 hover:underline"
+                            >
+                              Limpar análise
                             </Link>
                           </div>
                         </td>

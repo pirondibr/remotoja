@@ -31,6 +31,14 @@ function extractValidation(
   return raw as ValidationReport;
 }
 
+function extractAnalyzeJobs(
+  sources: Record<string, number | string | object> | null | undefined
+): DemoJob[] | null {
+  const raw = sources?._analyze_jobs;
+  if (!Array.isArray(raw)) return null;
+  return raw as DemoJob[];
+}
+
 function sourcesPlainCounts(
   sources: Record<string, number | string | object> | null | undefined
 ): Record<string, number | string> {
@@ -68,7 +76,37 @@ export async function GET(request: Request) {
     );
   }
 
-  // Cache do membro nunca exige validate. Validate sempre busca live.
+  // Análise salva: validate sem fresh → devolve cache (compartilhável).
+  if (validate && !bypassCache && hasDatabase()) {
+    try {
+      const cached = await getCachedJobs("paid", role);
+      const validation = extractValidation(cached?.sources);
+      if (cached && validation) {
+        const analyzeJobs = extractAnalyzeJobs(cached.sources);
+        const jobs =
+          analyzeJobs ?? filterByRole(cached.jobs as DemoJob[], role);
+        return NextResponse.json({
+          role,
+          count: jobs.length,
+          jobs,
+          fetched_via: "cache_analyze",
+          sources: sourcesPlainCounts(cached.sources),
+          validation,
+          scrape_report: extractScrapeReport(cached.sources),
+          cached: true,
+          cache_updated_at: cached.updated_at,
+          analyze_at:
+            typeof cached.sources?._analyze_at === "string"
+              ? cached.sources._analyze_at
+              : cached.updated_at,
+        });
+      }
+    } catch {
+      // segue para análise live
+    }
+  }
+
+  // Cache do membro (sem validate) ou admin cache_only.
   if ((!bypassCache && !validate) || cacheOnly) {
     if (hasDatabase()) {
       try {
@@ -142,8 +180,9 @@ export async function GET(request: Request) {
           sources: payload.sources,
         });
       } else if (validate) {
-        // Análise: grava relatório sem trocar o feed que o membro vê
+        // Análise: grava relatório + jobs analisados; não troca o feed do membro
         const existing = await getCachedJobs("paid", role);
+        const analyzeAt = new Date().toISOString();
         await setCachedJobs({
           kind: "paid",
           role,
@@ -158,6 +197,8 @@ export async function GET(request: Request) {
             ...(payload.validation
               ? { _validation: payload.validation }
               : {}),
+            _analyze_jobs: payload.jobs,
+            _analyze_at: analyzeAt,
           },
         });
       }
