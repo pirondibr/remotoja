@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
 import { getDemoJobs, type DemoJob } from "@/lib/demoJobs";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
+import { saveJobSession } from "@/lib/jobSession";
 import { BrandMark } from "./BrandMark";
 
 const FALLBACK_MATCHES = getDemoJobs(5);
@@ -35,6 +36,7 @@ function readPrefillRole(fromUrl: string | null): string {
 }
 
 export function OnboardWizard() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
@@ -152,6 +154,16 @@ export function OnboardWizard() {
   }
 
   const matches = liveJobs.length > 0 ? liveJobs : FALLBACK_MATCHES;
+
+  /** MVP: libera o dash pago sem checkout. */
+  function openMemberDash() {
+    const nextRole =
+      (typeof answers.role === "string" && answers.role.trim()) ||
+      draft.trim() ||
+      "SEO";
+    saveJobSession(nextRole, matches);
+    router.push(`/app?role=${encodeURIComponent(nextRole)}`);
+  }
 
   return (
     <div className="bg-mesh relative min-h-screen text-cream">
@@ -371,11 +383,7 @@ export function OnboardWizard() {
             {step.kind === "paywall" ? (
               <button
                 type="button"
-                onClick={() =>
-                  alert(
-                    "Checkout em breve. Por enquanto o funil e a landing estão no ar. Próximo passo: pagamento + scrapers no Render."
-                  )
-                }
+                onClick={openMemberDash}
                 className="w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint"
               >
                 {step.cta}
