@@ -46,6 +46,11 @@ function formatSource(source: string) {
     greenhouse: "Greenhouse",
     lever: "Lever",
     workable: "Workable",
+    solides: "Sólides",
+    inhire: "InHire",
+    ashby: "Ashby",
+    comeet: "Comeet",
+    recruitcrm: "RecruitCRM",
     company_site: "Site da empresa",
   };
   const key = raw.toLowerCase();

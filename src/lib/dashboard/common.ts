@@ -144,6 +144,11 @@ export function inferPortalFromUrl(url: string | null | undefined): string | nul
     if (host.includes("greenhouse.io")) return "greenhouse";
     if (host.includes("lever.co")) return "lever";
     if (host.includes("workable.com")) return "workable";
+    if (host.includes("solides.com")) return "solides";
+    if (host.includes("inhire.app")) return "inhire";
+    if (host.includes("ashbyhq.com")) return "ashby";
+    if (host.includes("comeet.com")) return "comeet";
+    if (host.includes("recruitcrm.io")) return "recruitcrm";
     if (host.includes("remotar.com")) return "remotar";
     if (host.includes("google.") && host.includes("jobs")) return "google_vagas";
     // Domínio próprio da empresa (carreira.xxx) — marca como company_site
