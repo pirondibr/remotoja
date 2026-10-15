@@ -8,7 +8,7 @@ services:
     schedule: "0 */6 * * *"
     buildCommand: pip install -r workers/requirements.txt
     startCommand: python -m workers.scraper.placeholder
-    plan: free
+    plan: starter
 
   # Descomente quando houver fila/matching contínuo:
   # - type: worker
