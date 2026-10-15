@@ -15,9 +15,13 @@ const DEAD_PAGE_RE =
 const STRONG_REMOTE_RE =
   /100%\s*remoto|totalmente\s+remoto|fully\s*remote|apenas\s+remoto|somente\s+remoto|remote\s*only|trabalho\s+(100%\s*)?a\s+dist[aâ]ncia|home\s*office|work\s+from\s+home|\bwfh\b|modelo\s*[:\-]?\s*remoto|regime\s*[:\-]?\s*remoto|formato\s*[:\-]?\s*remoto|localidade\s*[:\-]?\s*remoto|localization\s*[:\-]?\s*remote|\bremoto\b|\bremota\b|\bremote\b/i;
 
-/** Sinais de híbrido / presencial como modalidade. */
+/**
+ * Sinais de híbrido / presencial como MODALIDADE de trabalho.
+ * Não usar `\bpresencial\b` solto: páginas de HO citam "atendimento presencial"
+ * (canal ao cliente) e isso gerava falso positivo (ex.: Actionline / Catho).
+ */
 const HYBRID_OR_ONSITE_RE =
-  /\bh[ií]brido\b|\bhybrid\b|\bpresencial\b|\bon[\s-]?site\b|\bno\s+escrit[oó]rio\b|\bem\s+escrit[oó]rio\b|modelo\s*[:\-]?\s*h[ií]brido|regime\s*[:\-]?\s*h[ií]brido|formato\s*[:\-]?\s*h[ií]brido/i;
+  /\bh[ií]brido\b|\bhybrid\b|modelo\s*[:\-]?\s*(h[ií]brido|presencial|hybrid)|regime\s*[:\-]?\s*(h[ií]brido|presencial|hybrid)|formato\s*[:\-]?\s*(h[ií]brido|presencial|hybrid)|trabalho\s+presencial|vaga\s+presencial|localidade\s*[:\-]?\s*presencial|\bon[\s-]?site\b|trabalho\s+no\s+escrit[oó]rio|presencial\s*\/\s*h[ií]brido|h[ií]brido\s*\/\s*presencial/i;
 
 /** Título/lixo que não é vaga real. */
 const JUNK_TITLE_RE =
@@ -122,8 +126,26 @@ export function assessRemotePage(
   const metaHybrid = hasHybridOrOnsite(meta);
   const pageHybrid = hasHybridOrOnsite(page);
 
-  // "Híbrido ou Remoto" / Hybrid como modalidade → não é 100% remoto
-  if (metaHybrid || pageHybrid) {
+  // Modalidade híbrida/presencial no título/local → nunca é 100% remoto
+  if (metaHybrid) {
+    return {
+      ok: false,
+      kind: "false_positive",
+      reason: "modalidade híbrida/presencial (não 100% remoto)",
+    };
+  }
+
+  // Título já diz home office/remoto: prevalece sobre "híbrido/presencial"
+  // solto no corpo (filtros da Catho, "atendimento presencial", vagas similares).
+  if (metaRemote && !metaHybrid) {
+    return {
+      ok: true,
+      reason: "título/local indica remoto",
+    };
+  }
+
+  // Corpo com modalidade híbrida, sem remoto claro no título
+  if (pageHybrid) {
     const exclusiveRemote =
       /100%\s*remoto|totalmente\s+remoto|fully\s*remote|apenas\s+remoto|somente\s+remoto|remote\s*only/i.test(
         combined
@@ -137,12 +159,10 @@ export function assessRemotePage(
     }
   }
 
-  if (metaRemote || pageRemote) {
+  if (pageRemote) {
     return {
       ok: true,
-      reason: metaRemote
-        ? "título/local indica remoto"
-        : "página menciona remoto/home office",
+      reason: "página menciona remoto/home office",
     };
   }
 
