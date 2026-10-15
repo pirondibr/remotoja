@@ -15,14 +15,6 @@ function postedLabel(job: DemoJob): string {
   return job.posted || "Recente";
 }
 
-function freshestPostedLabel(jobs: DemoJob[]): string {
-  const withPosted = jobs.find((j) => j.posted);
-  if (withPosted?.posted) {
-    return withPosted.posted.replace(/^há\s+/i, "");
-  }
-  return "algumas horas";
-}
-
 function isOffLinkedIn(source: string) {
   return !source.toLowerCase().includes("linkedin");
 }
@@ -36,26 +28,6 @@ function readPrefillRole(fromUrl: string | null): string {
     /* ignore */
   }
   return "";
-}
-
-function Countdown({ seconds }: { seconds: number }) {
-  const [left, setLeft] = useState(seconds);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setLeft((prev) => (prev <= 1 ? seconds : prev - 1));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [seconds]);
-
-  const mm = String(Math.floor(left / 60)).padStart(2, "0");
-  const ss = String(left % 60).padStart(2, "0");
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-ink/50 px-2.5 py-1 text-xs font-semibold text-lime">
-      <span aria-hidden>⏱</span>
-      {mm}:{ss}
-    </span>
-  );
 }
 
 function LockIcon({ className = "" }: { className?: string }) {
@@ -197,11 +169,7 @@ export function OnboardWizard() {
           company: matches[0].company,
         }
       : null);
-  const moreCount = Math.max(matches.length * 2, 2);
-  const headlineTime = useMemo(
-    () => freshestPostedLabel(matches),
-    [matches],
-  );
+  const moreCount = Math.max(matches.length * 2, 16);
 
   const canContinue = useMemo(() => {
     if (step.kind === "single" || step.kind === "multi") {
@@ -449,39 +417,15 @@ export function OnboardWizard() {
                 </div>
               ) : matches.length > 0 ? (
                 <>
-                  <div className="relative mb-6 overflow-hidden rounded-2xl border border-lime/35 bg-gradient-to-r from-forest/80 to-moss/40 p-4">
-                    <div className="absolute top-3 right-3">
-                      <Countdown seconds={186} />
-                    </div>
-                    <div className="flex flex-col gap-3 pr-16 sm:flex-row sm:items-center sm:justify-between sm:pr-24">
-                      <div>
-                        <p className="font-[family-name:var(--font-display)] text-2xl font-extrabold text-lime">
-                          72% OFF
-                        </p>
-                        <p className="text-sm text-sand/80">
-                          Oferta por tempo limitado
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={goNext}
-                        className="shrink-0 rounded-full bg-lime px-6 py-2.5 text-sm font-bold text-ink transition hover:bg-mint"
-                      >
-                        Upgrade
-                      </button>
-                    </div>
-                  </div>
-
-                  <h1 className="text-center font-[family-name:var(--font-display)] text-[1.65rem] leading-tight font-bold sm:text-3xl">
-                    Sua próxima vaga foi publicada{" "}
-                    <span className="text-lime">{headlineTime}</span>
+                  <h1 className="text-center font-[family-name:var(--font-display)] text-[1.85rem] leading-tight font-bold sm:text-4xl">
+                    +{moreCount} matches para o seu perfil
                   </h1>
                   <p className="mx-auto mt-3 max-w-sm text-center text-sm text-sand/65">
-                    Vagas top recebem 100+ candidatos rápido. Candidate-se antes
-                    da multidão.
+                    Prévia de vagas remotas para {role}. Candidate-se antes da
+                    multidão.
                   </p>
 
-                  <div className="mt-7 space-y-3">
+                  <div className="mt-8 space-y-3">
                     {previewJobs.map((job, i) => (
                       <MatchJobCard
                         key={`${job.job_id || i}-${job.title}`}
@@ -490,18 +434,13 @@ export function OnboardWizard() {
                     ))}
 
                     {lockedJob && (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={goNext}
-                          className="w-full text-left"
-                        >
-                          <MatchJobCard job={lockedJob} locked />
-                        </button>
-                        <p className="mt-3 text-center text-sm font-medium text-cream/90">
-                          + {moreCount} matches para o seu perfil
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={goNext}
+                        className="w-full text-left"
+                      >
+                        <MatchJobCard job={lockedJob} locked />
+                      </button>
                     )}
                   </div>
                 </>

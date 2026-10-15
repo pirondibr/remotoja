@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
+import { termMatches } from "@/lib/dashboard/common";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
@@ -18,7 +19,11 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
     const jobs = await fetchRemotar(role);
-    return jobs.slice(0, 10);
+    return jobs
+      .filter((job) =>
+        termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)
+      )
+      .slice(0, 10);
   } catch {
     return [];
   }

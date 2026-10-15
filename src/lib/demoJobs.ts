@@ -14,6 +14,7 @@ export type DemoJob = {
   posted?: string | null;
   job_id?: string | null;
   remote?: boolean;
+  snippet?: string | null;
 };
 
 export type DemoJobsPayload = {

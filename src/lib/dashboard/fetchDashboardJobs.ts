@@ -1,4 +1,4 @@
-import { dedupeJobs } from "@/lib/dashboard/common";
+import { dedupeJobs, termMatches } from "@/lib/dashboard/common";
 import { fetchCatho } from "@/lib/dashboard/catho";
 import { fetchGoogleDashboard } from "@/lib/dashboard/google";
 import { fetchGupy } from "@/lib/dashboard/gupy";
@@ -104,20 +104,24 @@ export async function fetchDashboardJobs(
     }
   }
 
-  const deduped = dedupeJobs(merged);
+  // Portais (ex.: Remotar) às vezes devolvem vagas fora do cargo — filtra pelo termo
+  const relevant = dedupeJobs(merged).filter((job) => {
+    const blob = `${job.title} ${job.snippet || ""} ${job.company}`;
+    return termMatches(blob, term);
+  });
 
   // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
   if (!options.validate) {
     return {
       role: term,
-      count: deduped.length,
-      jobs: deduped,
+      count: relevant.length,
+      jobs: relevant,
       fetched_via: "dashboard_multi",
       sources,
     };
   }
 
-  const { jobs, validation } = await validateRemoteJobs(deduped);
+  const { jobs, validation } = await validateRemoteJobs(relevant);
   return {
     role: term,
     count: jobs.length,

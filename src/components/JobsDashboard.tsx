@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { CompanyAvatar } from "@/components/CompanyAvatar";
 import type { DemoJob } from "@/lib/demoJobs";
+import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 
@@ -46,7 +47,11 @@ export function JobsDashboard() {
   const [validation, setValidation] = useState<ValidationReport | null>(null);
 
   const loadJobs = useCallback(
-    async (nextRole: string, preferCache = true) => {
+    async (
+      nextRole: string,
+      preferCache = true,
+      signal?: AbortSignal
+    ) => {
       const trimmed = nextRole.trim();
       if (trimmed.length < 2) {
         setLoading(false);
@@ -58,24 +63,36 @@ export function JobsDashboard() {
       setError(null);
       setRole(trimmed);
       setDraft(trimmed);
+      // Evita flash da pesquisa anterior enquanto a nova carrega
+      setJobs([]);
+      setSources({});
+      setValidation(null);
 
-      // Prefetch visual só se já veio do feed pago (não da prévia do funil)
       if (preferCache && !inspect) {
         const cached = loadJobSession(trimmed);
-        if (cached && cached.jobs.length > 0) {
-          setJobs(cached.jobs);
+        if (
+          cached &&
+          cached.jobs.length > 0 &&
+          cached.role.toLowerCase() === trimmed.toLowerCase()
+        ) {
+          // Descarta sessão antiga misturada com outro cargo
+          const relevant = cached.jobs.filter((job) =>
+            termMatches(
+              `${job.title} ${job.snippet || ""} ${job.company}`,
+              trimmed
+            )
+          );
+          if (relevant.length > 0) setJobs(relevant);
         }
       }
 
       try {
         const params = new URLSearchParams({ role: trimmed });
-        if (!preferCache) params.set("fresh", "1");
-        // Double-check remoto/link só no modo admin (não na rotina do membro)
-        if (inspect) {
-          params.set("fresh", "1");
-          params.set("validate", "1");
-        }
-        const res = await fetch(`/api/dashboard/jobs?${params}`);
+        // Sempre fresh ao trocar cargo: não reaproveita cache de outro termo
+        if (!preferCache || inspect) params.set("fresh", "1");
+        if (inspect) params.set("validate", "1");
+        const res = await fetch(`/api/dashboard/jobs?${params}`, { signal });
+        if (signal?.aborted) return;
         const data = await res.json();
         const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
         setJobs(list);
@@ -90,10 +107,11 @@ export function JobsDashboard() {
               "Nenhuma vaga encontrada para esse cargo. Tente outro termo."
           );
         }
-      } catch {
+      } catch (err) {
+        if (signal?.aborted) return;
         setError("Falha ao carregar vagas. Tente novamente.");
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
       }
     },
     [inspect]
@@ -101,7 +119,9 @@ export function JobsDashboard() {
 
   useEffect(() => {
     const initial = roleFromUrl.trim() || "SEO";
-    void loadJobs(initial, !inspect);
+    const controller = new AbortController();
+    void loadJobs(initial, !inspect, controller.signal);
+    return () => controller.abort();
   }, [roleFromUrl, loadJobs, inspect]);
 
   const visible = useMemo(() => {
@@ -127,7 +147,7 @@ export function JobsDashboard() {
 
   function onSearch(event: FormEvent) {
     event.preventDefault();
-    void loadJobs(draft, false);
+    void loadJobs(draft, false, undefined);
   }
 
   return (

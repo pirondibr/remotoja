@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
+import { termMatches } from "@/lib/dashboard/common";
+import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+
+function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
+  return jobs.filter((job) =>
+    termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)
+  );
+}
 
 export const maxDuration = 60;
 
@@ -47,15 +55,21 @@ export async function GET(request: Request) {
     try {
       const cached = await getCachedJobs("paid", role);
       if (cached && cached.jobs.length > 0) {
-        return NextResponse.json({
-          role,
-          count: cached.jobs.length,
-          jobs: cached.jobs,
-          fetched_via: cached.fetched_via || "cache_paid",
-          sources: sourcesWithoutValidation(cached.sources),
-          cached: true,
-          cache_updated_at: cached.updated_at,
-        });
+        const jobs = filterByRole(cached.jobs as DemoJob[], role);
+        // Cache antigo misturado (ex.: SEO com vagas de programador) → força live
+        if (jobs.length === 0) {
+          // segue live
+        } else {
+          return NextResponse.json({
+            role,
+            count: jobs.length,
+            jobs,
+            fetched_via: cached.fetched_via || "cache_paid",
+            sources: sourcesWithoutValidation(cached.sources),
+            cached: true,
+            cache_updated_at: cached.updated_at,
+          });
+        }
       }
     } catch {
       // segue live

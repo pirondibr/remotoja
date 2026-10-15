@@ -105,12 +105,29 @@ export async function fetchScrapingBee(
   });
 }
 
+/** Cargos não-dev: portais às vezes misturam vagas de programador na busca. */
+const NON_DEV_ROLE =
+  /^(seo|sem|as[oa]|conte[uú]do|copy|redator|social|m[ií]dias?|marketing|designer|ux|ui|produto|product|gestor|gest[aã]o|rh|recrut)/i;
+
+const DEV_TITLE_NOISE =
+  /\b(desenvolvedor|developer|programador|full\s*stack|front[\s-]?end|back[\s-]?end|software\s*engineer|engenheiro\s+de\s+software|react\s*native|mobile\s*developer)\b/i;
+
 export function termMatches(title: string, term: string): boolean {
   const t = term.trim().toLowerCase();
   if (!t) return true;
   const hay = title.toLowerCase();
-  if (hay.includes(t)) return true;
-  // termos curtos: aceita se todas as palavras aparecem
-  const parts = t.split(/\s+/).filter(Boolean);
-  return parts.length > 1 && parts.every((p) => hay.includes(p));
+
+  const hitsTerm =
+    hay.includes(t) ||
+    (t.split(/\s+/).filter(Boolean).length > 1 &&
+      t.split(/\s+/).filter(Boolean).every((p) => hay.includes(p)));
+
+  if (!hitsTerm) return false;
+
+  // Ex.: busca "seo" não deve aceitar "Full Stack" só porque o portal misturou resultados
+  if (NON_DEV_ROLE.test(t) && DEV_TITLE_NOISE.test(hay) && !hay.includes(t)) {
+    return false;
+  }
+
+  return true;
 }
