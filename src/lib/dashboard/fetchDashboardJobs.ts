@@ -49,8 +49,9 @@ const FETCHERS: Fetcher[] = [
   {
     name: "linkedin",
     run: fetchLinkedIn,
-    timeoutMs: 45000,
-    beeCredits: BEE_PREMIUM_JS_CREDITS, // só se cair no fallback Bee
+    // guest 429 em Vercel → Bee guest (1–2 req, sem JS)
+    timeoutMs: 70000,
+    beeCredits: BEE_PREMIUM_JS_CREDITS,
   },
   {
     name: "indeed",
