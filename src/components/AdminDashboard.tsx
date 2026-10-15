@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+import type { ScrapeReport } from "@/lib/dashboard/types";
 
 type JobPreview = { title: string; company: string; source?: string };
 
@@ -25,9 +26,25 @@ type PaidFeed = {
   jobs_count: number;
   sources: Record<string, number | string>;
   validation: ValidationReport | null;
+  scrape_report: ScrapeReport | null;
   updated_at: string;
   href: string;
 };
+
+const PORTAL_LABELS: Record<string, string> = {
+  gupy: "Gupy",
+  remotar: "Remotar",
+  programathor: "Programathor",
+  infojobs: "InfoJobs",
+  catho: "Catho",
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+  google_vagas: "Google Vagas",
+};
+
+function portalLabel(key: string) {
+  return PORTAL_LABELS[key.toLowerCase()] || key;
+}
 
 type SearchesPayload = {
   rows: SearchRow[];
@@ -55,6 +72,7 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedFeed, setExpandedFeed] = useState<string | null>(null);
   const [paidRole, setPaidRole] = useState("SEO");
 
   const load = useCallback(async () => {
@@ -213,43 +231,180 @@ export function AdminDashboard() {
               <thead className="border-b border-moss/10 text-xs uppercase tracking-wide text-moss/60">
                 <tr>
                   <th className="py-2 pr-3 font-semibold">Cargo</th>
-                  <th className="py-2 pr-3 font-semibold">Vagas</th>
-                  <th className="py-2 pr-3 font-semibold">Validação</th>
+                  <th className="py-2 pr-3 font-semibold">No feed</th>
+                  <th className="py-2 pr-3 font-semibold">Scrape</th>
                   <th className="py-2 pr-3 font-semibold">Atualizado</th>
                   <th className="py-2 font-semibold text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {(data?.paid_feeds || []).map((feed) => (
-                  <tr key={feed.role} className="border-b border-moss/5">
-                    <td className="py-2.5 pr-3 font-medium">{feed.role}</td>
-                    <td className="py-2.5 pr-3">{feed.jobs_count}</td>
-                    <td className="py-2.5 pr-3 text-xs text-moss/70">
-                      {feed.validation
-                        ? `ok ${feed.validation.validated} · falso ${feed.validation.false_positives} · link ${feed.validation.invalid_links}`
-                        : "sem relatório"}
-                    </td>
-                    <td className="py-2.5 pr-3 text-xs text-moss/60">
-                      {formatWhen(feed.updated_at)}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <div className="flex flex-wrap justify-end gap-3">
-                        <Link
-                          href={feedHref(feed.role, "cache")}
-                          className="text-xs font-semibold text-moss hover:underline"
+                {(data?.paid_feeds || []).map((feed) => {
+                  const portals = feed.scrape_report?.portals || [];
+                  const found = portals.reduce((s, p) => s + p.found, 0);
+                  const kept = portals.reduce((s, p) => s + p.kept, 0);
+                  const fps = portals.reduce(
+                    (s, p) => s + (p.false_positives || 0),
+                    0
+                  );
+                  const open = expandedFeed === feed.role;
+                  return (
+                    <Fragment key={feed.role}>
+                      <tr
+                        className="cursor-pointer border-b border-moss/5 hover:bg-cream/40"
+                        onClick={() =>
+                          setExpandedFeed((r) =>
+                            r === feed.role ? null : feed.role
+                          )
+                        }
+                      >
+                        <td className="py-2.5 pr-3 font-medium">{feed.role}</td>
+                        <td className="py-2.5 pr-3">{feed.jobs_count}</td>
+                        <td className="py-2.5 pr-3 text-xs text-moss/70">
+                          {portals.length > 0
+                            ? `achou ${found} · pegou ${kept}${
+                                feed.validation
+                                  ? ` · FP ${fps}`
+                                  : " · sem análise"
+                              }`
+                            : "sem scrape_report ainda"}
+                        </td>
+                        <td className="py-2.5 pr-3 text-xs text-moss/60">
+                          {formatWhen(feed.updated_at)}
+                        </td>
+                        <td
+                          className="py-2.5 text-right"
+                          onClick={(e) => e.stopPropagation()}
                         >
-                          Cache
-                        </Link>
-                        <Link
-                          href={feedHref(feed.role, "analyze")}
-                          className="text-xs font-semibold text-forest hover:underline"
-                        >
-                          Análise
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <div className="flex flex-wrap justify-end gap-3">
+                            <Link
+                              href={feedHref(feed.role, "cache")}
+                              className="text-xs font-semibold text-moss hover:underline"
+                            >
+                              Cache
+                            </Link>
+                            <Link
+                              href={feedHref(feed.role, "analyze")}
+                              className="text-xs font-semibold text-forest hover:underline"
+                            >
+                              Análise
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr className="border-b border-moss/10 bg-cream/50">
+                          <td colSpan={5} className="px-3 py-3">
+                            <p className="mb-2 text-xs font-semibold text-moss/60">
+                              Detalhe por portal —{" "}
+                              <span className="font-normal">
+                                Encontradas = scraper trouxe · Pegamos = ficaram
+                                no feed após filtro · FP = falso positivo na
+                                análise
+                              </span>
+                            </p>
+                            {portals.length === 0 ? (
+                              <p className="text-xs text-moss/50">
+                                Ainda sem relatório. Abra o cache (após um fetch
+                                novo) ou rode a análise para gerar métricas.
+                              </p>
+                            ) : (
+                              <table className="min-w-full text-left text-xs">
+                                <thead className="text-moss/55 uppercase tracking-wide">
+                                  <tr>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Portal
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Encontradas
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Pegamos
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Checadas
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      OK
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Falso +
+                                    </th>
+                                    <th className="py-1.5 pr-3 font-semibold">
+                                      Link ruim
+                                    </th>
+                                    <th className="py-1.5 font-semibold">
+                                      Aproveit.
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {portals.map((p) => {
+                                    const rate =
+                                      p.found > 0
+                                        ? Math.round((p.kept / p.found) * 100)
+                                        : null;
+                                    const fpRate =
+                                      p.checked > 0
+                                        ? Math.round(
+                                            (p.false_positives / p.checked) *
+                                              100
+                                          )
+                                        : null;
+                                    return (
+                                      <tr
+                                        key={p.portal}
+                                        className="border-t border-moss/10"
+                                      >
+                                        <td className="py-1.5 pr-3 font-medium text-ink">
+                                          {portalLabel(p.portal)}
+                                          {p.error ? (
+                                            <span className="ml-1 text-amber-700">
+                                              (erro)
+                                            </span>
+                                          ) : null}
+                                        </td>
+                                        <td className="py-1.5 pr-3">{p.found}</td>
+                                        <td className="py-1.5 pr-3">{p.kept}</td>
+                                        <td className="py-1.5 pr-3">
+                                          {p.checked || "—"}
+                                        </td>
+                                        <td className="py-1.5 pr-3 text-forest">
+                                          {p.validated_ok || "—"}
+                                        </td>
+                                        <td className="py-1.5 pr-3 text-amber-800">
+                                          {p.checked
+                                            ? `${p.false_positives}${
+                                                fpRate != null
+                                                  ? ` (${fpRate}%)`
+                                                  : ""
+                                              }`
+                                            : "—"}
+                                        </td>
+                                        <td className="py-1.5 pr-3 text-red-700">
+                                          {p.checked
+                                            ? p.invalid_links
+                                            : "—"}
+                                        </td>
+                                        <td className="py-1.5 text-moss/70">
+                                          {rate != null ? `${rate}%` : "—"}
+                                          {p.error ? (
+                                            <span className="mt-0.5 block text-[10px] text-amber-700">
+                                              {p.error.slice(0, 80)}
+                                            </span>
+                                          ) : null}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>

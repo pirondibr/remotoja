@@ -4,7 +4,9 @@ import { listLeadSearches } from "@/lib/leadLog";
 import { cacheStats, listPaidCacheEntries } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { originLabel } from "@/lib/attribution";
+import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+import type { ScrapeReport } from "@/lib/dashboard/types";
 
 export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
@@ -41,9 +43,10 @@ export async function GET(request: Request) {
           ? sources._validation
           : null
       ) as ValidationReport | null;
+      const scrape_report = extractScrapeReport(sources) as ScrapeReport | null;
       const portalSources: Record<string, number | string> = {};
       for (const [key, value] of Object.entries(sources)) {
-        if (key === "_validation") continue;
+        if (key.startsWith("_")) continue;
         if (typeof value === "number" || typeof value === "string") {
           portalSources[key] = value;
         }
@@ -53,6 +56,7 @@ export async function GET(request: Request) {
         jobs_count: Number(entry.jobs_count) || 0,
         sources: portalSources,
         validation,
+        scrape_report,
         updated_at: entry.updated_at,
         href: `/api/admin/open-feed?role=${encodeURIComponent(entry.role_key)}&mode=cache`,
       };

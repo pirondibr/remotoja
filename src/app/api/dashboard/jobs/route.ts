@@ -4,6 +4,7 @@ import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { rankJobsForFeed, termMatches } from "@/lib/dashboard/common";
+import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
 import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJob } from "@/lib/dashboard/types";
@@ -25,13 +26,13 @@ function extractValidation(
   return raw as ValidationReport;
 }
 
-function sourcesWithoutValidation(
+function sourcesPlainCounts(
   sources: Record<string, number | string | object> | null | undefined
 ): Record<string, number | string> {
   const out: Record<string, number | string> = {};
   if (!sources) return out;
   for (const [key, value] of Object.entries(sources)) {
-    if (key === "_validation") continue;
+    if (key.startsWith("_")) continue;
     if (typeof value === "number" || typeof value === "string") {
       out[key] = value;
     }
@@ -77,8 +78,9 @@ export async function GET(request: Request) {
               count: jobs.length,
               jobs,
               fetched_via: cached.fetched_via || "cache_paid",
-              sources: sourcesWithoutValidation(cached.sources),
+              sources: sourcesPlainCounts(cached.sources),
               validation: extractValidation(cached.sources),
+              scrape_report: extractScrapeReport(cached.sources),
               cached: true,
               cache_updated_at: cached.updated_at,
             });
@@ -124,9 +126,9 @@ export async function GET(request: Request) {
   try {
     const payload = await fetchDashboardJobs(role, { validate });
 
-    // Cache só o feed "limpo" do usuário (sem filtrar por validação)
-    if (!validate && payload.jobs.length > 0) {
-      try {
+    try {
+      if (!validate && payload.jobs.length > 0) {
+        // Feed do membro + métricas de scrape
         await setCachedJobs({
           kind: "paid",
           role,
@@ -134,12 +136,35 @@ export async function GET(request: Request) {
           fetched_via: payload.fetched_via,
           sources: payload.sources,
         });
-      } catch {
-        // ignore
+      } else if (validate) {
+        // Análise: grava relatório sem trocar o feed que o membro vê
+        const existing = await getCachedJobs("paid", role);
+        await setCachedJobs({
+          kind: "paid",
+          role,
+          jobs: existing?.jobs?.length ? existing.jobs : payload.jobs,
+          fetched_via: existing?.fetched_via || payload.fetched_via,
+          sources: {
+            ...sourcesPlainCounts(existing?.sources),
+            ...sourcesPlainCounts(payload.sources),
+            ...(payload.scrape_report
+              ? { _scrape_report: payload.scrape_report }
+              : {}),
+            ...(payload.validation
+              ? { _validation: payload.validation }
+              : {}),
+          },
+        });
       }
+    } catch {
+      // ignore cache write
     }
 
-    return NextResponse.json({ ...payload, cached: false });
+    return NextResponse.json({
+      ...payload,
+      sources: sourcesPlainCounts(payload.sources),
+      cached: false,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.json(

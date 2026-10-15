@@ -7,6 +7,7 @@ import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchProgramathor } from "@/lib/dashboard/programathor";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
+import { buildScrapeReport } from "@/lib/dashboard/scrapeReport";
 import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
 
@@ -89,16 +90,21 @@ export async function fetchDashboardJobs(
   const term = role.trim();
   const results = await Promise.all(FETCHERS.map((f) => runOne(f, term)));
 
-  const sources: Record<string, number | string> = {};
+  const sources: Record<string, number | string | object> = {};
+  const foundByPortal: Record<string, number> = {};
+  const errorsByPortal: Record<string, string> = {};
   const merged: DashboardJob[] = [];
 
   for (const result of results) {
+    foundByPortal[result.name] = result.jobs.length;
     if (result.error && result.jobs.length === 0) {
       sources[result.name] = `error: ${result.error}`;
+      errorsByPortal[result.name] = result.error;
     } else {
       sources[result.name] = result.jobs.length;
       if (result.error) {
         sources[`${result.name}_warning`] = result.error;
+        errorsByPortal[result.name] = result.error;
       }
       merged.push(...result.jobs);
     }
@@ -115,22 +121,41 @@ export async function fetchDashboardJobs(
 
   // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
   if (!options.validate) {
+    const scrape_report = buildScrapeReport({
+      foundByPortal,
+      errorsByPortal,
+      keptJobs: relevant,
+    });
+    sources._scrape_report = scrape_report;
     return {
       role: term,
       count: relevant.length,
       jobs: relevant,
       fetched_via: "dashboard_multi",
       sources,
+      scrape_report,
     };
   }
 
   const { jobs, validation } = await validateRemoteJobs(relevant);
+  const ranked = rankJobsForFeed(jobs, term);
+  const scrape_report = buildScrapeReport({
+    foundByPortal,
+    errorsByPortal,
+    // "kept" = o que entraria no feed do membro (antes do corte da análise)
+    keptJobs: relevant,
+    validation,
+  });
+  sources._scrape_report = scrape_report;
+  sources._validation = validation;
+
   return {
     role: term,
-    count: jobs.length,
-    jobs: rankJobsForFeed(jobs, term),
+    count: ranked.length,
+    jobs: ranked,
     fetched_via: "dashboard_multi",
     sources,
     validation,
+    scrape_report,
   };
 }

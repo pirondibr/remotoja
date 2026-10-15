@@ -9,6 +9,7 @@ import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+import type { ScrapeReport } from "@/lib/dashboard/types";
 
 function postedLabel(job: DemoJob) {
   return formatJobAgo(job);
@@ -57,6 +58,7 @@ export function JobsDashboard() {
   const [filter, setFilter] = useState("");
   const [sources, setSources] = useState<Record<string, number | string>>({});
   const [validation, setValidation] = useState<ValidationReport | null>(null);
+  const [scrapeReport, setScrapeReport] = useState<ScrapeReport | null>(null);
   const [fromCache, setFromCache] = useState(false);
 
   const loadJobs = useCallback(
@@ -80,6 +82,7 @@ export function JobsDashboard() {
       setJobs([]);
       setSources({});
       setValidation(null);
+      setScrapeReport(null);
       setFromCache(false);
 
       if (preferCache && !inspect && !analyze) {
@@ -119,6 +122,11 @@ export function JobsDashboard() {
           data.sources && typeof data.sources === "object" ? data.sources : {}
         );
         setValidation(data.validation || null);
+        setScrapeReport(
+          data.scrape_report && typeof data.scrape_report === "object"
+            ? (data.scrape_report as ScrapeReport)
+            : null
+        );
         setFromCache(Boolean(data.cached));
         if (!cacheOnly && !analyze) {
           saveJobSession(trimmed, list);
@@ -255,7 +263,59 @@ export function JobsDashboard() {
           </button>
         </form>
 
-        {inspect && sourceBreakdown.length > 0 && !loading && (
+        {inspect && scrapeReport && scrapeReport.portals.length > 0 && !loading && (
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-moss/15 bg-white p-4">
+            <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
+              Scrape por portal
+            </p>
+            <p className="mt-1 text-[11px] text-moss/55">
+              Encontradas = o portal devolveu · Pegamos = entraram no feed após
+              filtro · FP só aparece depois da análise
+            </p>
+            <table className="mt-3 min-w-full text-left text-xs">
+              <thead className="text-moss/55 uppercase tracking-wide">
+                <tr>
+                  <th className="py-1.5 pr-3 font-semibold">Portal</th>
+                  <th className="py-1.5 pr-3 font-semibold">Encontradas</th>
+                  <th className="py-1.5 pr-3 font-semibold">Pegamos</th>
+                  <th className="py-1.5 pr-3 font-semibold">Aproveit.</th>
+                  <th className="py-1.5 pr-3 font-semibold">Checadas</th>
+                  <th className="py-1.5 pr-3 font-semibold">Falso +</th>
+                  <th className="py-1.5 font-semibold">Link ruim</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scrapeReport.portals.map((p) => {
+                  const rate =
+                    p.found > 0
+                      ? Math.round((p.kept / p.found) * 100)
+                      : null;
+                  return (
+                    <tr key={p.portal} className="border-t border-moss/10">
+                      <td className="py-1.5 pr-3 font-medium">
+                        {formatSource(p.portal)}
+                      </td>
+                      <td className="py-1.5 pr-3">{p.found}</td>
+                      <td className="py-1.5 pr-3">{p.kept}</td>
+                      <td className="py-1.5 pr-3">
+                        {rate != null ? `${rate}%` : "—"}
+                      </td>
+                      <td className="py-1.5 pr-3">{p.checked || "—"}</td>
+                      <td className="py-1.5 pr-3 text-amber-800">
+                        {p.checked ? p.false_positives : "—"}
+                      </td>
+                      <td className="py-1.5 text-red-700">
+                        {p.checked ? p.invalid_links : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {inspect && !scrapeReport && sourceBreakdown.length > 0 && !loading && (
           <div className="mt-4 flex flex-wrap gap-2">
             {sourceBreakdown.map(([name, count]) => (
               <span
@@ -271,7 +331,7 @@ export function JobsDashboard() {
         {inspect && validation && (
           <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
             <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
-              Validação das 20 primeiras (só admin)
+              Validação (double-check admin)
             </p>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
