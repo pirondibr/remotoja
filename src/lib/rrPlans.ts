@@ -8,6 +8,9 @@ export const RR_PLANS = [
     billed: "R$ 299/ano",
     perMonth: "R$24,90",
     popular: true,
+    /** Valor cobrado no Mercado Pago (BRL). */
+    priceBrl: 299,
+    durationDays: 365,
   },
   {
     id: "quarterly",
@@ -17,6 +20,8 @@ export const RR_PLANS = [
     billed: "R$ 179/ 3 meses",
     perMonth: "R$59,60",
     popular: false,
+    priceBrl: 179,
+    durationDays: 90,
   },
   {
     id: "monthly",
@@ -26,5 +31,13 @@ export const RR_PLANS = [
     billed: null,
     perMonth: "R$90",
     popular: false,
+    priceBrl: 90,
+    durationDays: 30,
   },
 ] as const;
+
+export type PlanId = (typeof RR_PLANS)[number]["id"];
+
+export function getPlan(planId: string) {
+  return RR_PLANS.find((p) => p.id === planId) ?? null;
+}

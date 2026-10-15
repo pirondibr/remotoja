@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { hasMemberAccess, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
@@ -37,6 +38,13 @@ function sourcesWithoutValidation(
 }
 
 export async function GET(request: Request) {
+  if (isAccessGateEnabled() && !(await hasMemberAccess())) {
+    return NextResponse.json(
+      { error: "Acesso de membro necessário. Conclua o pagamento." },
+      { status: 401 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const bypassCache = searchParams.get("fresh") === "1";

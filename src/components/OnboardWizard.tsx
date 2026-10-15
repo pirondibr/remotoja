@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
 import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
+import { startCheckout } from "@/lib/startCheckout";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
 
@@ -129,13 +130,14 @@ function MatchJobCard({
 }
 
 export function OnboardWizard() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
   const [draft, setDraft] = useState("");
   const [selectedPlan, setSelectedPlan] =
     useState<(typeof RR_PLANS)[number]["id"]>("yearly");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [liveJobs, setLiveJobs] = useState<DemoJob[]>([]);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
@@ -259,13 +261,29 @@ export function OnboardWizard() {
     if (index > 0) setIndex((prev) => prev - 1);
   }
 
-  function openMemberDash() {
+  async function startPaidCheckout() {
     const nextRole =
       (typeof answers.role === "string" && answers.role.trim()) ||
       draft.trim() ||
       prefillRole.trim() ||
       "SEO";
-    router.push(`/app?role=${encodeURIComponent(nextRole)}`);
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    try {
+      const result = await startCheckout({
+        planId: selectedPlan,
+        role: nextRole,
+      });
+      if ("error" in result) {
+        setCheckoutError(result.error);
+        return;
+      }
+      window.location.href = result.checkoutUrl;
+    } catch {
+      setCheckoutError("Falha ao abrir o Mercado Pago. Tente de novo.");
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   const hideDefaultHeader =
@@ -560,8 +578,13 @@ export function OnboardWizard() {
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-mint text-[11px] font-bold text-ink">
                   ✓
                 </span>
-                Sem fidelidade · Cancele quando quiser
+                Cartão ou Pix · Sem fidelidade
               </p>
+              {checkoutError && (
+                <p className="mt-3 text-center text-sm text-red-300">
+                  {checkoutError}
+                </p>
+              )}
             </div>
           )}
 
@@ -569,10 +592,13 @@ export function OnboardWizard() {
             {step.kind === "paywall" ? (
               <button
                 type="button"
-                onClick={openMemberDash}
-                className="w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint"
+                disabled={checkoutLoading}
+                onClick={() => void startPaidCheckout()}
+                className="w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint disabled:opacity-50"
               >
-                Acessar todas as vagas
+                {checkoutLoading
+                  ? "Abrindo Mercado Pago…"
+                  : "Pagar com cartão ou Pix"}
               </button>
             ) : step.kind === "matches" ? (
               <button

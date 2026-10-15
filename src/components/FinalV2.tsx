@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { CompanyAvatar } from "@/components/CompanyAvatar";
 import { RR_PLANS } from "@/lib/rrPlans";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/attribution";
 import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
+import { startCheckout } from "@/lib/startCheckout";
 
 function postedLabel(job: DemoJob): string {
   return formatJobAgo(job);
@@ -147,7 +148,6 @@ function JobCard({
 }
 
 export function FinalV2() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") || searchParams.get("q") || "";
 
@@ -160,6 +160,8 @@ export function FinalV2() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] =
     useState<(typeof RR_PLANS)[number]["id"]>("yearly");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   /** Preview: 3 abertas + 1 bloqueada (blur). */
   const previewJobs = jobs.slice(0, 3);
@@ -253,11 +255,26 @@ export function FinalV2() {
     setPhase("paywall");
   }
 
-  /** MVP: dash liberado sem checkout. */
-  function openMemberDash() {
+  async function startPaidCheckout() {
     const nextRole = role.trim() || "SEO";
     saveJobSession(nextRole, jobs);
-    router.push(`/app?role=${encodeURIComponent(nextRole)}`);
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    try {
+      const result = await startCheckout({
+        planId: selectedPlan,
+        role: nextRole,
+      });
+      if ("error" in result) {
+        setCheckoutError(result.error);
+        return;
+      }
+      window.location.href = result.checkoutUrl;
+    } catch {
+      setCheckoutError("Falha ao abrir o Mercado Pago. Tente de novo.");
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   return (
@@ -395,7 +412,7 @@ export function FinalV2() {
 
             <button
               type="button"
-              onClick={openMemberDash}
+              onClick={openPaywall}
               className="mt-6 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint"
             >
               Ver todas as vagas
@@ -512,15 +529,23 @@ export function FinalV2() {
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-mint text-[11px] font-bold text-ink">
                 ✓
               </span>
-              Sem fidelidade · Cancele quando quiser
+              Cartão ou Pix · Sem fidelidade
             </p>
+            {checkoutError && (
+              <p className="mt-3 text-center text-sm text-red-300">
+                {checkoutError}
+              </p>
+            )}
 
             <button
               type="button"
-              onClick={openMemberDash}
-              className="mt-5 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint"
+              disabled={checkoutLoading}
+              onClick={() => void startPaidCheckout()}
+              className="mt-5 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint disabled:opacity-50"
             >
-              🔑 Acessar todas as vagas
+              {checkoutLoading
+                ? "Abrindo Mercado Pago…"
+                : "Pagar com cartão ou Pix"}
             </button>
 
             <button
