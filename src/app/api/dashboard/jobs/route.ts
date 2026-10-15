@@ -3,14 +3,16 @@ import { hasMemberAccess, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
-import { termMatches } from "@/lib/dashboard/common";
+import { rankJobsForFeed, termMatches } from "@/lib/dashboard/common";
 import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
+import type { DashboardJob } from "@/lib/dashboard/types";
 
 function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
-  return jobs.filter((job) =>
+  const filtered = jobs.filter((job) =>
     termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)
   );
+  return rankJobsForFeed(filtered as DashboardJob[], role) as DemoJob[];
 }
 
 export const maxDuration = 60;

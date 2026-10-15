@@ -131,3 +131,85 @@ export function termMatches(title: string, term: string): boolean {
 
   return true;
 }
+
+/** 2 = termo inteiro no título, 1 = todas as palavras, 0 = só em company/snippet. */
+export function titleMatchScore(title: string, term: string): number {
+  const t = term.trim().toLowerCase();
+  if (!t) return 0;
+  const hay = (title || "").toLowerCase();
+  if (hay.includes(t)) return 2;
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length > 1 && parts.every((p) => hay.includes(p))) return 1;
+  return 0;
+}
+
+/** Converte posted relativo/ISO em timestamp ms (0 se desconhecido). */
+export function postedTimestamp(posted: string | null | undefined): number {
+  const raw = (posted || "").trim();
+  if (!raw) return 0;
+  const lower = raw.toLowerCase();
+  const now = Date.now();
+
+  const relative = (n: number, unit: string): number => {
+    const ms =
+      unit.startsWith("minuto") || unit.startsWith("minute")
+        ? n * 60_000
+        : unit.startsWith("hora") || unit.startsWith("hour")
+          ? n * 3_600_000
+          : unit.startsWith("dia") || unit.startsWith("day")
+            ? n * 86_400_000
+            : unit.startsWith("semana") || unit.startsWith("week")
+              ? n * 7 * 86_400_000
+              : unit.startsWith("m") || unit.startsWith("month")
+                ? n * 30 * 86_400_000
+                : unit.startsWith("ano") || unit.startsWith("year")
+                  ? n * 365 * 86_400_000
+                  : 0;
+    return now - ms;
+  };
+
+  // "28 minutos atrás" / "há 7 dias"
+  const pt = lower.match(
+    /^(?:h[aá]\s+)?(\d+)\s+(minutos?|horas?|dias?|semanas?|m[eê]s(?:es)?|anos?)\s*(?:atrás)?$/
+  );
+  if (pt) return relative(Number(pt[1]), pt[2]);
+
+  const en = lower.match(
+    /^(\d+)\s+(minutes?|hours?|days?|weeks?|months?|years?)\s+ago$/
+  );
+  if (en) return relative(Number(en[1]), en[2]);
+
+  if (lower === "agora" || lower === "recente") return now;
+
+  const br = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (br) {
+    const d = new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+    return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+  return 0;
+}
+
+/**
+ * Ordena feed: 1) termo no título, 2) data mais recente.
+ * Sem data conhecida fica depois das que têm data.
+ */
+export function rankJobsForFeed(
+  jobs: DashboardJob[],
+  term: string
+): DashboardJob[] {
+  return [...jobs].sort((a, b) => {
+    const titleA = titleMatchScore(a.title, term);
+    const titleB = titleMatchScore(b.title, term);
+    if (titleB !== titleA) return titleB - titleA;
+
+    const timeA = postedTimestamp(a.posted);
+    const timeB = postedTimestamp(b.posted);
+    if (timeA === 0 && timeB === 0) return 0;
+    if (timeA === 0) return 1;
+    if (timeB === 0) return -1;
+    return timeB - timeA;
+  });
+}
