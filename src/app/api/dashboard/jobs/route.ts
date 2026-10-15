@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 
 export const maxDuration = 60;
-export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
