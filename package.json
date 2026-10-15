@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "scrape:google-jobs": "python -m workers.scraper.google_jobs"
+    "scrape:google-jobs": "python -m workers.scraper.google_jobs",
+    "scrape:role": "python -m workers.scraper.google_jobs --role"
   },
   "dependencies": {
     "next": "16.4.1",

@@ -3,11 +3,15 @@
 Uso:
   set DATAFORSEO_USER=...
   set DATAFORSEO_PASS=...
+  python -m workers.scraper.google_jobs --role programador
   python -m workers.scraper.google_jobs --keyword "vagas de seo home office"
 
 Saídas:
   data/demo_jobs.json
   src/data/demo-jobs.json  (consumido pela landing Next.js)
+
+Regra de query (mesmo do app):
+  programador → vagas de programador home office
 """
 
 from __future__ import annotations
@@ -25,6 +29,27 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 API_POST = "https://api.dataforseo.com/v3/serp/google/jobs/task_post"
 API_GET = "https://api.dataforseo.com/v3/serp/google/jobs/task_get/advanced"
+
+
+def build_jobs_query(role_or_keyword: str) -> str:
+    """Cargo digitado → query Google Vagas BR."""
+    cleaned = " ".join(role_or_keyword.split()).strip()
+    if not cleaned:
+        return "vagas remotas home office"
+    lower = cleaned.lower()
+    already = any(
+        token in lower
+        for token in (
+            "vagas",
+            "home office",
+            "remoto",
+            "remote",
+            "trabalho em casa",
+        )
+    )
+    if already:
+        return cleaned
+    return f"vagas de {cleaned} home office"
 
 
 def _load_dotenv() -> None:
@@ -167,21 +192,57 @@ def main() -> None:
     _load_dotenv()
     parser = argparse.ArgumentParser(description="Scraper Google Vagas via DataForSEO")
     parser.add_argument(
+        "--role",
+        default="",
+        help='Cargo digitado (ex: programador → "vagas de programador home office")',
+    )
+    parser.add_argument(
         "--keyword",
-        default="vagas de seo home office",
-        help="Termo de busca no Google Vagas",
+        default="",
+        help="Query completa no Google Vagas (sobrescreve --role se informado)",
     )
     parser.add_argument("--depth", type=int, default=10)
     parser.add_argument("--location-code", type=int, default=2076, help="2076 = Brazil")
+    parser.add_argument(
+        "--dry-query",
+        action="store_true",
+        help="Só mostra a query montada, sem chamar a API",
+    )
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Não grava data/demo_jobs.json (útil para testes de cargo)",
+    )
     args = parser.parse_args()
 
+    if args.keyword.strip():
+        keyword = args.keyword.strip()
+        role = args.role.strip() or keyword
+    elif args.role.strip():
+        role = args.role.strip()
+        keyword = build_jobs_query(role)
+    else:
+        role = "seo"
+        keyword = build_jobs_query(role)
+
+    if args.dry_query:
+        print(json.dumps({"role": role, "query": keyword}, ensure_ascii=False, indent=2))
+        return
+
     jobs = fetch_google_jobs(
-        args.keyword,
+        keyword,
         location_code=args.location_code,
         depth=args.depth,
     )
-    write_outputs(args.keyword, jobs)
-    print(json.dumps({"count": len(jobs), "jobs": jobs[:5]}, ensure_ascii=False, indent=2))
+    if not args.no_write:
+        write_outputs(keyword, jobs)
+    print(
+        json.dumps(
+            {"role": role, "query": keyword, "count": len(jobs), "jobs": jobs[:5]},
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

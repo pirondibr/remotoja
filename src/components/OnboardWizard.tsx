@@ -1,26 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
 import {
   formatJobAgo,
   formatJobBadge,
   formatJobMeta,
   getDemoJobs,
+  type DemoJob,
 } from "@/lib/demoJobs";
+import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { BrandMark } from "./BrandMark";
 
-const DEMO_MATCHES = getDemoJobs(5);
+const FALLBACK_MATCHES = getDemoJobs(5);
 
 export function OnboardWizard() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
   const [draft, setDraft] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<(typeof PLANS)[number]["id"]>("yearly");
+  const [liveJobs, setLiveJobs] = useState<DemoJob[]>([]);
+  const [liveQuery, setLiveQuery] = useState("");
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+  const [jobsSource, setJobsSource] = useState<"live" | "fallback" | "idle">("idle");
 
   const step = FUNNEL_STEPS[index];
   const isLast = index === FUNNEL_STEPS.length - 1;
+
+  const role =
+    (typeof answers.role === "string" && answers.role) ||
+    draft ||
+    "seu cargo";
 
   const canContinue = useMemo(() => {
     if (step.kind === "single" || step.kind === "multi") {
@@ -29,10 +41,63 @@ export function OnboardWizard() {
       return Array.isArray(value) ? value.length > 0 : Boolean(value);
     }
     if (step.kind === "text") {
-      return (typeof answers[step.id] === "string" ? answers[step.id] : draft).toString().trim().length > 1;
+      return (typeof answers[step.id] === "string" ? answers[step.id] : draft)
+        .toString()
+        .trim().length > 1;
+    }
+    if (step.kind === "matches") {
+      return !jobsLoading;
     }
     return true;
-  }, [answers, draft, step]);
+  }, [answers, draft, step, jobsLoading]);
+
+  useEffect(() => {
+    if (step.kind !== "matches") return;
+
+    const roleQuery =
+      (typeof answers.role === "string" && answers.role.trim()) || draft.trim();
+    if (!roleQuery) {
+      setLiveJobs(FALLBACK_MATCHES);
+      setLiveQuery(buildJobsQuery("seo"));
+      setJobsSource("fallback");
+      return;
+    }
+
+    const controller = new AbortController();
+    setJobsLoading(true);
+    setJobsError(null);
+    setJobsSource("idle");
+    setLiveQuery(buildJobsQuery(roleQuery));
+
+    fetch(`/api/jobs?role=${encodeURIComponent(roleQuery)}`, {
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+        if (jobs.length > 0 && data.fetched_via === "dataforseo_google_jobs") {
+          setLiveJobs(jobs.slice(0, 5));
+          setLiveQuery(data.query || buildJobsQuery(roleQuery));
+          setJobsSource("live");
+        } else {
+          setLiveJobs(jobs.length > 0 ? jobs.slice(0, 5) : FALLBACK_MATCHES);
+          setLiveQuery(data.query || buildJobsQuery(roleQuery));
+          setJobsSource("fallback");
+          if (data.error) setJobsError(data.error);
+        }
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setLiveJobs(FALLBACK_MATCHES);
+        setJobsSource("fallback");
+        setJobsError(err instanceof Error ? err.message : "Falha na busca");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setJobsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [step.kind, answers.role, draft]);
 
   function toggleMulti(option: string) {
     const current = (answers[step.id] as string[] | undefined) ?? [];
@@ -57,10 +122,7 @@ export function OnboardWizard() {
     if (index > 0) setIndex((prev) => prev - 1);
   }
 
-  const role =
-    (typeof answers.role === "string" && answers.role) ||
-    draft ||
-    "seu cargo";
+  const matches = liveJobs.length > 0 ? liveJobs : FALLBACK_MATCHES;
 
   return (
     <div className="bg-mesh relative min-h-screen text-cream">
@@ -143,7 +205,9 @@ export function OnboardWizard() {
               {step.options.map((option) => {
                 const selected =
                   step.kind === "multi"
-                    ? ((answers[step.id] as string[] | undefined) ?? []).includes(option)
+                    ? ((answers[step.id] as string[] | undefined) ?? []).includes(
+                        option
+                      )
                     : answers[step.id] === option;
                 return (
                   <button
@@ -168,37 +232,64 @@ export function OnboardWizard() {
           )}
 
           {step.kind === "text" && (
-            <div className="mt-8">
+            <div className="mt-8 space-y-3">
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={step.placeholder}
                 className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
               />
+              {draft.trim().length > 1 && (
+                <p className="text-xs text-sand/50">
+                  Busca no Google Vagas:{" "}
+                  <span className="text-lime">{buildJobsQuery(draft)}</span>
+                </p>
+              )}
             </div>
           )}
 
           {step.kind === "matches" && (
             <div className="mt-8 space-y-3">
-              {DEMO_MATCHES.map((job) => (
-                <article
-                  key={`${job.company}-${job.title}`}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="rounded-full bg-lime/15 px-2.5 py-0.5 text-xs font-medium text-lime">
-                      {formatJobBadge(job)}
-                    </span>
-                    <span className="text-xs text-sand/50">{formatJobAgo(job)}</span>
-                  </div>
-                  <h3 className="font-semibold text-cream">{job.title}</h3>
-                  <p className="text-sm text-sand/70">{job.company}</p>
-                  <p className="mt-1 text-sm text-sand/55">{formatJobMeta(job)}</p>
-                </article>
-              ))}
+              {jobsLoading ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                  <p className="font-medium text-cream">Buscando no Google Vagas…</p>
+                  <p className="mt-2 text-sm text-sand/60">
+                    Query: {liveQuery || buildJobsQuery(role)}
+                  </p>
+                  <p className="mt-1 text-xs text-sand/45">
+                    Leva ~10–30s (DataForSEO)
+                  </p>
+                </div>
+              ) : (
+                matches.map((job) => (
+                  <article
+                    key={`${job.company}-${job.title}-${job.job_id || job.source}`}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-lime/15 px-2.5 py-0.5 text-xs font-medium text-lime">
+                        {formatJobBadge(job)}
+                      </span>
+                      <span className="text-xs text-sand/50">
+                        {formatJobAgo(job)}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-cream">{job.title}</h3>
+                    <p className="text-sm text-sand/70">{job.company}</p>
+                    <p className="mt-1 text-sm text-sand/55">{formatJobMeta(job)}</p>
+                  </article>
+                ))
+              )}
               <p className="pt-2 text-center text-sm text-sand/50">
-                Demo via Google Vagas · “vagas de seo home office”
+                {jobsSource === "live"
+                  ? `Google Vagas · “${liveQuery}”`
+                  : jobsLoading
+                    ? "…"
+                    : `Fallback demo · “${liveQuery || "vagas de seo home office"}”`}
               </p>
+              {jobsError && jobsSource === "fallback" && (
+                <p className="text-center text-xs text-sand/40">{jobsError}</p>
+              )}
             </div>
           )}
 
