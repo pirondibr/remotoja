@@ -188,7 +188,7 @@ export async function fetchDashboardJobs(
 
   const cargoLlm = await classifyCargoWithLlm(term, allTagged);
   allTagged = cargoLlm.jobs;
-  if (cargoLlm.usedLlm) sources._cargo_llm = true;
+  if (cargoLlm.usedLlm) sources._cargo_llm = 1;
   if (cargoLlm.error) sources._cargo_llm_error = cargoLlm.error;
 
   const relevant = rankJobsForFeed(
