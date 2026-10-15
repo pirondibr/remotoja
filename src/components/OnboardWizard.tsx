@@ -7,12 +7,9 @@ import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
 import { type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { BrandMark } from "./BrandMark";
+import { CompanyAvatar } from "./CompanyAvatar";
 
 const ROLE_STORAGE_KEY = "remotoja_onboard_role";
-
-function companyInitial(name: string) {
-  return (name.trim()[0] || "?").toUpperCase();
-}
 
 function postedLabel(job: DemoJob): string {
   return job.posted || "Recente";
@@ -106,9 +103,11 @@ function MatchJobCard({
 
   const inner = (
     <div className="flex items-start gap-3">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
-        {companyInitial(job.company)}
-      </div>
+      <CompanyAvatar
+        company={job.company}
+        logoUrl={job.company_logo}
+        tone="dark"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -522,15 +521,25 @@ export function OnboardWizard() {
                 <div className="pointer-events-none select-none blur-[6px] opacity-75">
                   {(matches[0]
                     ? [matches[0]]
-                    : [{ title: "Vaga remota", company: "Empresa", source: "" }]
+                    : [
+                        {
+                          title: "Vaga remota",
+                          company: "Empresa",
+                          source: "",
+                          company_logo: null,
+                        } as DemoJob,
+                      ]
                   ).map((job, i) => (
                     <div
                       key={i}
                       className="flex items-center gap-3 bg-white/5 p-4"
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
-                        {companyInitial(job.company)}
-                      </div>
+                      <CompanyAvatar
+                        company={job.company}
+                        logoUrl={job.company_logo}
+                        tone="dark"
+                        size="sm"
+                      />
                       <div>
                         <p className="font-semibold">{job.title}</p>
                         <p className="text-sm text-sand/50">{job.company}</p>

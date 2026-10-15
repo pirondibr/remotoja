@@ -4,13 +4,10 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
+import { CompanyAvatar } from "@/components/CompanyAvatar";
 import type { DemoJob } from "@/lib/demoJobs";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
-
-function companyInitial(name: string) {
-  return (name.trim()[0] || "?").toUpperCase();
-}
 
 function postedLabel(job: DemoJob) {
   return job.posted || "Recente";
@@ -323,9 +320,10 @@ export function JobsDashboard() {
                   <article className="rounded-2xl border border-moss/10 bg-white p-4 transition hover:border-moss/25 sm:p-5">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-forest text-sm font-bold text-lime">
-                          {companyInitial(job.company)}
-                        </div>
+                        <CompanyAvatar
+                          company={job.company}
+                          logoUrl={job.company_logo}
+                        />
                         <div className="min-w-0">
                           <h2 className="text-lg font-semibold leading-snug text-ink">
                             {job.title}

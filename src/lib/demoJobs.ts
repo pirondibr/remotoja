@@ -6,6 +6,7 @@ export type DemoJob = {
   location: string;
   source: string;
   source_url?: string | null;
+  company_logo?: string | null;
   contract_type?: string | null;
   salary?: string | null;
   experience?: string | null;

@@ -11,9 +11,39 @@ type RemotarJob = {
   state?: string | null;
   createdAt?: string;
   externalLink?: string | null;
-  company?: { name?: string } | null;
+  thumbnailUrl?: string | null;
+  jobSalary?: { min?: number | null; max?: number | null; currency?: string | null } | null;
+  company?: {
+    name?: string;
+    companyProfilePicture?: {
+      url?: string | null;
+      smallUrl?: string | null;
+      mediumUrl?: string | null;
+    } | null;
+  } | null;
   companyDisplayName?: string | null;
 };
+
+function remotarLogo(row: RemotarJob): string | null {
+  const pic = row.company?.companyProfilePicture;
+  const url =
+    pic?.smallUrl || pic?.mediumUrl || pic?.url || row.thumbnailUrl || "";
+  return url.trim() || null;
+}
+
+function remotarSalary(row: RemotarJob): string | null {
+  const s = row.jobSalary;
+  if (!s) return null;
+  const min = s.min != null ? Number(s.min) : null;
+  const max = s.max != null ? Number(s.max) : null;
+  if (min == null && max == null) return null;
+  const fmt = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  if (min != null && max != null && min !== max) return `${fmt(min)} a ${fmt(max)}`;
+  if (min != null) return fmt(min);
+  if (max != null) return fmt(max);
+  return null;
+}
 
 export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
   const url = `https://api.remotar.com.br/jobs?search=${encodeURIComponent(term.trim())}`;
@@ -61,6 +91,8 @@ export async function fetchRemotar(term: string): Promise<DashboardJob[]> {
       source_url:
         row.externalLink ||
         `https://remotar.com.br/job/${id}/${companySlug}/${titleSlug}`,
+      company_logo: remotarLogo(row),
+      salary: remotarSalary(row),
       posted: (row.createdAt || "").slice(0, 10) || null,
       job_id: `remotar-${id}`,
       // Não assumir remoto: a validação da página decide de verdade

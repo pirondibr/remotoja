@@ -37,15 +37,27 @@ export function normalizeKey(title: string, company: string): string {
 }
 
 export function dedupeJobs(jobs: DashboardJob[]): DashboardJob[] {
-  const seen = new Set<string>();
-  const out: DashboardJob[] = [];
+  const byKey = new Map<string, DashboardJob>();
   for (const job of jobs) {
     const key = normalizeKey(job.title || "", job.company || "");
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(job);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, job);
+      continue;
+    }
+    // Prefere a cópia que tem logo / salário / link
+    byKey.set(key, {
+      ...prev,
+      ...job,
+      company_logo: job.company_logo || prev.company_logo || null,
+      salary: job.salary || prev.salary || null,
+      experience: job.experience || prev.experience || null,
+      education: job.education || prev.education || null,
+      source_url: job.source_url || prev.source_url || null,
+    });
   }
-  return out;
+  return Array.from(byKey.values());
 }
 
 export async function fetchHtml(

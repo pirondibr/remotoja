@@ -8,6 +8,7 @@ type RawItem = {
   type?: string;
   title?: string;
   employer_name?: string;
+  employer_image_url?: string | null;
   location?: string;
   source_name?: string;
   source_url?: string | null;
@@ -48,12 +49,14 @@ function normalizeItem(item: RawItem): DemoJob | null {
   if (!title || !company) return null;
   const location = (item.location || "Brasil").trim();
   const source = (item.source_name || "").replace(/^via\s+/i, "").trim() || "Remoto";
+  const logo = (item.employer_image_url || "").trim() || null;
   return {
     title,
     company,
     location,
     source,
     source_url: item.source_url ?? null,
+    company_logo: logo,
     contract_type: item.contract_type ?? null,
     salary: item.salary ?? null,
     posted: item.time_ago ?? null,

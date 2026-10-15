@@ -5,6 +5,9 @@ type GupyRow = {
   id?: number | string;
   name?: string;
   careerPageName?: string;
+  careerPageLogo?: string | null;
+  companyLogo?: string | null;
+  logoUrl?: string | null;
   jobUrl?: string;
   city?: string;
   state?: string;
@@ -37,12 +40,15 @@ function mapRow(row: GupyRow): DashboardJob | null {
   if (!title || !company) return null;
   const location = [row.city, row.state, row.country].filter(Boolean).join(", ") || "Brasil";
   const id = String(row.id || "");
+  const logo =
+    (row.careerPageLogo || row.companyLogo || row.logoUrl || "").trim() || null;
   return {
     title,
     company,
     location,
     source: "gupy",
     source_url: row.jobUrl || `https://portal.gupy.io/job/${id}`,
+    company_logo: logo,
     contract_type: row.type || null,
     posted: (row.publishedDate || "").slice(0, 10) || null,
     job_id: `gupy-${id}`,
