@@ -32,6 +32,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const bypassCache = searchParams.get("fresh") === "1";
+  /** Double-check remoto/link: só sob demanda (admin inspect). */
+  const validate = searchParams.get("validate") === "1";
 
   if (role.length < 2) {
     return NextResponse.json(
@@ -40,7 +42,8 @@ export async function GET(request: Request) {
     );
   }
 
-  if (!bypassCache && hasDatabase()) {
+  // Cache do membro nunca exige validate. Validate sempre busca live.
+  if (!bypassCache && !validate && hasDatabase()) {
     try {
       const cached = await getCachedJobs("paid", role);
       if (cached && cached.jobs.length > 0) {
@@ -50,7 +53,6 @@ export async function GET(request: Request) {
           jobs: cached.jobs,
           fetched_via: cached.fetched_via || "cache_paid",
           sources: sourcesWithoutValidation(cached.sources),
-          validation: extractValidation(cached.sources),
           cached: true,
           cache_updated_at: cached.updated_at,
         });
@@ -61,25 +63,23 @@ export async function GET(request: Request) {
   }
 
   try {
-    const payload = await fetchDashboardJobs(role);
-    if (payload.jobs.length > 0 || payload.validation) {
+    const payload = await fetchDashboardJobs(role, { validate });
+
+    // Cache só o feed "limpo" do usuário (sem filtrar por validação)
+    if (!validate && payload.jobs.length > 0) {
       try {
         await setCachedJobs({
           kind: "paid",
           role,
           jobs: payload.jobs,
           fetched_via: payload.fetched_via,
-          sources: {
-            ...payload.sources,
-            ...(payload.validation
-              ? { _validation: payload.validation }
-              : {}),
-          },
+          sources: payload.sources,
         });
       } catch {
         // ignore
       }
     }
+
     return NextResponse.json({ ...payload, cached: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";

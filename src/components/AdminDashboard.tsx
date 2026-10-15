@@ -109,7 +109,7 @@ export function AdminDashboard() {
     event.preventDefault();
     const role = paidRole.trim();
     if (role.length < 2) return;
-    window.location.href = `/app?role=${encodeURIComponent(role)}&inspect=1`;
+    window.location.href = `/app?role=${encodeURIComponent(role)}&inspect=1&validate=1`;
   }
 
   if (loading && !data) {

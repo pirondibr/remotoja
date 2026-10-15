@@ -71,11 +71,14 @@ export function JobsDashboard() {
       }
 
       try {
-        const res = await fetch(
-          `/api/dashboard/jobs?role=${encodeURIComponent(trimmed)}${
-            inspect || !preferCache ? "&fresh=1" : ""
-          }`
-        );
+        const params = new URLSearchParams({ role: trimmed });
+        if (!preferCache) params.set("fresh", "1");
+        // Double-check remoto/link só no modo admin (não na rotina do membro)
+        if (inspect) {
+          params.set("fresh", "1");
+          params.set("validate", "1");
+        }
+        const res = await fetch(`/api/dashboard/jobs?${params}`);
         const data = await res.json();
         const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
         setJobs(list);
@@ -291,10 +294,12 @@ export function JobsDashboard() {
         {loading && (
           <div className="mt-10 rounded-2xl border border-moss/10 bg-white p-10 text-center">
             <p className="font-semibold">
-              Procurando vagas e validando se são remotas de verdade…
+              {inspect
+                ? "Agregando portais e rodando double-check (admin)…"
+                : "Procurando vagas em diversos portais…"}
             </p>
             <p className="mt-2 text-sm text-moss/60">
-              Isso pode levar até cerca de um minuto
+              Isso pode levar alguns segundos
             </p>
           </div>
         )}

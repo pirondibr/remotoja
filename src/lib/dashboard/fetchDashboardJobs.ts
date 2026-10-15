@@ -10,6 +10,11 @@ import { fetchRemotar } from "@/lib/dashboard/remotar";
 import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
 
+export type FetchDashboardOptions = {
+  /** Só para inspeção admin — não roda no fluxo do membro. */
+  validate?: boolean;
+};
+
 type Fetcher = {
   name: string;
   run: (term: string) => Promise<DashboardJob[]>;
@@ -78,7 +83,8 @@ async function runOne(
 }
 
 export async function fetchDashboardJobs(
-  role: string
+  role: string,
+  options: FetchDashboardOptions = {}
 ): Promise<DashboardJobsPayload> {
   const term = role.trim();
   const results = await Promise.all(FETCHERS.map((f) => runOne(f, term)));
@@ -99,8 +105,19 @@ export async function fetchDashboardJobs(
   }
 
   const deduped = dedupeJobs(merged);
-  const { jobs, validation } = await validateRemoteJobs(deduped, 20);
 
+  // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
+  if (!options.validate) {
+    return {
+      role: term,
+      count: deduped.length,
+      jobs: deduped,
+      fetched_via: "dashboard_multi",
+      sources,
+    };
+  }
+
+  const { jobs, validation } = await validateRemoteJobs(deduped);
   return {
     role: term,
     count: jobs.length,
