@@ -2,6 +2,9 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { BrandMark } from "@/components/BrandMark";
 import { PLANS } from "@/lib/funnel";
+import { formatJobAgo, getDemoJobs } from "@/lib/demoJobs";
+
+const heroJobs = getDemoJobs(3);
 
 const testimonials = [
   {
@@ -72,24 +75,24 @@ export default function Home() {
                 <span>Radar ao vivo</span>
                 <span className="text-mint">● escaneando</span>
               </div>
-              {[
-                { t: "CS Remoto · SaaS", s: "Gupy · há 18 min", hot: true },
-                { t: "Designer Produto", s: "Carreira · há 41 min", hot: true },
-                { t: "Eng. Software Pleno", s: "Portal · há 2h", hot: false },
-              ].map((row) => (
+              {heroJobs.map((job, index) => (
                 <div
-                  key={row.t}
+                  key={`${job.company}-${job.title}`}
                   className="mb-2 rounded-xl border border-white/8 bg-ink/40 px-3 py-2.5 last:mb-0"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-cream">{row.t}</p>
-                    {row.hot && (
-                      <span className="text-[10px] font-semibold tracking-wide text-lime uppercase">
+                    <p className="line-clamp-1 text-sm font-medium text-cream">
+                      {job.title}
+                    </p>
+                    {index < 2 && (
+                      <span className="shrink-0 text-[10px] font-semibold tracking-wide text-lime uppercase">
                         Novo
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-sand/55">{row.s}</p>
+                  <p className="text-xs text-sand/55">
+                    {job.source} · {formatJobAgo(job)}
+                  </p>
                 </div>
               ))}
             </div>

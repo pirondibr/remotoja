@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { FUNNEL_STEPS, PLANS, type FunnelAnswer } from "@/lib/funnel";
 import {
-  FUNNEL_STEPS,
-  PLANS,
-  SAMPLE_MATCHES,
-  type FunnelAnswer,
-} from "@/lib/funnel";
+  formatJobAgo,
+  formatJobBadge,
+  formatJobMeta,
+  getDemoJobs,
+} from "@/lib/demoJobs";
 import { BrandMark } from "./BrandMark";
+
+const DEMO_MATCHES = getDemoJobs(5);
 
 export function OnboardWizard() {
   const [index, setIndex] = useState(0);
@@ -177,24 +180,24 @@ export function OnboardWizard() {
 
           {step.kind === "matches" && (
             <div className="mt-8 space-y-3">
-              {SAMPLE_MATCHES.map((job) => (
+              {DEMO_MATCHES.map((job) => (
                 <article
-                  key={job.title}
+                  key={`${job.company}-${job.title}`}
                   className="rounded-2xl border border-white/10 bg-white/5 p-4"
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-lime/15 px-2.5 py-0.5 text-xs font-medium text-lime">
-                      {job.badge}
+                      {formatJobBadge(job)}
                     </span>
-                    <span className="text-xs text-sand/50">{job.ago}</span>
+                    <span className="text-xs text-sand/50">{formatJobAgo(job)}</span>
                   </div>
                   <h3 className="font-semibold text-cream">{job.title}</h3>
                   <p className="text-sm text-sand/70">{job.company}</p>
-                  <p className="mt-1 text-sm text-sand/55">{job.meta}</p>
+                  <p className="mt-1 text-sm text-sand/55">{formatJobMeta(job)}</p>
                 </article>
               ))}
               <p className="pt-2 text-center text-sm text-sand/50">
-                + dezenas de matches similares no feed completo
+                Demo via Google Vagas · “vagas de seo home office”
               </p>
             </div>
           )}

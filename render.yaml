@@ -7,7 +7,7 @@ services:
     runtime: python
     schedule: "0 */6 * * *"
     buildCommand: pip install -r workers/requirements.txt
-    startCommand: python -m workers.scraper.placeholder
+    startCommand: python -m workers.scraper.google_jobs --keyword "vagas de seo home office"
     plan: starter
 
   # Descomente quando houver fila/matching contínuo:

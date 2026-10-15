@@ -1,0 +1,128 @@
+{
+  "query": "vagas de seo home office",
+  "location": "Brazil",
+  "fetched_via": "dataforseo_google_jobs",
+  "count": 10,
+  "jobs": [
+    {
+      "title": "Analista de SEO – Remoto",
+      "company": "Taggui RH",
+      "location": "Qualquer lugar",
+      "source": "Glassdoor",
+      "source_url": "https://www.glassdoor.com.br/job-listing/analista-de-seo-remoto-ag%C3%AAncia-mestre-JV_KO0,22_KE23,37.htm?jl=1010167150904",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": null,
+      "job_id": "uL6SxDTwHBqeg2hBAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Especialista - Marketing de Busca - SEO + AEO + Conteúdo",
+      "company": "Entrust",
+      "location": "Qualquer lugar",
+      "source": "Nerdin",
+      "source_url": "https://www.nerdin.com.br/vaga_emprego/vaga-especialista-marketing-de-busca-seo-aeo-conteudo-99622.php",
+      "contract_type": "Prestador de serviços",
+      "salary": null,
+      "posted": "há 7 dias",
+      "job_id": "n-iqaUi8Zi3I0qNBAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Analista de Google Business Profile (SEO Local) – Agência de Marketing",
+      "company": "Relou Rh Especializado LTDA",
+      "location": "Qualquer lugar",
+      "source": "Indeed",
+      "source_url": "https://br.indeed.com/viewjob?jk=f94c2a9f540b8f55",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": null,
+      "job_id": "NuaGB_pPw-UQm_nCAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Analista SEO – Remoto",
+      "company": "Inova Guest",
+      "location": "Qualquer lugar",
+      "source": "Vagas De SEO",
+      "source_url": "https://vagasdeseo.com/vaga/inova-guest-80-analista-seo-remoto/",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": null,
+      "job_id": "KgpKMclV1ohjfwDJAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Analista de Conteúdo Inbound - Remoto",
+      "company": "Agência Mestre",
+      "location": "Qualquer lugar",
+      "source": "Vagas De Emprego Portal Taggui RH",
+      "source_url": "https://rs.tagguirh.com.br/visualizar-vaga/agenciamestre/1615",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": "há 14 dias",
+      "job_id": "7khzdACRp3I2SxKHAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Analista de SEO",
+      "company": "Holos Media",
+      "location": "Qualquer lugar",
+      "source": "Trabajo.org",
+      "source_url": "https://br.trabajo.org/emprego-4037-f1a0df40c78b69cace32c23b5a511111",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": "há 9 dias",
+      "job_id": "TgZpCzbY0DJfvFsLAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Analista de Conteúdo",
+      "company": "Netlinks",
+      "location": "Qualquer lugar",
+      "source": "Recrutei",
+      "source_url": "https://jobs.recrutei.com.br/netlinks/vacancy/22963-analista-de-conteudo",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": null,
+      "job_id": "NzXFLtotswglil4PAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "SEO Copywriter",
+      "company": "The Elite Job",
+      "location": "Qualquer lugar",
+      "source": "Trabajo.org",
+      "source_url": "https://br.trabajo.org/emprego-2251-39449458ba0edc938b17555918da1704",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": "há 4 dias",
+      "job_id": "gk1whbepxuva3JnoAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "SEO and Web Dev Specialist",
+      "company": "Hyre",
+      "location": "Qualquer lugar",
+      "source": "Glassdoor",
+      "source_url": "https://www.glassdoor.com.br/job-listing/seo-and-web-dev-specialist-hyre-JV_IC2479061_KO0,26_KE27,31.htm?jl=1010283984326",
+      "contract_type": "Prestador de serviços",
+      "salary": null,
+      "posted": "há 13 dias",
+      "job_id": "knokjwRWncftnRfQAAAAAA==",
+      "remote": true
+    },
+    {
+      "title": "Especialista de SEO Técnico (Pleno ou Sênior)",
+      "company": "Hedgehog Digital",
+      "location": "Qualquer lugar",
+      "source": "Vagas De SEO",
+      "source_url": "https://vagasdeseo.com/vaga/hedgehog-digital-80-especialista-de-seo-tecnico-pleno-ou-senior/",
+      "contract_type": "Tempo integral",
+      "salary": null,
+      "posted": null,
+      "job_id": "c1I1-l2qRP5XJ1jIAAAAAA==",
+      "remote": true
+    }
+  ]
+}

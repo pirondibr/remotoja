@@ -217,27 +217,3 @@ export const PLANS = [
     popular: true,
   },
 ] as const;
-
-export const SAMPLE_MATCHES = [
-  {
-    title: "Product Designer Pleno",
-    company: "Fintech BR",
-    meta: "Remoto · Brasil · R$ 9–13k",
-    badge: "Fora do LinkedIn",
-    ago: "há 42 min",
-  },
-  {
-    title: "Customer Success",
-    company: "SaaS B2B",
-    meta: "Remoto · BR/LATAM · R$ 6–9k",
-    badge: "Nova",
-    ago: "há 1h",
-  },
-  {
-    title: "Dev Full Stack",
-    company: "Startup Series A",
-    meta: "Remoto · PJ · R$ 12–18k",
-    badge: "Fora do LinkedIn",
-    ago: "há 3h",
-  },
-];

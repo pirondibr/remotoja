@@ -1,4 +1,5 @@
-# Dependências dos scrapers (preencher ao criar os scripts)
+# Scrapers RemotoJá (stdlib urllib no google_jobs; libs extras para próximos portais)
 httpx>=0.27.0
 beautifulsoup4>=4.12.0
 pydantic>=2.0.0
+python-dotenv>=1.0.0

@@ -32,6 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# scraper raw dumps / temp
+workers/scraper/google_jobs_raw.json
+workers/scraper/_sample_item.json
+workers/scraper/demo_jobs.json
+__pycache__/
+*.pyc
 
 # vercel
 .vercel

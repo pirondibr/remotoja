@@ -34,8 +34,19 @@ npm run dev
 1. **Vercel** — conecte este repo; root = pasta do Next.js; build padrão `next build`.
 2. **Render** — use o Blueprint `render.yaml` para o cron de scrapers (placeholder por enquanto).
 
+## Google Vagas (demo)
+
+```bash
+cp .env.example .env   # DATAFORSEO_USER / DATAFORSEO_PASS
+npm run scrape:google-jobs
+# default: "vagas de seo home office" → src/data/demo-jobs.json
+```
+
+A landing e o funil `/onboard` leem essas demos.
+
 ## Próximos passos
 
+- [x] Scraper Google Vagas (DataForSEO)
 - [ ] Checkout / assinatura (Stripe ou Mercado Pago)
 - [ ] Scrapers reais (Gupy, Remotar, Programathor, carreiras, etc.)
 - [ ] Postgres + API de matches
