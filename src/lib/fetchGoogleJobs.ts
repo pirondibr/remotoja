@@ -68,12 +68,20 @@ async function sleep(ms: number) {
 
 export async function fetchGoogleJobsByRole(
   role: string,
-  options?: { depth?: number; locationCode?: number; languageCode?: string }
+  options?: {
+    depth?: number;
+    locationCode?: number;
+    languageCode?: string;
+    maxAttempts?: number;
+    pollMs?: number;
+  }
 ): Promise<GoogleJobsResult> {
   const query = buildJobsQuery(role);
   const depth = options?.depth ?? 10;
   const locationCode = options?.locationCode ?? 2076;
   const languageCode = options?.languageCode ?? "pt";
+  const maxAttempts = options?.maxAttempts ?? 25;
+  const pollMs = options?.pollMs ?? 3000;
   const headers = {
     Authorization: authHeader(),
     "Content-Type": "application/json",
@@ -100,8 +108,8 @@ export async function fetchGoogleJobsByRole(
 
   const taskId = task.id as string;
 
-  for (let attempt = 0; attempt < 25; attempt++) {
-    await sleep(3000);
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await sleep(pollMs);
     const getRes = await fetch(`${API_GET}/${taskId}`, {
       method: "GET",
       headers: { Authorization: headers.Authorization },

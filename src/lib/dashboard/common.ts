@@ -89,7 +89,7 @@ export async function fetchScrapingBee(
     ...(extras || {}),
   });
   return fetchHtml(`https://app.scrapingbee.com/api/v1/?${params}`, {
-    timeoutMs: 90000,
+    timeoutMs: 25000,
   });
 }
 

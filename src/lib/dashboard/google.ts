@@ -1,9 +1,13 @@
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
 import type { DashboardJob } from "@/lib/dashboard/types";
 
-/** Google Vagas via DataForSEO (estável no serverless; equivalente ao fallback do worker). */
+/** Google Vagas via DataForSEO — poll curto para caber no maxDuration do Vercel. */
 export async function fetchGoogleDashboard(term: string): Promise<DashboardJob[]> {
-  const result = await fetchGoogleJobsByRole(term, { depth: 20 });
+  const result = await fetchGoogleJobsByRole(term, {
+    depth: 10,
+    maxAttempts: 8,
+    pollMs: 2000,
+  });
   return result.jobs.map((job) => ({
     ...job,
     source: job.source || "google_vagas",

@@ -12,30 +12,63 @@ import type { DashboardJobsPayload, DashboardJob } from "@/lib/dashboard/types";
 type Fetcher = {
   name: string;
   run: (term: string) => Promise<DashboardJob[]>;
-  /** Se false, pula quando a chave não existe (Indeed). */
-  optional?: boolean;
+  timeoutMs: number;
+  /** Pula se a chave não existe. */
+  requiresScrapingBee?: boolean;
 };
 
 const FETCHERS: Fetcher[] = [
-  { name: "gupy", run: fetchGupy },
-  { name: "remotar", run: fetchRemotar },
-  { name: "programathor", run: fetchProgramathor },
-  { name: "infojobs", run: fetchInfoJobs },
-  { name: "catho", run: fetchCatho },
-  { name: "linkedin", run: fetchLinkedIn },
-  { name: "indeed", run: fetchIndeed, optional: true },
-  { name: "google_vagas", run: fetchGoogleDashboard },
+  { name: "gupy", run: fetchGupy, timeoutMs: 12000 },
+  { name: "remotar", run: fetchRemotar, timeoutMs: 12000 },
+  { name: "programathor", run: fetchProgramathor, timeoutMs: 12000 },
+  { name: "infojobs", run: fetchInfoJobs, timeoutMs: 12000 },
+  { name: "catho", run: fetchCatho, timeoutMs: 15000 },
+  { name: "linkedin", run: fetchLinkedIn, timeoutMs: 18000 },
+  {
+    name: "indeed",
+    run: fetchIndeed,
+    timeoutMs: 22000,
+    requiresScrapingBee: true,
+  },
+  { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 22000 },
 ];
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timeout ${ms}ms (${label})`)),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
 
 async function runOne(
   fetcher: Fetcher,
   term: string
 ): Promise<{ name: string; jobs: DashboardJob[]; error?: string }> {
   try {
-    if (fetcher.optional && !process.env.SCRAPINGBEE_API_KEY) {
-      return { name: fetcher.name, jobs: [], error: "skipped: sem SCRAPINGBEE_API_KEY" };
+    if (fetcher.requiresScrapingBee && !process.env.SCRAPINGBEE_API_KEY) {
+      return {
+        name: fetcher.name,
+        jobs: [],
+        error: "skipped: sem SCRAPINGBEE_API_KEY",
+      };
     }
-    const jobs = await fetcher.run(term);
+    const jobs = await withTimeout(
+      fetcher.run(term),
+      fetcher.timeoutMs,
+      fetcher.name
+    );
     return { name: fetcher.name, jobs };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

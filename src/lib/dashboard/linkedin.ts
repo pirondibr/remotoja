@@ -73,13 +73,14 @@ export async function fetchLinkedIn(term: string): Promise<DashboardJob[]> {
 
   if (out.length) return out;
 
+  // Fallback ScrapingBee só se guest zerou (caro/lento no serverless)
   if (!process.env.SCRAPINGBEE_API_KEY) {
     throw new Error("LinkedIn guest falhou e SCRAPINGBEE_API_KEY ausente");
   }
   const search =
     `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(term)}` +
     `&location=Brazil&geoId=${GEO_BRAZIL}&f_WT=2&position=1&pageNum=0`;
-  const html = await fetchScrapingBee(search, { wait: "3000" });
+  const html = await fetchScrapingBee(search, { wait: "2000" });
   for (const job of parseCards(html)) {
     if (!job.job_id || seen.has(job.job_id)) continue;
     seen.add(job.job_id);
