@@ -109,7 +109,14 @@ export async function fetchDashboardJobs(
         sources[`${result.name}_warning`] = result.error;
         errorsByPortal[result.name] = result.error;
       }
-      merged.push(...result.jobs);
+      // scrape = método; source = portal exibido (Google Vagas pode ser Gupy/LinkedIn/…)
+      merged.push(
+        ...result.jobs.map((job) => ({
+          ...job,
+          scrape: result.name,
+          source: job.source || result.name,
+        }))
+      );
     }
   }
 

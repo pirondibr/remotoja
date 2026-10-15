@@ -10,7 +10,9 @@ export async function fetchGoogleDashboard(term: string): Promise<DashboardJob[]
   });
   return result.jobs.map((job) => ({
     ...job,
+    // Portal exibido = board original (Gupy, LinkedIn…). scrape=google_vagas no merge.
     source: job.source || "Remoto",
+    scrape: "google_vagas",
     job_id: job.job_id ? `gjobs-${job.job_id}` : job.job_id,
   }));
 }

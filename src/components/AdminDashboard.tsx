@@ -331,10 +331,11 @@ export function AdminDashboard() {
                               </div>
                             )}
                             <p className="mb-2 text-xs font-semibold text-moss/60">
-                              Por portal —{" "}
+                              Por scrape —{" "}
                               <span className="font-normal">
-                                Encontradas / Exato / Relacionado / Fora /
-                                Remotas / Pegamos no feed
+                                método de coleta (ex.: Google Vagas). O portal
+                                da vaga (Gupy/LinkedIn/…) aparece no card da
+                                inspeção.
                               </span>
                             </p>
                             {portals.length === 0 ? (
@@ -347,7 +348,7 @@ export function AdminDashboard() {
                                 <thead className="text-moss/55 uppercase tracking-wide">
                                   <tr>
                                     <th className="py-1.5 pr-3 font-semibold">
-                                      Portal
+                                      Scrape
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Encontradas

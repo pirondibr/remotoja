@@ -5,6 +5,8 @@ export type DemoJob = {
   company: string;
   location: string;
   source: string;
+  /** Como a vaga entrou no agregador (ex.: google_vagas). Pode diferir de source. */
+  scrape?: string | null;
   source_url?: string | null;
   company_logo?: string | null;
   contract_type?: string | null;

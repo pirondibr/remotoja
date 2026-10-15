@@ -315,7 +315,7 @@ export function JobsDashboard() {
                 <table className="mt-3 min-w-full text-left text-xs">
                   <thead className="text-moss/55 uppercase tracking-wide">
                     <tr>
-                      <th className="py-1.5 pr-3 font-semibold">Portal</th>
+                      <th className="py-1.5 pr-3 font-semibold">Scrape</th>
                       <th className="py-1.5 pr-3 font-semibold">Encontradas</th>
                       <th className="py-1.5 pr-3 font-semibold">Exato</th>
                       <th className="py-1.5 pr-3 font-semibold">Relac.</th>
@@ -436,6 +436,14 @@ export function JobsDashboard() {
                         <span className="font-semibold text-ink">
                           {formatSource(item.source)}
                         </span>
+                        {item.scrape &&
+                        item.scrape.toLowerCase() !==
+                          item.source.toLowerCase() ? (
+                          <span className="text-moss/55">
+                            {" "}
+                            via {formatSource(item.scrape)}
+                          </span>
+                        ) : null}
                         {" · "}
                         {item.title}
                         {item.reason ? (
@@ -516,6 +524,17 @@ export function JobsDashboard() {
                             {inspect && (
                               <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
                                 {formatSource(job.source)}
+                              </span>
+                            )}
+                            {inspect && (
+                              <span className="rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-cream">
+                                Portal · {formatSource(job.source)}
+                              </span>
+                            )}
+                            {inspect && (
+                              <span className="rounded-full border border-moss/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-moss">
+                                Scrape ·{" "}
+                                {formatSource(job.scrape || job.source)}
                               </span>
                             )}
                             {inspect && job.match_tier && (

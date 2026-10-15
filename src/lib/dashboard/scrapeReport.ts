@@ -61,8 +61,11 @@ export function buildScrapeReport(input: {
     else byPortal.get(portal)!.error = err;
   }
 
+  const scrapeKey = (job: DashboardJob) =>
+    (job.scrape || job.source || "unknown").toLowerCase();
+
   for (const job of input.allJobs) {
-    const key = (job.source || "unknown").toLowerCase();
+    const key = scrapeKey(job);
     if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
     const row = byPortal.get(key)!;
     const tier = job.match_tier || "fora";
@@ -73,14 +76,14 @@ export function buildScrapeReport(input: {
   }
 
   for (const job of input.keptJobs) {
-    const key = (job.source || "unknown").toLowerCase();
+    const key = scrapeKey(job);
     if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
     byPortal.get(key)!.kept += 1;
   }
 
   for (const item of input.validation?.items || []) {
     if (item.status === "skipped") continue;
-    const key = (item.source || "unknown").toLowerCase();
+    const key = (item.scrape || item.source || "unknown").toLowerCase();
     if (!byPortal.has(key)) byPortal.set(key, emptyPortal(key));
     const row = byPortal.get(key)!;
     row.checked += 1;

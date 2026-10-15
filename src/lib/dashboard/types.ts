@@ -20,6 +20,7 @@ export type ValidationItem = {
   title: string;
   company: string;
   source: string;
+  scrape?: string | null;
   source_url: string | null;
   status: ValidationStatus;
   reason?: string;
