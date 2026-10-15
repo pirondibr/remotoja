@@ -53,7 +53,6 @@ export async function logLeadSearch(
   const sql = getSql();
   const id = randomUUID();
   const jobs = Array.isArray(input.jobs_shown) ? input.jobs_shown : [];
-  const jobsJson = JSON.stringify(jobs);
   await sql`
     INSERT INTO lead_searches (
       id, role, channel,
@@ -61,7 +60,7 @@ export async function logLeadSearch(
       fbclid, gclid, referrer,
       jobs_shown, jobs_count, cached, user_agent
     ) VALUES (
-      ${id}::uuid,
+      ${id},
       ${input.role.trim().slice(0, 120)},
       ${(input.channel || "demo").slice(0, 40)},
       ${clean(input.utm_source)},
@@ -72,7 +71,7 @@ export async function logLeadSearch(
       ${clean(input.fbclid)},
       ${clean(input.gclid)},
       ${clean(input.referrer)},
-      ${jobsJson}::jsonb,
+      ${sql.json(jobs)},
       ${jobs.length},
       ${Boolean(input.cached)},
       ${clean(input.user_agent)}
@@ -103,13 +102,15 @@ export async function listLeadSearches(options?: {
     FROM lead_searches
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
-  `) as LeadSearchRow[];
+  `) as unknown as LeadSearchRow[];
 
   return {
     total,
     rows: rows.map((row) => ({
       ...row,
-      jobs_shown: (Array.isArray(row.jobs_shown) ? row.jobs_shown : []) as DemoJob[],
+      jobs_shown: (Array.isArray(row.jobs_shown)
+        ? row.jobs_shown
+        : []) as DemoJob[],
     })),
   };
 }

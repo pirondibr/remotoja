@@ -1,6 +1,4 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-
-export type Sql = NeonQueryFunction<false, false>;
+import postgres, { type Sql } from "postgres";
 
 let sqlSingleton: Sql | null = null;
 let schemaReady: Promise<void> | null = null;
@@ -15,7 +13,13 @@ export function getSql(): Sql {
     throw new Error("DATABASE_URL não configurada");
   }
   if (!sqlSingleton) {
-    sqlSingleton = neon(url);
+    sqlSingleton = postgres(url, {
+      ssl: "require",
+      max: 1,
+      idle_timeout: 20,
+      connect_timeout: 15,
+      prepare: false,
+    });
   }
   return sqlSingleton;
 }

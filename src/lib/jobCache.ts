@@ -26,7 +26,7 @@ export async function getCachedJobs(
     WHERE kind = ${kind} AND role_key = ${roleKey}
     LIMIT 1
   `;
-  const row = rows[0] as CachedJobsRow | undefined;
+  const row = rows[0] as unknown as CachedJobsRow | undefined;
   if (!row) return null;
   return {
     ...row,
@@ -46,16 +46,14 @@ export async function setCachedJobs(input: {
   await ensureSchema();
   const sql = getSql();
   const roleKey = normalizeRoleKey(input.role);
-  const jobsJson = JSON.stringify(input.jobs ?? []);
-  const sourcesJson = JSON.stringify(input.sources ?? null);
   await sql`
     INSERT INTO job_cache (kind, role_key, jobs, fetched_via, sources, updated_at)
     VALUES (
       ${input.kind},
       ${roleKey},
-      ${jobsJson}::jsonb,
+      ${sql.json(input.jobs ?? [])},
       ${input.fetched_via ?? null},
-      ${sourcesJson}::jsonb,
+      ${input.sources ? sql.json(input.sources) : null},
       now()
     )
     ON CONFLICT (kind, role_key) DO UPDATE SET
@@ -95,9 +93,9 @@ export async function cacheStats(): Promise<{
     GROUP BY kind
   `;
   const out = { demo: 0, paid: 0 };
-  for (const row of rows as Array<{ kind: string; count: number }>) {
-    if (row.kind === "demo") out.demo = row.count;
-    if (row.kind === "paid") out.paid = row.count;
+  for (const row of rows as unknown as Array<{ kind: string; count: number }>) {
+    if (row.kind === "demo") out.demo = Number(row.count);
+    if (row.kind === "paid") out.paid = Number(row.count);
   }
   return out;
 }
