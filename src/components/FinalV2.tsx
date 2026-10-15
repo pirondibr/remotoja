@@ -4,12 +4,15 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
-import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { RR_PLANS } from "@/lib/rrPlans";
-import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
+import type { DemoJob } from "@/lib/demoJobs";
 
 function companyInitial(name: string) {
   return (name.trim()[0] || "?").toUpperCase();
+}
+
+function postedLabel(job: DemoJob): string {
+  return job.posted || "Recente";
 }
 
 function freshestPostedLabel(jobs: DemoJob[]): string {
@@ -40,6 +43,105 @@ function Countdown({ seconds }: { seconds: number }) {
   );
 }
 
+function LockIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id="lockGrad" x1="4" y1="2" x2="20" y2="22">
+          <stop stopColor="#c8f560" />
+          <stop offset="1" stopColor="#7dffb3" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M7 11V8a5 5 0 0 1 10 0v3"
+        stroke="url(#lockGrad)"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <rect
+        x="5"
+        y="11"
+        width="14"
+        height="10"
+        rx="2.5"
+        fill="url(#lockGrad)"
+      />
+    </svg>
+  );
+}
+
+function JobCard({
+  job,
+  locked = false,
+}: {
+  job: DemoJob;
+  locked?: boolean;
+}) {
+  const notOnLinkedIn = !job.source.toLowerCase().includes("linkedin");
+
+  const inner = (
+    <div className="flex items-start gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
+        {companyInitial(job.company)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="truncate font-semibold text-cream">{job.title}</h2>
+            <p className="truncate text-sm text-sand/55">{job.company}</p>
+          </div>
+          {!locked && (
+            <span className="mt-0.5 shrink-0 opacity-80" aria-hidden>
+              <LockIcon className="h-4 w-4" />
+            </span>
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {notOnLinkedIn && (
+            <span className="rounded-full bg-lime/20 px-2.5 py-1 text-[11px] font-semibold text-lime">
+              🚫 Fora do LinkedIn
+            </span>
+          )}
+          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
+            🔥 {postedLabel(job)}
+          </span>
+          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
+            🌏 100% remoto
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!locked) {
+    return (
+      <article className="relative rounded-2xl border border-white/10 bg-[#0a1f19]/90 p-4">
+        {inner}
+      </article>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a1f19]/90 p-4 text-left"
+    >
+      <div className="pointer-events-none select-none blur-[7px]">{inner}</div>
+      <div className="absolute top-3.5 right-3.5 z-10">
+        <LockIcon />
+      </div>
+      <div className="pointer-events-none absolute inset-0 bg-ink/20" />
+    </button>
+  );
+}
+
 export function FinalV2() {
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") || searchParams.get("q") || "";
@@ -49,19 +151,27 @@ export function FinalV2() {
   );
   const [role, setRole] = useState(initialRole);
   const [jobs, setJobs] = useState<DemoJob[]>([]);
-  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<"live" | "fallback" | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<(typeof RR_PLANS)[number]["id"]>("yearly");
+  const [selectedPlan, setSelectedPlan] =
+    useState<(typeof RR_PLANS)[number]["id"]>("yearly");
 
-  const visibleJobs = jobs.slice(0, 4);
-  const moreCount = Math.max(jobs.length - 2, 120 + (role.length % 80));
+  /** Preview: 3 abertas + 1 bloqueada (blur). */
+  const previewJobs = jobs.slice(0, 3);
+  const lockedJob: DemoJob | null =
+    jobs[3] ||
+    (jobs[0]
+      ? {
+          ...jobs[0],
+          title: jobs[0].title,
+          company: jobs[0].company,
+        }
+      : null);
 
-  const headlineTime = useMemo(
-    () => freshestPostedLabel(jobs),
-    [jobs]
-  );
+  /** Quando pagar, outros scrapers entram — mostramos o dobro do que achamos agora. */
+  const moreCount = Math.max(jobs.length * 2, 2);
+
+  const headlineTime = useMemo(() => freshestPostedLabel(jobs), [jobs]);
 
   async function runSearch(value: string) {
     const trimmed = value.trim();
@@ -69,9 +179,7 @@ export function FinalV2() {
 
     setLoading(true);
     setError(null);
-    setQuery(buildJobsQuery(trimmed));
     setJobs([]);
-    setSource(null);
     setPhase("results");
 
     try {
@@ -79,14 +187,9 @@ export function FinalV2() {
       const data = await res.json();
       const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
       setJobs(list);
-      setQuery(data.query || buildJobsQuery(trimmed));
-      setSource(
-        data.fetched_via === "dataforseo_google_jobs" ? "live" : "fallback"
-      );
-      if (data.error) setError(data.error);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha na busca");
-      setSource("fallback");
+      if (data.error && list.length === 0) setError("Não encontramos vagas agora. Tente outro cargo.");
+    } catch {
+      setError("Não encontramos vagas agora. Tente outro cargo.");
     } finally {
       setLoading(false);
     }
@@ -104,6 +207,10 @@ export function FinalV2() {
     void runSearch(role);
   }
 
+  function openPaywall() {
+    setPhase("paywall");
+  }
+
   return (
     <div className="bg-mesh relative min-h-screen text-cream">
       <div className="bg-grain pointer-events-none absolute inset-0 opacity-40" />
@@ -113,29 +220,25 @@ export function FinalV2() {
           <Link href="/">
             <BrandMark light size="sm" />
           </Link>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/final"
-              className="text-xs text-sand/50 transition hover:text-sand/80"
-            >
-              v1
-            </Link>
-            <span className="rounded-full border border-lime/30 bg-lime/10 px-2.5 py-1 text-[10px] font-bold tracking-wide text-lime uppercase">
-              /final/v2
-            </span>
-          </div>
+          <span className="rounded-full border border-lime/30 bg-lime/10 px-2.5 py-1 text-[10px] font-bold tracking-wide text-lime uppercase">
+            /final/v2
+          </span>
         </div>
 
         {/* SEARCH */}
-        {(phase === "search" || (!loading && phase === "results" && jobs.length === 0)) && (
+        {(phase === "search" ||
+          (!loading && phase === "results" && jobs.length === 0)) && (
           <section className="mb-6">
             <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold leading-tight">
               Encontre sua próxima vaga remota
             </h1>
             <p className="mt-2 text-sm text-sand/70">
-              Atalho de teste no modelo Remote Rocketship — busca + wall + paywall.
+              Digite o cargo e veja matches frescos de vários portais.
             </p>
-            <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <form
+              onSubmit={onSubmit}
+              className="mt-5 flex flex-col gap-2 sm:flex-row"
+            >
               <input
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -151,14 +254,7 @@ export function FinalV2() {
                 {loading ? "…" : "Buscar"}
               </button>
             </form>
-            {role.trim().length > 1 && (
-              <p className="mt-2 text-xs text-sand/45">
-                Query: <span className="text-lime">{buildJobsQuery(role)}</span>
-              </p>
-            )}
-            {error && (
-              <p className="mt-3 text-xs text-sand/50">{error}</p>
-            )}
+            {error && <p className="mt-3 text-xs text-sand/50">{error}</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               {["SEO", "programador", "designer"].map((chip) => (
                 <button
@@ -181,16 +277,16 @@ export function FinalV2() {
         {/* LOADING */}
         {loading && (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
-            <p className="font-semibold">Escaneando Google Vagas…</p>
-            <p className="mt-2 text-sm text-sand/60">{query}</p>
-            <p className="mt-1 text-xs text-sand/40">~10–30s</p>
+            <p className="font-semibold">
+              Procurando vagas em diversos portais e empresas…
+            </p>
+            <p className="mt-2 text-sm text-sand/55">Isso pode levar alguns segundos</p>
           </div>
         )}
 
-        {/* RESULTS — Remote Rocketship style */}
+        {/* RESULTS */}
         {!loading && phase === "results" && jobs.length > 0 && (
           <section className="animate-rise flex flex-1 flex-col">
-            {/* Promo banner */}
             <div className="relative mb-6 overflow-hidden rounded-2xl border border-lime/35 bg-gradient-to-r from-forest/80 to-moss/40 p-4">
               <div className="absolute top-3 right-3">
                 <Countdown seconds={186} />
@@ -204,7 +300,7 @@ export function FinalV2() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPhase("paywall")}
+                  onClick={openPaywall}
                   className="shrink-0 rounded-full bg-lime px-6 py-2.5 text-sm font-bold text-ink transition hover:bg-mint"
                 >
                   Upgrade
@@ -221,71 +317,36 @@ export function FinalV2() {
               multidão.
             </p>
 
-            {source && (
-              <p className="mt-3 text-center text-[11px] text-sand/40">
-                {source === "live" ? "Google Vagas ao vivo" : "fallback"} · {query}
-              </p>
-            )}
-
             <div className="mt-7 space-y-3">
-              {visibleJobs.map((job, index) => {
-                const notOnLinkedIn =
-                  !job.source.toLowerCase().includes("linkedin");
-                return (
-                  <article
-                    key={`${job.job_id || index}-${job.title}`}
-                    className="relative rounded-2xl border border-white/10 bg-[#0a1f19]/90 p-4 shadow-[0_0_0_1px_rgba(200,245,96,0.04)]"
+              {previewJobs.map((job, index) => (
+                <JobCard
+                  key={`${job.job_id || index}-${job.title}`}
+                  job={job}
+                />
+              ))}
+
+              {lockedJob && (
+                <div>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={openPaywall}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") openPaywall();
+                    }}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
-                        {companyInitial(job.company)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h2 className="truncate font-semibold text-cream">
-                              {job.title}
-                            </h2>
-                            <p className="truncate text-sm text-sand/55">
-                              {job.company}
-                            </p>
-                          </div>
-                          <span
-                            className="mt-0.5 shrink-0 text-lime/80"
-                            title="Desbloqueie no plano"
-                            aria-label="Bloqueado"
-                          >
-                            🔒
-                          </span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {notOnLinkedIn && (
-                            <span className="rounded-full bg-lime/20 px-2.5 py-1 text-[11px] font-semibold text-lime">
-                              🚫 Fora do LinkedIn
-                            </span>
-                          )}
-                          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
-                            🔥 {formatJobAgo(job)}
-                          </span>
-                          <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/80">
-                            🌏 100% remoto
-                          </span>
-                          {job.source && (
-                            <span className="rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-sand/55">
-                              via {job.source}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    <JobCard job={lockedJob} locked />
+                  </div>
+                  <p className="mt-3 text-center text-sm font-medium text-cream/90">
+                    + {moreCount} matches para o seu perfil
+                  </p>
+                </div>
+              )}
             </div>
 
             <button
               type="button"
-              onClick={() => setPhase("paywall")}
+              onClick={openPaywall}
               className="mt-6 w-full rounded-full bg-lime py-4 text-base font-bold text-ink transition hover:bg-mint"
             >
               Ver todas as vagas
@@ -300,28 +361,33 @@ export function FinalV2() {
           </section>
         )}
 
-        {/* PAYWALL — Choose your plan */}
+        {/* PAYWALL */}
         {!loading && phase === "paywall" && (
           <section className="animate-rise flex flex-1 flex-col pb-8">
-            {/* Blurred teaser */}
             <div className="relative mb-6 overflow-hidden rounded-2xl border border-white/10">
-              <div className="pointer-events-none select-none blur-[3px] opacity-70">
-                {(jobs[0] ? [jobs[0]] : [{ title: "Vaga remota", company: "Empresa" }]).map(
-                  (job, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 bg-white/5 p-4"
-                    >
-                      <div className="h-10 w-10 rounded-full bg-cream/90" />
-                      <div>
-                        <p className="font-semibold">{job.title}</p>
-                        <p className="text-sm text-sand/50">{job.company}</p>
-                      </div>
+              <div className="pointer-events-none select-none blur-[6px] opacity-75">
+                {(jobs[0]
+                  ? [jobs[0]]
+                  : [{ title: "Vaga remota", company: "Empresa", source: "" }]
+                ).map((job, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 bg-white/5 p-4"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cream text-sm font-bold text-ink">
+                      {companyInitial(job.company)}
                     </div>
-                  )
-                )}
+                    <div>
+                      <p className="font-semibold">{job.title}</p>
+                      <p className="text-sm text-sand/50">{job.company}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="absolute inset-x-0 bottom-3 text-center text-sm font-medium text-mint">
+              <div className="absolute top-3 right-3">
+                <LockIcon />
+              </div>
+              <p className="absolute inset-x-0 bottom-3 text-center text-sm font-medium text-cream">
                 + {moreCount} matches para o seu perfil
               </p>
             </div>
@@ -349,7 +415,9 @@ export function FinalV2() {
                         Mais popular
                       </div>
                     )}
-                    <div className={`flex items-start justify-between gap-3 ${plan.popular ? "pt-5" : ""}`}>
+                    <div
+                      className={`flex items-start justify-between gap-3 ${plan.popular ? "pt-5" : ""}`}
+                    >
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold text-cream">{plan.name}</span>
