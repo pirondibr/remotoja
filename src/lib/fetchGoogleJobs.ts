@@ -112,7 +112,8 @@ export async function fetchGoogleJobsByRole(
   const taskId = task.id as string;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await sleep(pollMs);
+    // Primeira checagem mais cedo; depois espaça o poll
+    await sleep(attempt === 0 ? Math.min(1200, pollMs) : pollMs);
     const getRes = await fetch(`${API_GET}/${taskId}`, {
       method: "GET",
       headers: { Authorization: headers.Authorization },

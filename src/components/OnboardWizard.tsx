@@ -246,16 +246,20 @@ export function OnboardWizard() {
         const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
         setLiveJobs(jobs.slice(0, 8));
         if (jobs.length === 0) {
-          setJobsError(
-            data.error ||
-              `Não encontramos vagas remotas para “${roleQuery}” agora. Continue para o feed completo.`,
-          );
+          const raw = typeof data.error === "string" ? data.error : "";
+          const friendly = /timeout|google jobs/i.test(raw)
+            ? `A busca demorou mais que o normal para “${roleQuery}”. Continue para ver o feed completo.`
+            : raw ||
+              `Não encontramos vagas remotas para “${roleQuery}” agora. Continue para o feed completo.`;
+          setJobsError(friendly);
         }
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         setLiveJobs([]);
-        setJobsError(err instanceof Error ? err.message : "Falha na busca");
+        setJobsError(
+          "Não foi possível carregar a prévia agora. Continue para o feed completo.",
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setJobsLoading(false);

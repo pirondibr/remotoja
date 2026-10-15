@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
+import { fetchRemotar } from "@/lib/dashboard/remotar";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
+import type { DemoJob } from "@/lib/demoJobs";
 
 export const maxDuration = 60;
 
@@ -11,6 +13,15 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
   // Fallback antigo gravava vagas de SEO em qualquer cargo — ignora.
   if (fetchedVia === "fallback_demo") return false;
   return true;
+}
+
+async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
+  try {
+    const jobs = await fetchRemotar(role);
+    return jobs.slice(0, 10);
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(request: Request) {
@@ -57,50 +68,68 @@ export async function GET(request: Request) {
     }
   }
 
+  let googleError: string | null = null;
+
   try {
     const result = await fetchGoogleJobsByRole(role, {
       depth: 10,
-      maxAttempts: 10,
+      maxAttempts: 14,
       pollMs: 2000,
     });
 
-    if (result.jobs.length === 0) {
-      return NextResponse.json({
-        role,
-        query: buildJobsQuery(role),
-        count: 0,
-        jobs: [],
-        fetched_via: "dataforseo_google_jobs",
-        note: "sem resultados live para este cargo",
-        cached: false,
-      });
+    if (result.jobs.length > 0) {
+      try {
+        await setCachedJobs({
+          kind: "demo",
+          role,
+          jobs: result.jobs,
+          fetched_via: result.fetched_via,
+        });
+      } catch {
+        // ignore
+      }
+      return NextResponse.json({ ...result, cached: false });
     }
+  } catch (error) {
+    googleError =
+      error instanceof Error ? error.message : "Erro desconhecido no Google Jobs";
+  }
 
+  // Se o Google atrasar/falhar: Remotar (rápido) com o mesmo cargo — não SEO genérico
+  const remotarJobs = await fetchRemotarFallback(role);
+  if (remotarJobs.length > 0) {
     try {
       await setCachedJobs({
         kind: "demo",
         role,
-        jobs: result.jobs,
-        fetched_via: result.fetched_via,
+        jobs: remotarJobs,
+        fetched_via: "fallback_remotar",
       });
     } catch {
       // ignore
     }
-
-    return NextResponse.json({ ...result, cached: false });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro desconhecido";
-    return NextResponse.json(
-      {
-        role,
-        query: buildJobsQuery(role),
-        count: 0,
-        jobs: [],
-        fetched_via: "error",
-        error: message,
-        cached: false,
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      role,
+      query: buildJobsQuery(role),
+      count: remotarJobs.length,
+      jobs: remotarJobs,
+      fetched_via: "fallback_remotar",
+      note: googleError
+        ? `Google Jobs indisponível (${googleError}). Prévia via Remotar.`
+        : "Prévia via Remotar",
+      cached: false,
+    });
   }
+
+  return NextResponse.json({
+    role,
+    query: buildJobsQuery(role),
+    count: 0,
+    jobs: [],
+    fetched_via: "error",
+    error:
+      googleError ||
+      `Não encontramos vagas remotas para “${role}” agora. Continue para o feed completo.`,
+    cached: false,
+  });
 }
