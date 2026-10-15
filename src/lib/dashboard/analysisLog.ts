@@ -23,6 +23,8 @@ export type AnalysisLog = {
 export const BEE_STEALTH_JS_CREDITS = 75;
 /** ScrapingBee premium + JS ≈ 25 créditos (Indeed etc.). */
 export const BEE_PREMIUM_JS_CREDITS = 25;
+/** ScrapingBee premium sem JS ≈ 10 créditos (LinkedIn guest API). */
+export const BEE_PREMIUM_CREDITS = 10;
 
 export function beeCreditUsd(credits: number): number {
   const per =

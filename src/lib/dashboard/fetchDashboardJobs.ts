@@ -10,6 +10,7 @@ import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import { filterPortugueseJobs } from "@/lib/dashboard/languageFilter";
 import {
   AnalysisLogBuilder,
+  BEE_PREMIUM_CREDITS,
   BEE_PREMIUM_JS_CREDITS,
   beeCreditUsd,
 } from "@/lib/dashboard/analysisLog";
@@ -49,9 +50,11 @@ const FETCHERS: Fetcher[] = [
   {
     name: "linkedin",
     run: fetchLinkedIn,
-    // guest 429 em Vercel → Bee guest (1–2 req, sem JS)
-    timeoutMs: 70000,
-    beeCredits: BEE_PREMIUM_JS_CREDITS,
+    // Bee direto na API guest (1–2 req, sem JS) — guest Vercel é instável
+    timeoutMs: 55000,
+    requiresScrapingBee: true,
+    // ~1–2 páginas premium sem JS
+    beeCredits: BEE_PREMIUM_CREDITS * 2,
   },
   {
     name: "indeed",
@@ -123,10 +126,8 @@ async function runOne(
     // Português em todos os portais (principalmente corta inglês do LinkedIn/Remotar).
     const { kept: ptJobs, dropped: droppedEn } = filterPortugueseJobs(all);
     const jobs = ptJobs.slice(0, PORTAL_FETCH_LIMIT);
-    // Bee: Indeed sempre; LinkedIn só se usou fallback (heuristic: veio vazio do guest = raro).
-    // Cobramos crédito Bee só para indeed (linkedin guest é grátis na maioria).
     const cost_usd =
-      jobs.length > 0 && fetcher.name === "indeed" && fetcher.beeCredits
+      jobs.length > 0 && fetcher.beeCredits
         ? beeCreditUsd(fetcher.beeCredits)
         : 0;
     return {

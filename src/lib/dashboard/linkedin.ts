@@ -1,8 +1,11 @@
-import { cleanText, fetchHtml, fetchScrapingBee } from "@/lib/dashboard/common";
+import { cleanText, fetchScrapingBee } from "@/lib/dashboard/common";
 import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 const GEO_BRAZIL = "106057199";
+
+/** Meta antes do filtro PT — 1 página guest (~25) costuma bastar pro cap 20. */
+const LINKEDIN_RAW_TARGET = PORTAL_FETCH_LIMIT * 2;
 
 function guestUrl(term: string, start: number) {
   const kw = encodeURIComponent(term);
@@ -24,7 +27,6 @@ function inner(chunk: string, classRe: RegExp): string {
 }
 
 function parseCards(html: string): DashboardJob[] {
-  // class do card costuma quebrar linha (base-card\n base-card--link …)
   const parts = html.split(
     /<div[^>]*class="[^"]*base-card[^"]*"[^>]*>/i
   );
@@ -80,68 +82,31 @@ function mergeBatch(
   }
 }
 
-/** Meta antes do filtro PT — 1 página guest (~25) costuma bastar pro cap 20. */
-const LINKEDIN_RAW_TARGET = PORTAL_FETCH_LIMIT * 2;
-
 /**
- * LinkedIn remoto BR.
- * Guest em IP de datacenter (Vercel) costuma 429 ou devolver poucas cards e
- * abortar na 2ª página — nesse caso completamos com ScrapingBee na mesma URL
- * guest (HTML estático, sem JS). Antes o Bee só rodava se guest = 0 absoluto,
- * então "4 vagas e 429" ficava travado em 4.
+ * LinkedIn remoto BR via ScrapingBee na API guest (sem JS).
+ * Fetch direto do Vercel toma 429 / resposta parcial — Bee direto é mais
+ * previsível (custa crédito premium sem render).
  */
 export async function fetchLinkedIn(term: string): Promise<PortalFetchResult> {
-  const seen = new Set<string>();
-  const out: DashboardJob[] = [];
-  let guestError: string | null = null;
-
-  try {
-    for (let page = 0; page < 3; page++) {
-      const html = await fetchHtml(guestUrl(term, page * 25), {
-        timeoutMs: 15000,
-      });
-      const batch = parseCards(html);
-      if (!batch.length) break;
-      mergeBatch(batch, seen, out);
-      if (out.length >= LINKEDIN_RAW_TARGET) break;
-    }
-  } catch (err) {
-    guestError = err instanceof Error ? err.message : String(err);
+  if (!process.env.SCRAPINGBEE_API_KEY) {
+    throw new Error("SCRAPINGBEE_API_KEY ausente (LinkedIn via Bee)");
   }
 
-  const needBee =
-    out.length < PORTAL_FETCH_LIMIT ||
-    (Boolean(guestError) && out.length < LINKEDIN_RAW_TARGET);
+  const seen = new Set<string>();
+  const out: DashboardJob[] = [];
 
-  if (needBee) {
-    if (!process.env.SCRAPINGBEE_API_KEY) {
-      if (out.length === 0) {
-        throw new Error(
-          guestError
-            ? `LinkedIn guest falhou (${guestError}) e SCRAPINGBEE_API_KEY ausente`
-            : "LinkedIn guest vazio e SCRAPINGBEE_API_KEY ausente"
-        );
-      }
-      // Mantém o pouco que o guest trouxe.
-    } else {
-      for (let page = 0; page < 2; page++) {
-        const html = await fetchScrapingBee(guestUrl(term, page * 25), {
-          render_js: "false",
-        });
-        const batch = parseCards(html);
-        if (!batch.length) break;
-        mergeBatch(batch, seen, out);
-        if (out.length >= LINKEDIN_RAW_TARGET) break;
-      }
-    }
+  for (let page = 0; page < 2; page++) {
+    const html = await fetchScrapingBee(guestUrl(term, page * 25), {
+      render_js: "false",
+    });
+    const batch = parseCards(html);
+    if (!batch.length) break;
+    mergeBatch(batch, seen, out);
+    if (out.length >= LINKEDIN_RAW_TARGET) break;
   }
 
   if (out.length === 0) {
-    throw new Error(
-      guestError
-        ? `LinkedIn sem vagas após Bee (guest: ${guestError})`
-        : "LinkedIn sem vagas parseáveis (guest + Bee)"
-    );
+    throw new Error("LinkedIn sem vagas parseáveis (Bee guest)");
   }
 
   return {
