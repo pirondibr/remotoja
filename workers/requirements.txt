@@ -1,0 +1,4 @@
+# Dependências dos scrapers (preencher ao criar os scripts)
+httpx>=0.27.0
+beautifulsoup4>=4.12.0
+pydantic>=2.0.0
