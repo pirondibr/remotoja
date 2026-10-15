@@ -21,6 +21,7 @@ export type ValidationItem = {
   company: string;
   source: string;
   scrape?: string | null;
+  match_tier?: "exato" | "relacionado" | "fora" | null;
   source_url: string | null;
   status: ValidationStatus;
   reason?: string;

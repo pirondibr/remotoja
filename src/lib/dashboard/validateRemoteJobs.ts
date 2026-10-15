@@ -96,6 +96,7 @@ export async function validateRemoteJobs(
         company: job.company,
         source: job.source,
         scrape: job.scrape || job.source,
+        match_tier: job.match_tier || null,
         source_url: url || null,
       };
 

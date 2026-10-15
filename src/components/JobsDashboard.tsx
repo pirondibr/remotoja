@@ -9,7 +9,13 @@ import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
-import type { ScrapeReport } from "@/lib/dashboard/types";
+import type {
+  ScrapeReport,
+  ValidationItem,
+  ValidationStatus,
+} from "@/lib/dashboard/types";
+
+type ReviewTab = "feed" | ValidationStatus;
 
 function postedLabel(job: DemoJob) {
   return formatJobAgo(job);
@@ -60,6 +66,7 @@ export function JobsDashboard() {
   const [validation, setValidation] = useState<ValidationReport | null>(null);
   const [scrapeReport, setScrapeReport] = useState<ScrapeReport | null>(null);
   const [fromCache, setFromCache] = useState(false);
+  const [reviewTab, setReviewTab] = useState<ReviewTab>("feed");
 
   const loadJobs = useCallback(
     async (
@@ -164,9 +171,56 @@ export function JobsDashboard() {
         job.title.toLowerCase().includes(q) ||
         job.company.toLowerCase().includes(q) ||
         (job.location || "").toLowerCase().includes(q) ||
-        (job.source || "").toLowerCase().includes(q)
+        (job.source || "").toLowerCase().includes(q) ||
+        (job.scrape || "").toLowerCase().includes(q)
     );
   }, [jobs, filter]);
+
+  const reviewItems = useMemo(() => {
+    if (!validation?.items?.length) return [] as ValidationItem[];
+    const checked = validation.items.filter((i) => i.status !== "skipped");
+    const byTab =
+      reviewTab === "feed"
+        ? []
+        : reviewTab === "skipped"
+          ? validation.items.filter((i) => i.status === "skipped")
+          : checked.filter((i) => i.status === reviewTab);
+    const q = filter.trim().toLowerCase();
+    if (!q) return byTab;
+    return byTab.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.company.toLowerCase().includes(q) ||
+        item.source.toLowerCase().includes(q) ||
+        (item.scrape || "").toLowerCase().includes(q) ||
+        (item.reason || "").toLowerCase().includes(q)
+    );
+  }, [validation, reviewTab, filter]);
+
+  const reviewTabs = useMemo(() => {
+    if (!validation) return [] as Array<{ id: ReviewTab; label: string; count: number }>;
+    const items = validation.items || [];
+    const count = (status: ValidationStatus) =>
+      items.filter((i) => i.status === status).length;
+    return [
+      { id: "feed" as const, label: "Feed", count: jobs.length },
+      {
+        id: "validated" as const,
+        label: "Válidas",
+        count: count("validated"),
+      },
+      {
+        id: "false_positive" as const,
+        label: "Falso +",
+        count: count("false_positive"),
+      },
+      {
+        id: "invalid_link" as const,
+        label: "Link ruim",
+        count: count("invalid_link"),
+      },
+    ];
+  }, [validation, jobs.length]);
 
   const sourceBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -381,87 +435,62 @@ export function JobsDashboard() {
         {inspect && validation && (
           <div className="mt-4 rounded-2xl border border-moss/15 bg-white p-4">
             <p className="text-xs font-semibold tracking-wide text-moss/50 uppercase">
-              Validação (double-check admin)
+              Revisão da análise
             </p>
+            <p className="mt-1 text-[11px] text-moss/55">
+              Use as abas para checar manualmente se a classificação está
+              correta. Em Falso + só aparecem as vagas marcadas assim.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {reviewTabs.map((tab) => {
+                const active = reviewTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setReviewTab(tab.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      active
+                        ? tab.id === "false_positive"
+                          ? "bg-amber-700 text-white"
+                          : tab.id === "invalid_link"
+                            ? "bg-red-700 text-white"
+                            : tab.id === "validated"
+                              ? "bg-forest text-cream"
+                              : "bg-ink text-cream"
+                        : "border border-moss/15 bg-cream text-moss hover:border-moss/30"
+                    }`}
+                  >
+                    {tab.label}
+                    <span className="ml-1 opacity-80">({tab.count})</span>
+                  </button>
+                );
+              })}
+            </div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
-                <p className="text-2xl font-bold text-ink">{validation.validated}</p>
-                <p className="text-xs text-moss/60">validadas (remoto ok)</p>
+                <p className="text-2xl font-bold text-ink">
+                  {validation.validated}
+                </p>
+                <p className="text-xs text-moss/60">válidas</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-ink">
+                <p className="text-2xl font-bold text-amber-800">
                   {validation.false_positives}
                 </p>
                 <p className="text-xs text-moss/60">falso positivos</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-ink">
+                <p className="text-2xl font-bold text-red-700">
                   {validation.invalid_links}
                 </p>
                 <p className="text-xs text-moss/60">links inválidos</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-ink">{validation.kept}</p>
-                <p className="text-xs text-moss/60">exibidas no feed</p>
+                <p className="text-xs text-moss/60">ficaram no feed</p>
               </div>
             </div>
-            {Object.keys(sources).length > 0 && (
-              <p className="mt-3 text-xs text-moss/60">
-                Contagem bruta por scraper:{" "}
-                <span className="font-medium text-moss">
-                  {Object.entries(sources)
-                    .filter(([k]) => !k.startsWith("_"))
-                    .map(([k, v]) => `${formatSource(k)}=${v}`)
-                    .join(" · ")}
-                </span>
-              </p>
-            )}
-            {validation.items?.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-moss/70">
-                  Detalhe por vaga (portal + status)
-                </p>
-                <ul className="mt-2 max-h-80 space-y-1.5 overflow-y-auto text-xs text-moss/80">
-                  {validation.items
-                    .filter((item) => item.status !== "skipped")
-                    .map((item, i) => (
-                      <li
-                        key={`${item.title}-${i}`}
-                        className="rounded-lg border border-moss/10 bg-cream/50 px-2.5 py-1.5"
-                      >
-                        <span
-                          className={
-                            item.status === "validated"
-                              ? "font-semibold text-forest"
-                              : item.status === "false_positive"
-                                ? "font-semibold text-amber-700"
-                                : "font-semibold text-red-700"
-                          }
-                        >
-                          {item.status}
-                        </span>
-                        {" · "}
-                        <span className="font-semibold text-ink">
-                          {formatSource(item.source)}
-                        </span>
-                        {item.scrape &&
-                        item.scrape.toLowerCase() !==
-                          item.source.toLowerCase() ? (
-                          <span className="text-moss/55">
-                            {" "}
-                            via {formatSource(item.scrape)}
-                          </span>
-                        ) : null}
-                        {" · "}
-                        {item.title}
-                        {item.reason ? (
-                          <span className="text-moss/55"> · {item.reason}</span>
-                        ) : null}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
 
@@ -469,7 +498,11 @@ export function JobsDashboard() {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filtrar nesta lista (título, empresa, portal…)"
+            placeholder={
+              reviewTab === "feed"
+                ? "Filtrar nesta lista (título, empresa, portal…)"
+                : "Filtrar nesta aba (título, empresa, motivo…)"
+            }
             className="w-full rounded-xl border border-moss/10 bg-white px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
         </div>
@@ -491,13 +524,116 @@ export function JobsDashboard() {
           </div>
         )}
 
-        {!loading && error && jobs.length === 0 && (
+        {!loading && error && jobs.length === 0 && reviewTab === "feed" && (
           <div className="mt-10 rounded-2xl border border-moss/10 bg-white p-8 text-center text-sm text-moss/70">
             {error}
           </div>
         )}
 
-        {!loading && visible.length > 0 && (
+        {/* Abas de revisão da análise (só as vagas da categoria) */}
+        {!loading && reviewTab !== "feed" && (
+          <div className="mt-8">
+            <p className="mb-3 text-sm font-semibold text-moss">
+              {reviewTab === "false_positive"
+                ? "Falso positivos — revise se a análise errou"
+                : reviewTab === "validated"
+                  ? "Válidas — cargo ok + remoto + link"
+                  : reviewTab === "invalid_link"
+                    ? "Links inválidos / página quebrada"
+                    : "Revisão"}
+              <span className="ml-2 font-normal text-moss/55">
+                {reviewItems.length} vaga
+                {reviewItems.length === 1 ? "" : "s"}
+              </span>
+            </p>
+            {reviewItems.length === 0 ? (
+              <p className="rounded-2xl border border-moss/10 bg-white p-8 text-center text-sm text-moss/60">
+                Nenhuma vaga nesta categoria
+                {filter.trim() ? " com esse filtro" : ""}.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {reviewItems.map((item, index) => {
+                  const href = item.source_url || undefined;
+                  return (
+                    <li key={`${item.status}-${item.title}-${index}`}>
+                      <article
+                        className={`rounded-2xl border p-4 sm:p-5 ${
+                          item.status === "false_positive"
+                            ? "border-amber-300 bg-amber-50/80"
+                            : item.status === "invalid_link"
+                              ? "border-red-200 bg-red-50/70"
+                              : "border-moss/10 bg-white"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <h2 className="text-lg font-semibold leading-snug text-ink">
+                              {item.title}
+                            </h2>
+                            <p className="mt-0.5 text-sm text-moss/70">
+                              {item.company}
+                            </p>
+                            {item.reason && (
+                              <p className="mt-2 text-sm text-moss/80">
+                                Motivo: {item.reason}
+                              </p>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  item.status === "validated"
+                                    ? "bg-forest/15 text-forest"
+                                    : item.status === "false_positive"
+                                      ? "bg-amber-200 text-amber-950"
+                                      : "bg-red-200 text-red-900"
+                                }`}
+                              >
+                                {item.status === "validated"
+                                  ? "Válida"
+                                  : item.status === "false_positive"
+                                    ? "Falso positivo"
+                                    : "Link inválido"}
+                              </span>
+                              <span className="rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-cream">
+                                Portal · {formatSource(item.source)}
+                              </span>
+                              <span className="rounded-full border border-moss/20 bg-white px-2.5 py-1 text-[11px] font-semibold text-moss">
+                                Scrape ·{" "}
+                                {formatSource(item.scrape || item.source)}
+                              </span>
+                              {item.match_tier && (
+                                <span className="rounded-full bg-sand px-2.5 py-1 text-[11px] font-semibold text-moss">
+                                  Cargo · {item.match_tier}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center justify-center rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-cream transition hover:bg-forest"
+                            >
+                              Abrir vaga →
+                            </a>
+                          ) : (
+                            <span className="inline-flex shrink-0 items-center justify-center rounded-full bg-sand px-5 py-2.5 text-sm font-medium text-moss/50">
+                              Sem URL
+                            </span>
+                          )}
+                        </div>
+                      </article>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {!loading && reviewTab === "feed" && visible.length > 0 && (
           <ul className="mt-8 space-y-3">
             {visible.map((job, index) => {
               const href = job.source_url || undefined;
@@ -529,11 +665,6 @@ export function JobsDashboard() {
                             </ul>
                           )}
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {inspect && (
-                              <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-cream">
-                                {formatSource(job.source)}
-                              </span>
-                            )}
                             {inspect && (
                               <span className="rounded-full bg-ink/90 px-2.5 py-1 text-[11px] font-semibold text-cream">
                                 Portal · {formatSource(job.source)}
@@ -599,11 +730,14 @@ export function JobsDashboard() {
           </ul>
         )}
 
-        {!loading && jobs.length > 0 && visible.length === 0 && (
-          <p className="mt-10 text-center text-sm text-moss/60">
-            Nenhum resultado com esse filtro na lista atual.
-          </p>
-        )}
+        {!loading &&
+          reviewTab === "feed" &&
+          jobs.length > 0 &&
+          visible.length === 0 && (
+            <p className="mt-10 text-center text-sm text-moss/60">
+              Nenhum resultado com esse filtro na lista atual.
+            </p>
+          )}
       </main>
     </div>
   );
