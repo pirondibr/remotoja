@@ -191,8 +191,12 @@ export function QuickJobSearch() {
 
         <p className="pb-4 text-center text-xs text-sand/40">
           Atalho de teste ·{" "}
+          <Link href="/final/v2" className="underline hover:text-sand/70">
+            v2 estilo RR
+          </Link>
+          {" · "}
           <Link href="/onboard" className="underline hover:text-sand/70">
-            funil completo
+            funil
           </Link>
           {" · "}
           <span className="text-sand/50">/final?role=programador</span>
