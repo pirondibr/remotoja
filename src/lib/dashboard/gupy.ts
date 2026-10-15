@@ -1,0 +1,68 @@
+import { cleanText, fetchHtml } from "@/lib/dashboard/common";
+import type { DashboardJob } from "@/lib/dashboard/types";
+
+type GupyRow = {
+  id?: number | string;
+  name?: string;
+  careerPageName?: string;
+  jobUrl?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  workplaceType?: string;
+  type?: string;
+  publishedDate?: string;
+  description?: string;
+};
+
+function parseNextData(html: string): GupyRow[] {
+  const marker = 'id="__NEXT_DATA__"';
+  const startAttr = html.indexOf(marker);
+  if (startAttr < 0) throw new Error("Gupy: __NEXT_DATA__ não encontrado");
+  const start = html.indexOf(">", startAttr) + 1;
+  const end = html.indexOf("</script>", start);
+  const data = JSON.parse(html.slice(start, end));
+  const pageProps = data?.props?.pageProps || {};
+  const initial = pageProps.initialJobList || {};
+  if (Array.isArray(initial.data)) return initial.data;
+  if (Array.isArray(pageProps.jobs)) return pageProps.jobs;
+  return [];
+}
+
+function mapRow(row: GupyRow): DashboardJob | null {
+  const workplace = (row.workplaceType || "").toLowerCase();
+  if (workplace && !["remote", "remoto"].includes(workplace)) return null;
+  const title = (row.name || "").trim();
+  const company = (row.careerPageName || "").trim();
+  if (!title || !company) return null;
+  const location = [row.city, row.state, row.country].filter(Boolean).join(", ") || "Brasil";
+  const id = String(row.id || "");
+  return {
+    title,
+    company,
+    location,
+    source: "gupy",
+    source_url: row.jobUrl || `https://portal.gupy.io/job/${id}`,
+    contract_type: row.type || null,
+    posted: (row.publishedDate || "").slice(0, 10) || null,
+    job_id: `gupy-${id}`,
+    remote: true,
+    snippet: cleanText(row.description || "", 220) || null,
+  };
+}
+
+export async function fetchGupy(term: string): Promise<DashboardJob[]> {
+  const q = encodeURIComponent(term.trim());
+  const url = `https://portal.gupy.io/job-search/term=${q}&workplaceTypes[]=remote`;
+  const html = await fetchHtml(url);
+  const rows = parseNextData(html);
+  const out: DashboardJob[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const mapped = mapRow(row);
+    if (!mapped?.job_id || seen.has(mapped.job_id)) continue;
+    seen.add(mapped.job_id);
+    out.push(mapped);
+  }
+  return out;
+}

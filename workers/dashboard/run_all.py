@@ -1,4 +1,4 @@
-"""Roda a bateria do dashboard: gupy → indeed → linkedin → google_vagas → merge.
+"""Roda a bateria do dashboard e faz merge.
 
 Uso:
   python -m workers.dashboard.run_all SEO
@@ -11,8 +11,29 @@ import argparse
 import json
 import sys
 
-from workers.dashboard import gupy, indeed, linkedin, google_vagas, merge
+from workers.dashboard import (
+    catho,
+    google_vagas,
+    gupy,
+    indeed,
+    infojobs,
+    linkedin,
+    merge,
+    programathor,
+    remotar,
+)
 from workers.dashboard.common import load_env, save
+
+
+def _run(label: str, fn, summary: dict, key: str) -> None:
+    print(f"→ {label}", file=sys.stderr)
+    try:
+        jobs = fn()
+        save(key, jobs, meta={"term": summary["term"]})
+        summary["sources"][key] = len(jobs)
+    except (SystemExit, Exception) as exc:
+        print(f"{label} pulado: {exc}", file=sys.stderr)
+        summary["sources"][key] = f"skipped: {exc}"
 
 
 def main() -> None:
@@ -23,6 +44,10 @@ def main() -> None:
     parser.add_argument("--skip-indeed", action="store_true")
     parser.add_argument("--skip-linkedin", action="store_true")
     parser.add_argument("--skip-google", action="store_true")
+    parser.add_argument("--skip-remotar", action="store_true")
+    parser.add_argument("--skip-programathor", action="store_true")
+    parser.add_argument("--skip-infojobs", action="store_true")
+    parser.add_argument("--skip-catho", action="store_true")
     parser.add_argument("--provider", default="auto", help="Indeed provider")
     parser.add_argument("--linkedin-provider", default="auto")
     parser.add_argument("--scrolls", type=int, default=2)
@@ -33,50 +58,64 @@ def main() -> None:
     summary: dict = {"term": args.term, "sources": {}}
 
     if not args.skip_gupy:
-        print("→ Gupy", file=sys.stderr)
-        jobs = gupy.fetch_gupy([args.term], remote_only=True)
-        save("gupy", jobs, meta={"term": args.term})
-        summary["sources"]["gupy"] = len(jobs)
+        _run(
+            "Gupy",
+            lambda: gupy.fetch_gupy([args.term], remote_only=True),
+            summary,
+            "gupy",
+        )
+
+    if not args.skip_remotar:
+        _run("Remotar", lambda: remotar.fetch_remotar(args.term), summary, "remotar")
+
+    if not args.skip_programathor:
+        _run(
+            "Programathor",
+            lambda: programathor.fetch_programathor(args.term),
+            summary,
+            "programathor",
+        )
+
+    if not args.skip_infojobs:
+        _run(
+            "InfoJobs",
+            lambda: infojobs.fetch_infojobs(args.term),
+            summary,
+            "infojobs",
+        )
+
+    if not args.skip_catho:
+        _run("Catho", lambda: catho.fetch_catho(args.term), summary, "catho")
 
     if not args.skip_indeed:
-        print("→ Indeed", file=sys.stderr)
-        try:
-            jobs = indeed.fetch_indeed(args.term, provider=args.provider)
-            save("indeed", jobs, meta={"term": args.term, "provider": args.provider})
-            summary["sources"]["indeed"] = len(jobs)
-        except (SystemExit, Exception) as exc:
-            print(f"Indeed pulado: {exc}", file=sys.stderr)
-            summary["sources"]["indeed"] = f"skipped: {exc}"
+        _run(
+            "Indeed",
+            lambda: indeed.fetch_indeed(args.term, provider=args.provider),
+            summary,
+            "indeed",
+        )
 
     if not args.skip_linkedin:
-        print("→ LinkedIn", file=sys.stderr)
-        try:
-            jobs = linkedin.fetch_linkedin(
+        _run(
+            "LinkedIn",
+            lambda: linkedin.fetch_linkedin(
                 args.term,
                 provider=args.linkedin_provider,
                 pages=args.linkedin_pages,
-            )
-            save(
-                "linkedin",
-                jobs,
-                meta={"term": args.term, "provider": args.linkedin_provider},
-            )
-            summary["sources"]["linkedin"] = len(jobs)
-        except (SystemExit, Exception) as exc:
-            print(f"LinkedIn pulado: {exc}", file=sys.stderr)
-            summary["sources"]["linkedin"] = f"skipped: {exc}"
+            ),
+            summary,
+            "linkedin",
+        )
 
     if not args.skip_google:
-        print("→ Google Vagas (ScrapingBee)", file=sys.stderr)
-        try:
-            jobs = google_vagas.fetch_google_vagas(
+        _run(
+            "Google Vagas",
+            lambda: google_vagas.fetch_google_vagas(
                 args.term, scrolls=args.scrolls, provider="auto"
-            )
-            save("google_vagas", jobs, meta={"term": args.term})
-            summary["sources"]["google_vagas"] = len(jobs)
-        except (SystemExit, Exception) as exc:
-            print(f"Google Vagas pulado: {exc}", file=sys.stderr)
-            summary["sources"]["google_vagas"] = f"skipped: {exc}"
+            ),
+            summary,
+            "google_vagas",
+        )
 
     merged = merge.dedupe(merge.load_all())
     save("merged", merged, meta={"deduped": True})

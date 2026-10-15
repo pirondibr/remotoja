@@ -12,7 +12,11 @@
     "scrape:dashboard": "python -m workers.dashboard.run_all",
     "scrape:gupy": "python -m workers.dashboard.gupy",
     "scrape:linkedin": "python -m workers.dashboard.linkedin",
-    "scrape:indeed": "python -m workers.dashboard.indeed"
+    "scrape:indeed": "python -m workers.dashboard.indeed",
+    "scrape:remotar": "python -m workers.dashboard.remotar",
+    "scrape:programathor": "python -m workers.dashboard.programathor",
+    "scrape:infojobs": "python -m workers.dashboard.infojobs",
+    "scrape:catho": "python -m workers.dashboard.catho"
   },
   "dependencies": {
     "next": "16.4.1",

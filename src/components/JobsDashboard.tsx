@@ -49,13 +49,18 @@ export function JobsDashboard() {
     }
 
     try {
-      const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(
+        `/api/dashboard/jobs?role=${encodeURIComponent(trimmed)}`
+      );
       const data = await res.json();
       const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
       setJobs(list);
       saveJobSession(trimmed, list);
       if (list.length === 0) {
-        setError("Nenhuma vaga encontrada para esse cargo. Tente outro termo.");
+        setError(
+          data.error ||
+            "Nenhuma vaga encontrada para esse cargo. Tente outro termo."
+        );
       }
     } catch {
       setError("Falha ao carregar vagas. Tente novamente.");

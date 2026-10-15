@@ -2,8 +2,8 @@
 
 Base documentada em 15/10/2026 (outra IA / Minha Vaga Remota), adaptada para o RemotoJá.
 
-> **Demo (pré-pagamento):** só `workers/scraper/google_jobs.py` (DataForSEO).  
-> **Dashboard (pós-pagamento):** este pacote — Gupy, Indeed, LinkedIn, Google Vagas (ScrapingBee); depois Catho / InfoJobs.
+> **Demo (pré-pagamento):** só `workers/scraper/google_jobs.py` (DataForSEO) → `/api/jobs`.  
+> **Dashboard (pós-pagamento):** este pacote + `/api/dashboard/jobs` (TS no Vercel) — Gupy, Remotar, Programathor, InfoJobs, Catho, Indeed, LinkedIn, Google Vagas.
 
 Testes originais com o termo **SEO** (remoto/home office, Brasil). Preferência: Python 3 com stdlib + chaves no `.env`.
 
@@ -38,11 +38,21 @@ Testes originais com o termo **SEO** (remoto/home office, Brasil). Preferência:
 - Fallback ScrapingBee na página `/jobs/search/`.
 - Sem login; volume por `--pages` (25 cards/página guest).
 
-## Próximos
+### 5. Remotar – `remotar.py`
+- API JSON: `https://api.remotar.com.br/jobs?search=`
+- Sem chave; pagina via `meta.last_page`.
 
-- InfoJobs  
-- Catho  
-- Remotar / Programathor
+### 6. Programathor – `programathor.py`
+- HTML `cell-list` em `/jobs?q=&worktype=remoto`.
+- Filtra título pelo termo (o site às vezes ignora `q=`).
+
+### 7. InfoJobs – `infojobs.py`
+- `vagas-de-emprego-{slug}-trabalho-home-office.aspx` (fallback sem home-office).
+- Cards `js_rowCard` + `data-href`.
+
+### 8. Catho – `catho.py`
+- `catho.com.br/vagas/?q=&remoto_home_office=true`
+- Articles `data-offer-item`; fallback ScrapingBee se 403.
 
 ## Schema comum (`common.job`)
 
@@ -52,7 +62,10 @@ Testes originais com o termo **SEO** (remoto/home office, Brasil). Preferência:
 
 ```
 run_all.py "<cargo>"
-  → gupy → indeed → linkedin → google_vagas
+  → gupy → remotar → programathor → infojobs → catho
+  → indeed → linkedin → google_vagas
   → merge.py → output/merged.json
-  → (futuro) API / Postgres → /app
+
+/app → /api/dashboard/jobs  (scrapers TS espelhando os workers)
+/final → /api/jobs          (demo DataForSEO only)
 ```
