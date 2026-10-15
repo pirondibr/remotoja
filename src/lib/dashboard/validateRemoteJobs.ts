@@ -70,9 +70,9 @@ async function mapPool<T, R>(
 }
 
 /**
- * - Top 10: valida link (incl. soft-404) + remoto real; remove híbrido/presencial/quebradas.
- * - Top 11–50: enriquece detalhes; se o link abrir, também remove híbrido óbvio.
- * - Demais: passam sem fetch.
+ * - Top 10: double-check rigoroso (foco UI).
+ * - Top 11–50: também valida remoto/link; se passar → status validated (conta em Válidas).
+ * - Demais: passam sem fetch (skipped).
  */
 export async function validateRemoteJobs(
   jobs: DashboardJob[],
@@ -144,11 +144,13 @@ export async function validateRemoteJobs(
         probe.text
       );
 
+      // Qualquer vaga que passou no double-check de remoto conta como validada
+      // (antes só o top 10 recebia "validated" → portais como Catho ficavam com 0 válidas).
       return {
         job: enriched,
         item: {
           ...base,
-          status: mustValidate ? "validated" : "skipped",
+          status: "validated",
           reason: assess.reason,
         },
       };
@@ -196,7 +198,7 @@ export async function validateRemoteJobs(
   return {
     jobs: kept,
     validation: {
-      checked: Math.min(jobs.length, validateLimit),
+      checked: validated + falsePositives + indecisos + invalidLinks,
       validated,
       false_positives: falsePositives,
       indecisos,

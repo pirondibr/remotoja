@@ -20,23 +20,39 @@ async function loadCathoHtml(url: string): Promise<string> {
   }
 }
 
-/** "11.234 resultados" / "1.234 vagas encontradas" */
+/** "11.234 resultados" — às vezes o número vem em meta/JSON ou com tags no meio. */
 function parseCathoTotal(html: string): number | null {
+  const flat = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   const patterns = [
     /([\d.]+)\s*resultados/i,
     /([\d.]+)\s*vagas?\s*(?:encontradas|dispon)/i,
+    /content="[^"]*?([\d.]+)\s*vagas?\s*dispon/i,
     /"total(?:Results|Count|Offers)?"\s*:\s*(\d+)/i,
   ];
   for (const re of patterns) {
-    const m = html.match(re);
+    const m = flat.match(re) || html.match(re);
     if (!m) continue;
     const raw = m[1].includes(".") && !m[1].includes(",")
       ? m[1].replace(/\./g, "")
       : m[1].replace(/[^\d]/g, "");
     const n = Number(raw);
+    // Ignora totais absurdos sem filtro (ex.: 500k+) — ainda assim reporta se < 200k
+    if (Number.isFinite(n) && n > 0 && n < 500_000) return n;
     if (Number.isFinite(n) && n > 0) return n;
   }
   return null;
+}
+
+function cathoRelevanceScore(job: DashboardJob, term: string): number {
+  const title = (job.title || "").toLowerCase();
+  const t = term.trim().toLowerCase();
+  let score = 0;
+  if (t && title.includes(t)) score += 4;
+  else if (t.split(/\s+/).filter(Boolean).some((p) => p.length >= 4 && title.includes(p)))
+    score += 2;
+  if (/home\s*office/i.test(title)) score += 3;
+  if (/\bremot/i.test(title)) score += 2;
+  return score;
 }
 
 function parseCathoJobs(html: string, term: string): DashboardJob[] {
@@ -126,8 +142,9 @@ async function fetchCathoQuery(
 }
 
 /**
- * Catho: 1º busca `cargo home office` + filtro remoto.
- * Se zerar → fallback só com o cargo + filtro `remoto_home_office`.
+ * Catho: 1º busca `cargo home office` + `work_model[0]=remote`.
+ * Se zerar → fallback só com o cargo + mesmo filtro.
+ * Prioriza títulos com cargo + home office antes do cap 20.
  */
 export async function fetchCatho(term: string): Promise<PortalFetchResult> {
   const base = term.trim();
@@ -135,21 +152,21 @@ export async function fetchCatho(term: string): Promise<PortalFetchResult> {
   const titleQuery = alreadyHasHomeOffice ? base : `${base} home office`;
 
   const primary = await fetchCathoQuery(titleQuery, base);
-  if (primary.jobs.length > 0) {
-    return {
-      jobs: primary.jobs.slice(0, PORTAL_FETCH_LIMIT),
-      available: Math.max(primary.available, primary.jobs.length),
-    };
-  }
+  let jobs = primary.jobs;
+  let available = primary.available;
 
-  // Título com "home office" zerou → filtro home office do portal com o cargo puro
-  if (!alreadyHasHomeOffice) {
+  if (!jobs.length && !alreadyHasHomeOffice) {
     const fallback = await fetchCathoQuery(base, base);
-    return {
-      jobs: fallback.jobs.slice(0, PORTAL_FETCH_LIMIT),
-      available: Math.max(fallback.available, fallback.jobs.length),
-    };
+    jobs = fallback.jobs;
+    available = fallback.available;
   }
 
-  return { jobs: [], available: primary.available || 0 };
+  jobs = [...jobs].sort(
+    (a, b) => cathoRelevanceScore(b, base) - cathoRelevanceScore(a, base)
+  );
+
+  return {
+    jobs: jobs.slice(0, PORTAL_FETCH_LIMIT),
+    available: Math.max(available, jobs.length),
+  };
 }
