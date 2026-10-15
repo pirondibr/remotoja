@@ -1,4 +1,5 @@
-# Workers RemotoJá no Render (landing fica na Vercel)
+# Workers Minha Vaga Remota no Render (landing fica na Vercel)
+# Nomes dos services (remotoja-*) mantidos para não recriar no Render.
 # Docs: https://render.com/docs/blueprint-spec
 
 services:

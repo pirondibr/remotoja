@@ -17,11 +17,11 @@ const body = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "RemotoJá — Vagas remotas no Brasil antes do LinkedIn",
+  title: "Minha Vaga Remota — Vagas remotas no Brasil antes do LinkedIn",
   description:
     "Agregamos vagas remotas de vários portais no Brasil. Aplique cedo, com filtros por salário, senioridade e fontes fora do LinkedIn.",
   openGraph: {
-    title: "RemotoJá — Vagas remotas no Brasil antes do LinkedIn",
+    title: "Minha Vaga Remota — Vagas remotas no Brasil antes do LinkedIn",
     description:
       "Escaneamos portais e páginas de carreira para você candidatar antes da fila.",
     locale: "pt_BR",

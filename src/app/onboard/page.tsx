@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { OnboardWizard } from "@/components/OnboardWizard";
 
 export const metadata: Metadata = {
-  title: "Montar meu feed · RemotoJá",
+  title: "Montar meu feed · Minha Vaga Remota",
   description:
     "Responda algumas perguntas e veja vagas remotas no Brasil alinhadas ao seu perfil.",
 };

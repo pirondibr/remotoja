@@ -150,7 +150,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     id: "headstart",
     kind: "value",
     progress: 88,
-    headline: "O RemotoJá te coloca na frente.",
+    headline: "A Minha Vaga Remota te coloca na frente.",
     subheadline: "Enquanto outros ainda não viram a vaga, você já pode se candidatar.",
     bullets: [
       "Vaga publicada → detectamos em minutos",
@@ -182,7 +182,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 100,
     headline: "Aviso rápido",
     subheadline:
-      "Nossos scrapers rodam o tempo todo. Por isso o RemotoJá é um produto pago: você é o cliente, não as empresas.",
+      "Nossos scrapers rodam o tempo todo. Por isso a Minha Vaga Remota é um produto pago: você é o cliente, não as empresas.",
     cta: "Acessar todas as vagas",
     note: "Sem fidelidade · Cancele quando quiser · 7 dias de garantia",
   },

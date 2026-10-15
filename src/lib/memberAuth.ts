@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-export const MEMBER_COOKIE = "remotoja_member";
-export const DEMO_COOKIE = "remotoja_demo";
+export const MEMBER_COOKIE = "mvr_member";
+export const DEMO_COOKIE = "mvr_demo";
 
 const MEMBER_MAX_AGE_SEC = 60 * 60 * 24 * 400; // cobre plano anual + folga
 const DEMO_MAX_AGE_SEC = 60 * 60 * 24 * 30;

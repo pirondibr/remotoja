@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
-const COOKIE = "remotoja_admin";
+const COOKIE = "mvr_admin";
 const MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
 function secret(): string {

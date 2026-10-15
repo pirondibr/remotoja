@@ -1,4 +1,4 @@
-const STORAGE_KEY = "remotoja_attribution_v1";
+const STORAGE_KEY = "mvr_attribution_v1";
 
 export type Attribution = {
   utm_source?: string;

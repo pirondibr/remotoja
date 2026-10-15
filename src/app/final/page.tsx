@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { QuickJobSearch } from "@/components/QuickJobSearch";
 
 export const metadata: Metadata = {
-  title: "Busca rápida · RemotoJá (teste)",
+  title: "Busca rápida · Minha Vaga Remota (teste)",
   description:
     "Atalho de teste: pesquise vagas no Google Jobs sem passar pelo questionário.",
   robots: {

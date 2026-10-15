@@ -1,6 +1,6 @@
-# RemotoJá
+# Minha Vaga Remota
 
-SaaS de **vagas remotas no Brasil** — agrega vários portais e te coloca na frente da fila do LinkedIn.
+SaaS de **vagas remotas no Brasil** (`minhavagaremota.com.br`) — agrega vários portais e te coloca na frente da fila do LinkedIn.
 
 ## Arquitetura
 

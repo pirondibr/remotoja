@@ -1,4 +1,4 @@
-# Workers RemotoJá
+# Workers Minha Vaga Remota
 
 Dois grupos separados de propósito:
 

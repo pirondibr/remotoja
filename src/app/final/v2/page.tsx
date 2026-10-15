@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { FinalV2 } from "@/components/FinalV2";
 
 export const metadata: Metadata = {
-  title: "Busca v2 · RemotoJá (teste RR)",
+  title: "Busca v2 · Minha Vaga Remota (teste RR)",
   description:
     "Atalho de teste no modelo Remote Rocketship: resultados com urgência + paywall.",
   robots: { index: false, follow: false },

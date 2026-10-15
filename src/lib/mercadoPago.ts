@@ -17,7 +17,7 @@ export function appBaseUrl(): string {
   if (vercel) {
     return vercel.startsWith("http") ? vercel.replace(/\/$/, "") : `https://${vercel}`;
   }
-  return "https://remotoja.vercel.app";
+  return "https://minhavagaremota.com.br";
 }
 
 export type CreatePreferenceInput = {
@@ -48,7 +48,7 @@ export async function createCheckoutPreference(
     items: [
       {
         id: plan.id,
-        title: `RemotoJá — ${plan.name}`,
+        title: `Minha Vaga Remota — ${plan.name}`,
         description: `Acesso ao feed de vagas remotas (${role})`,
         quantity: 1,
         currency_id: "BRL",
@@ -72,7 +72,7 @@ export async function createCheckoutPreference(
     },
     auto_return: "approved",
     notification_url: `${base}/api/checkout/webhook`,
-    statement_descriptor: "REMOTOJA",
+    statement_descriptor: "MINHAVAGAREM",
     // Cartão + PIX (exclui boleto/lotérica)
     payment_methods: {
       excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],

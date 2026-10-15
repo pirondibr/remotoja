@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CheckoutSuccessClient } from "@/components/CheckoutSuccessClient";
 
 export const metadata: Metadata = {
-  title: "Pagamento confirmado · RemotoJá",
+  title: "Pagamento confirmado · Minha Vaga Remota",
   robots: { index: false, follow: false },
 };
 

@@ -1,4 +1,4 @@
-/** Planos RemotoJá (checkout Mercado Pago). */
+/** Planos Minha Vaga Remota (checkout Mercado Pago). */
 export const RR_PLANS = [
   {
     id: "monthly",

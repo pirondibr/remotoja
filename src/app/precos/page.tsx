@@ -5,9 +5,9 @@ import { BrandMark } from "@/components/BrandMark";
 import { PLANS } from "@/lib/funnel";
 
 export const metadata: Metadata = {
-  title: "Preços · RemotoJá",
+  title: "Preços · Minha Vaga Remota",
   description:
-    "Planos RemotoJá: R$ 39/mês ou trimestral. Cancele quando quiser.",
+    "Planos Minha Vaga Remota: R$ 39/mês ou trimestral. Cancele quando quiser.",
 };
 
 const features = [

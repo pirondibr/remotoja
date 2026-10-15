@@ -12,7 +12,7 @@ const POPULAR_ROLES = [
   "Dados",
 ];
 
-const ROLE_STORAGE_KEY = "remotoja_onboard_role";
+const ROLE_STORAGE_KEY = "mvr_onboard_role";
 
 export function HomeSearch({
   id,

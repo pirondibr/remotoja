@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { JobsDashboard } from "@/components/JobsDashboard";
 
 export const metadata: Metadata = {
-  title: "Meu feed · RemotoJá",
+  title: "Meu feed · Minha Vaga Remota",
   description: "Portal de membros com vagas remotas encontradas para o seu perfil.",
   robots: { index: false, follow: false },
 };

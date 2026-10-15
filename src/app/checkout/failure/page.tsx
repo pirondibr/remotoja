@@ -3,7 +3,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 
 export const metadata: Metadata = {
-  title: "Pagamento não concluído · RemotoJá",
+  title: "Pagamento não concluído · Minha Vaga Remota",
   robots: { index: false, follow: false },
 };
 

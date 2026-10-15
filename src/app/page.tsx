@@ -97,7 +97,7 @@ export default function HomeV2() {
               <span className="block text-lime">pra achar vaga remota.</span>
             </h1>
             <p className="animate-rise-delay-2 mt-5 max-w-xl text-lg text-sand/80">
-              O RemotoJá busca no Gupy, Catho, InfoJobs, Indeed, LinkedIn e mais,
+              A Minha Vaga Remota busca no Gupy, Catho, InfoJobs, Indeed, LinkedIn e mais,
               e mostra só as vagas 100% remotas para o seu cargo. Muitas nem
               aparecem no LinkedIn.
             </p>
@@ -183,7 +183,7 @@ export default function HomeV2() {
               </ul>
             </div>
             <div className="rounded-3xl bg-forest p-7 text-cream">
-              <p className="text-sm font-bold text-lime">Com o RemotoJá</p>
+              <p className="text-sm font-bold text-lime">Com a Minha Vaga Remota</p>
               <ul className="mt-4 space-y-3">
                 {AFTER.map((item) => (
                   <li key={item} className="flex gap-3 text-sand/90">
@@ -317,7 +317,7 @@ export default function HomeV2() {
       <footer className="border-t border-white/10 bg-ink px-5 py-8 text-sm text-sand/50 md:px-10">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <BrandMark light size="sm" />
-          <p>© 2026 RemotoJá · Vagas remotas no Brasil</p>
+          <p>© 2026 Minha Vaga Remota · Vagas remotas no Brasil</p>
           <Link href="/precos" className="hover:text-cream">
             Preços
           </Link>

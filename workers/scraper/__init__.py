@@ -1,1 +1,1 @@
-"""Scrapers RemotoJá — portais BR (implementação no próximo passo)."""
+"""Scrapers Minha Vaga Remota — portais BR (implementação no próximo passo)."""

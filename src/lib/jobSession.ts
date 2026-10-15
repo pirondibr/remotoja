@@ -1,6 +1,6 @@
 import type { DemoJob } from "@/lib/demoJobs";
 
-const KEY = "remotoja_member_jobs_v2";
+const KEY = "mvr_member_jobs_v2";
 
 export type JobSessionPayload = {
   role: string;

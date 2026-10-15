@@ -10,7 +10,7 @@ import { startCheckout } from "@/lib/startCheckout";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
 
-const ROLE_STORAGE_KEY = "remotoja_onboard_role";
+const ROLE_STORAGE_KEY = "mvr_onboard_role";
 
 function postedLabel(job: DemoJob): string {
   return formatJobAgo(job);

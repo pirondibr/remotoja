@@ -4,7 +4,7 @@ import { BrandMark } from "./BrandMark";
 export function SiteHeader({ dark = false }: { dark?: boolean }) {
   return (
     <header className="relative z-20 flex items-center justify-between px-5 py-5 md:px-10">
-      <Link href="/" aria-label="RemotoJá início">
+      <Link href="/" aria-label="Minha Vaga Remota início">
         <BrandMark light={dark} size="md" />
       </Link>
       <nav className="flex items-center gap-3 md:gap-5">

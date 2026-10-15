@@ -6,9 +6,9 @@ export function BrandMark({
   size?: "sm" | "md" | "lg";
 }) {
   const sizes = {
-    sm: "text-lg",
-    md: "text-2xl",
-    lg: "text-4xl md:text-5xl",
+    sm: "text-base",
+    md: "text-xl md:text-2xl",
+    lg: "text-3xl md:text-5xl",
   };
 
   return (
@@ -17,8 +17,8 @@ export function BrandMark({
         light ? "text-cream" : "text-ink"
       }`}
     >
-      Remoto
-      <span className={light ? "text-lime" : "text-moss"}>Já</span>
+      Minha Vaga{" "}
+      <span className={light ? "text-lime" : "text-moss"}>Remota</span>
     </span>
   );
 }

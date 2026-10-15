@@ -1,6 +1,6 @@
-# Como funcionam os scrapers – RemotoJá (Dashboard pago)
+# Como funcionam os scrapers – Minha Vaga Remota (Dashboard pago)
 
-Base documentada em 15/10/2026 (outra IA / Minha Vaga Remota), adaptada para o RemotoJá.
+Base documentada em 15/10/2026.
 
 > **Demo (pré-pagamento):** só `workers/scraper/google_jobs.py` (DataForSEO) → `/api/jobs`.  
 > **Dashboard (pós-pagamento):** este pacote + `/api/dashboard/jobs` (TS no Vercel) — Gupy, Remotar, Programathor, InfoJobs, Catho, Indeed, LinkedIn, Google Vagas.
