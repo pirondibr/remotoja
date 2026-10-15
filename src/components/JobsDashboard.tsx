@@ -141,6 +141,14 @@ export function JobsDashboard() {
         if (!cacheOnly && !analyze) {
           saveJobSession(trimmed, list);
         }
+        // Após reanalisar: tira fresh da URL para o link ficar compartilhável (cache).
+        if (inspect && analyze && forceFresh && typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has("fresh")) {
+            url.searchParams.delete("fresh");
+            window.history.replaceState({}, "", url.toString());
+          }
+        }
         if (list.length === 0) {
           setError(
             data.error ||
@@ -303,6 +311,21 @@ export function JobsDashboard() {
                 {adminMode === "analyze"
                   ? "Servindo análise em cache"
                   : "Servindo do cache pago"}
+              </p>
+            )}
+            {inspect && adminMode === "analyze" && !loading && (
+              <p className="mt-2 text-[11px] text-moss/60">
+                Link compartilhável (sem reanalisar):{" "}
+                <a
+                  className="font-semibold text-forest underline"
+                  href={`/api/admin/open-feed?role=${encodeURIComponent(role)}&mode=analyze`}
+                >
+                  /api/admin/open-feed?role={role}&mode=analyze
+                </a>
+                <span className="block mt-0.5 text-amber-800">
+                  Não use <code className="text-[10px]">fresh=1</code> — isso
+                  força scrape de novo (é o botão Reanalisar).
+                </span>
               </p>
             )}
           </div>

@@ -209,9 +209,11 @@ export function AdminDashboard() {
           Feed pago (inspeção)
         </h2>
         <p className="mt-1 text-sm text-moss/70">
-          <strong>Cache</strong> = feed do membro. <strong>Análise</strong> =
-          relatório salvo (reabre sem refazer).{" "}
-          <strong>Reanalisar</strong> = força scrape + double-check de novo.
+          <strong>Cache</strong> = feed do membro. <strong>Ver análise</strong>{" "}
+          = relatório salvo (compartilhável, sem refazer).{" "}
+          <strong>Reanalisar</strong> = força scrape + double-check (não
+          compartilhe esse link — tem <code className="text-xs">fresh=1</code>
+          ).
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <input

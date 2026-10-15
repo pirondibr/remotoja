@@ -59,7 +59,7 @@ export async function GET(request: Request) {
     dest.searchParams.set("validate", "1");
     dest.searchParams.set("fresh", "1");
   } else {
-    // analyze: prefer cache salvo
+    // analyze: prefer cache salvo — NUNCA incluir fresh=1 (link compartilhável)
     dest.searchParams.set("mode", "analyze");
     dest.searchParams.set("validate", "1");
   }

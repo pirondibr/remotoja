@@ -2,10 +2,11 @@ import { cleanText, fetchHtml } from "@/lib/dashboard/common";
 import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
 import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
+/** Filtro Home Office real da Catho (remoto_home_office=true é legado e NÃO aplica). */
 function cathoSearchUrl(query: string): string {
   return (
     `https://www.catho.com.br/vagas/?q=${encodeURIComponent(query)}` +
-    `&remoto_home_office=true`
+    `&work_model%5B0%5D=remote`
   );
 }
 
