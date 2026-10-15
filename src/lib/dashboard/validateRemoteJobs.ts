@@ -47,6 +47,28 @@ function withDetails(job: DashboardJob, html: string): DashboardJob {
   };
 }
 
+/** Título já declara remoto → aceita mesmo se o link da vaga estiver quebrado. */
+function titleImpliesRemote(title: string | undefined | null): boolean {
+  return /\b(remoto|remota|home\s*office|100%\s*remoto|trabalho\s+remoto|remote)\b/i.test(
+    title || ""
+  );
+}
+
+function acceptByTitleRemote(
+  job: DashboardJob,
+  base: Omit<ValidationItem, "status" | "reason">,
+  linkReason: string
+): { job: DashboardJob; item: ValidationItem } {
+  return {
+    job: { ...job, remote: true },
+    item: {
+      ...base,
+      status: "validated",
+      reason: `título indica remoto (link: ${linkReason})`,
+    },
+  };
+}
+
 async function probeUrl(
   url: string,
   opts: { mustValidate: boolean; takeStealthSlot: () => boolean }
@@ -272,6 +294,9 @@ export async function validateRemoteJobs(
 
       if (!row.url) {
         if (row.mustValidate) {
+          if (titleImpliesRemote(row.job.title)) {
+            return acceptByTitleRemote(row.job, base, "sem URL");
+          }
           return {
             job: null,
             item: { ...base, status: "invalid_link" as const, reason: "sem URL" },
@@ -288,12 +313,16 @@ export async function validateRemoteJobs(
       }
 
       if (!row.probe?.ok) {
+        const why = row.probe?.reason || "link não abriu";
+        if (titleImpliesRemote(row.job.title)) {
+          return acceptByTitleRemote(row.job, base, why);
+        }
         return {
           job: null,
           item: {
             ...base,
             status: "invalid_link" as const,
-            reason: row.probe?.reason || "link não abriu",
+            reason: why,
           },
         };
       }
@@ -305,6 +334,12 @@ export async function validateRemoteJobs(
         llmAssess || assessRemotePage(row.job, row.probe.text);
 
       if (!assess.ok) {
+        if (
+          assess.kind === "invalid_link" &&
+          titleImpliesRemote(row.job.title)
+        ) {
+          return acceptByTitleRemote(row.job, base, assess.reason);
+        }
         return {
           job: null,
           item: {
