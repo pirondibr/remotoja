@@ -1,5 +1,5 @@
 import { cleanText, fetchHtml } from "@/lib/dashboard/common";
-import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import { PORTAL_FETCH_LIMIT_DEEP } from "@/lib/dashboard/limits";
 import type { DashboardJob, PortalFetchResult } from "@/lib/dashboard/types";
 
 type GupyRow = {
@@ -72,21 +72,37 @@ function mapRow(row: GupyRow): DashboardJob | null {
   };
 }
 
-export async function fetchGupy(term: string): Promise<PortalFetchResult> {
+function searchUrl(term: string, page: number) {
   const q = encodeURIComponent(term.trim());
-  const url = `https://portal.gupy.io/job-search/term=${q}&workplaceTypes[]=remote`;
-  const html = await fetchHtml(url);
-  const { rows, available } = parseNextData(html);
+  // page=1 offset 0; page=2 offset 12 (confirmado no __NEXT_DATA__)
+  return (
+    `https://portal.gupy.io/job-search/term=${q}` +
+    `&workplaceTypes[]=remote&page=${page}`
+  );
+}
+
+/** Gupy remoto — 2 páginas (~12 cada) para encher o cap expandido. */
+export async function fetchGupy(term: string): Promise<PortalFetchResult> {
   const out: DashboardJob[] = [];
   const seen = new Set<string>();
-  for (const row of rows) {
-    const mapped = mapRow(row);
-    if (!mapped?.job_id || seen.has(mapped.job_id)) continue;
-    seen.add(mapped.job_id);
-    out.push(mapped);
+  let available = 0;
+
+  for (let page = 1; page <= 2; page++) {
+    const html = await fetchHtml(searchUrl(term, page));
+    const parsed = parseNextData(html);
+    available = Math.max(available, parsed.available);
+    for (const row of parsed.rows) {
+      const mapped = mapRow(row);
+      if (!mapped?.job_id || seen.has(mapped.job_id)) continue;
+      seen.add(mapped.job_id);
+      out.push(mapped);
+    }
+    if (parsed.rows.length === 0) break;
+    if (out.length >= PORTAL_FETCH_LIMIT_DEEP) break;
   }
+
   return {
-    jobs: out.slice(0, PORTAL_FETCH_LIMIT),
+    jobs: out.slice(0, PORTAL_FETCH_LIMIT_DEEP),
     available: Math.max(available, out.length),
   };
 }

@@ -6,7 +6,10 @@ import { fetchIndeed } from "@/lib/dashboard/indeed";
 import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
-import { PORTAL_FETCH_LIMIT } from "@/lib/dashboard/limits";
+import {
+  PORTAL_FETCH_LIMIT,
+  PORTAL_FETCH_LIMIT_DEEP,
+} from "@/lib/dashboard/limits";
 import { filterPortugueseJobs } from "@/lib/dashboard/languageFilter";
 import {
   AnalysisLogBuilder,
@@ -35,6 +38,8 @@ type Fetcher = {
   name: string;
   run: (term: string) => Promise<PortalFetchResult | DashboardJob[]>;
   timeoutMs: number;
+  /** Cap pós-filtro PT (default PORTAL_FETCH_LIMIT). */
+  cap?: number;
   /** Pula se a chave não existe. */
   requiresScrapingBee?: boolean;
   /** Custo estimado Bee por chamada bem-sucedida (créditos). */
@@ -43,7 +48,12 @@ type Fetcher = {
 
 /** Programathor pausado. LinkedIn ativo + filtro PT em todos os scrapes. */
 const FETCHERS: Fetcher[] = [
-  { name: "gupy", run: fetchGupy, timeoutMs: 12000 },
+  {
+    name: "gupy",
+    run: fetchGupy,
+    timeoutMs: 20000, // 2 páginas HTML
+    cap: PORTAL_FETCH_LIMIT_DEEP,
+  },
   { name: "remotar", run: fetchRemotar, timeoutMs: 12000 },
   { name: "infojobs", run: fetchInfoJobs, timeoutMs: 12000 },
   { name: "catho", run: fetchCatho, timeoutMs: 22000 },
@@ -63,7 +73,12 @@ const FETCHERS: Fetcher[] = [
     requiresScrapingBee: true,
     beeCredits: BEE_PREMIUM_JS_CREDITS,
   },
-  { name: "google_vagas", run: fetchGoogleDashboard, timeoutMs: 55000 },
+  {
+    name: "google_vagas",
+    run: fetchGoogleDashboard,
+    timeoutMs: 70000, // depth 40 + poll
+    cap: PORTAL_FETCH_LIMIT_DEEP,
+  },
 ];
 
 function asPortalResult(
@@ -125,7 +140,8 @@ async function runOne(
     const { jobs: all, available } = asPortalResult(raw);
     // Português em todos os portais (principalmente corta inglês do LinkedIn/Remotar).
     const { kept: ptJobs, dropped: droppedEn } = filterPortugueseJobs(all);
-    const jobs = ptJobs.slice(0, PORTAL_FETCH_LIMIT);
+    const cap = fetcher.cap ?? PORTAL_FETCH_LIMIT;
+    const jobs = ptJobs.slice(0, cap);
     const cost_usd =
       jobs.length > 0 && fetcher.beeCredits
         ? beeCreditUsd(fetcher.beeCredits)

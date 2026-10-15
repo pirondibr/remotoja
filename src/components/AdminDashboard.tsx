@@ -422,8 +422,11 @@ export function AdminDashboard() {
                                     <th className="py-1.5 pr-3 font-semibold">
                                       No portal
                                     </th>
-                                    <th className="py-1.5 pr-3 font-semibold">
-                                      Cap 20
+                                    <th
+                                      className="py-1.5 pr-3 font-semibold"
+                                      title="Vagas ingeridas após filtro PT (cap 20; Gupy/Google até 30)"
+                                    >
+                                      Cap
                                     </th>
                                     <th className="py-1.5 pr-3 font-semibold">
                                       Exato
