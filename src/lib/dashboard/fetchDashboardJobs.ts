@@ -10,6 +10,7 @@ import {
   buildScrapeReport,
   tagJobsWithMatch,
 } from "@/lib/dashboard/scrapeReport";
+import { classifyCargoWithLlm } from "@/lib/dashboard/llmJobAnalysis";
 import { validateRemoteJobs } from "@/lib/dashboard/validateRemoteJobs";
 import type {
   DashboardJobsPayload,
@@ -156,28 +157,24 @@ export async function fetchDashboardJobs(
     }
   }
 
-  // Dedupe + classifica cargo (exato / relacionado / fora)
-  const allTagged = tagJobsWithMatch(dedupeJobs(merged), term);
-
-  // Feed do membro: só cargo exato ou relacionado (fora fica só no relatório)
-  const relevant = rankJobsForFeed(
-    allTagged.filter(
-      (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
-    ),
-    term
-  );
-
-  const scrapeBase = {
-    foundByPortal,
-    availableByPortal,
-    errorsByPortal,
-    allJobs: allTagged,
-    keptJobs: relevant,
-  };
+  // Dedupe + classifica cargo (regras). Na análise admin, LLM barato refina.
+  let allTagged = tagJobsWithMatch(dedupeJobs(merged), term);
 
   // Rotina do usuário: só agrega portais. Validação remoto/link é opt-in (admin).
   if (!options.validate) {
-    const scrape_report = buildScrapeReport(scrapeBase);
+    const relevant = rankJobsForFeed(
+      allTagged.filter(
+        (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
+      ),
+      term
+    );
+    const scrape_report = buildScrapeReport({
+      foundByPortal,
+      availableByPortal,
+      errorsByPortal,
+      allJobs: allTagged,
+      keptJobs: relevant,
+    });
     sources._scrape_report = scrape_report;
     return {
       role: term,
@@ -189,12 +186,32 @@ export async function fetchDashboardJobs(
     };
   }
 
+  const cargoLlm = await classifyCargoWithLlm(term, allTagged);
+  allTagged = cargoLlm.jobs;
+  if (cargoLlm.usedLlm) sources._cargo_llm = true;
+  if (cargoLlm.error) sources._cargo_llm_error = cargoLlm.error;
+
+  const relevant = rankJobsForFeed(
+    allTagged.filter(
+      (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
+    ),
+    term
+  );
+
   const { jobs, validation } = await validateRemoteJobs(relevant);
   const ranked = rankJobsForFeed(jobs, term);
-  const scrape_report = buildScrapeReport({
-    ...scrapeBase,
-    validation,
-  });
+  const scrape_report = {
+    ...buildScrapeReport({
+      foundByPortal,
+      availableByPortal,
+      errorsByPortal,
+      allJobs: allTagged,
+      keptJobs: relevant,
+      validation,
+    }),
+    cargo_llm: Boolean(cargoLlm.usedLlm),
+    cargo_llm_error: cargoLlm.error || null,
+  };
   sources._scrape_report = scrape_report;
   sources._validation = validation;
 

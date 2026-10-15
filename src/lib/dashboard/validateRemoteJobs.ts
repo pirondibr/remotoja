@@ -1,6 +1,8 @@
 import { fetchHtml, UA } from "@/lib/dashboard/common";
 import { assessRemotePage } from "@/lib/dashboard/assessRemotePage";
+import { assessRemoteWithLlm } from "@/lib/dashboard/llmJobAnalysis";
 import { extractJobDetailsFromText } from "@/lib/dashboard/extractJobDetails";
+import { hasOpenRouter } from "@/lib/openrouter";
 import type {
   DashboardJob,
   ValidationItem,
@@ -73,6 +75,7 @@ async function mapPool<T, R>(
  * - Top 10: double-check rigoroso (foco UI).
  * - Top 11–50: também valida remoto/link; se passar → status validated (conta em Válidas).
  * - Demais: passam sem fetch (skipped).
+ * - Com OPENROUTER_API_KEY: modalidade remota via LLM barato (regex só como fallback).
  */
 export async function validateRemoteJobs(
   jobs: DashboardJob[],
@@ -82,53 +85,95 @@ export async function validateRemoteJobs(
   const toFetch = jobs.slice(0, Math.max(validateLimit, enrichLimit));
   const untouched = jobs.slice(toFetch.length);
 
-  const fetched = await mapPool(
+  type ProbeRow = {
+    job: DashboardJob;
+    index: number;
+    mustValidate: boolean;
+    url: string;
+    probe: { ok: boolean; text: string; reason?: string } | null;
+  };
+
+  const probed = await mapPool(
     toFetch,
     CONCURRENCY,
-    async (
-      job,
-      index
-    ): Promise<{ job: DashboardJob | null; item: ValidationItem }> => {
-      const mustValidate = index < validateLimit;
+    async (job, index): Promise<ProbeRow> => {
       const url = (job.source_url || "").trim();
+      const mustValidate = index < validateLimit;
+      if (!url) {
+        return {
+          job,
+          index,
+          mustValidate,
+          url: "",
+          probe: { ok: false, text: "", reason: "sem URL" },
+        };
+      }
+      const probe = await probeUrl(url);
+      return { job, index, mustValidate, url, probe };
+    }
+  );
+
+  const llmCandidates: Array<{ job: DashboardJob; pageHtml: string }> = [];
+  const llmIndexByProbe: number[] = [];
+  for (let i = 0; i < probed.length; i++) {
+    const row = probed[i];
+    if (row.probe?.ok && row.probe.text) {
+      llmIndexByProbe.push(i);
+      llmCandidates.push({ job: row.job, pageHtml: row.probe.text });
+    }
+  }
+
+  const llmMap =
+    hasOpenRouter() && llmCandidates.length > 0
+      ? await assessRemoteWithLlm(llmCandidates)
+      : null;
+
+  const fetched: Array<{ job: DashboardJob | null; item: ValidationItem }> =
+    probed.map((row) => {
       const base = {
-        title: job.title,
-        company: job.company,
-        source: job.source,
-        scrape: job.scrape || job.source,
-        match_tier: job.match_tier || null,
-        source_url: url || null,
+        title: row.job.title,
+        company: row.job.company,
+        source: row.job.source,
+        scrape: row.job.scrape || row.job.source,
+        match_tier: row.job.match_tier || null,
+        source_url: row.url || null,
       };
 
-      if (!url) {
-        if (mustValidate) {
+      if (!row.url) {
+        if (row.mustValidate) {
           return {
             job: null,
-            item: { ...base, status: "invalid_link", reason: "sem URL" },
+            item: { ...base, status: "invalid_link" as const, reason: "sem URL" },
           };
         }
         return {
-          job,
-          item: { ...base, status: "skipped", reason: "sem URL (enrich)" },
-        };
-      }
-
-      const probe = await probeUrl(url);
-      if (!probe.ok) {
-        // Em enrich (11–50) também remove link quebrado
-        return {
-          job: null,
+          job: row.job,
           item: {
             ...base,
-            status: "invalid_link",
-            reason: probe.reason || "link não abriu",
+            status: "skipped" as const,
+            reason: "sem URL (enrich)",
           },
         };
       }
 
-      const assess = assessRemotePage(job, probe.text);
+      if (!row.probe?.ok) {
+        return {
+          job: null,
+          item: {
+            ...base,
+            status: "invalid_link" as const,
+            reason: row.probe?.reason || "link não abriu",
+          },
+        };
+      }
+
+      const llmPos = llmIndexByProbe.indexOf(row.index);
+      const llmAssess =
+        llmMap && llmPos >= 0 ? llmMap.get(llmPos) : undefined;
+      const assess =
+        llmAssess || assessRemotePage(row.job, row.probe.text);
+
       if (!assess.ok) {
-        // Soft-404 / híbrido / sem remoto: remove sempre que baixamos a página
         return {
           job: null,
           item: {
@@ -140,22 +185,19 @@ export async function validateRemoteJobs(
       }
 
       const enriched = withDetails(
-        { ...job, remote: true },
-        probe.text
+        { ...row.job, remote: true },
+        row.probe.text
       );
 
-      // Qualquer vaga que passou no double-check de remoto conta como validada
-      // (antes só o top 10 recebia "validated" → portais como Catho ficavam com 0 válidas).
       return {
         job: enriched,
         item: {
           ...base,
-          status: "validated",
+          status: "validated" as const,
           reason: assess.reason,
         },
       };
-    }
-  );
+    });
 
   const kept: DashboardJob[] = [];
   const items: ValidationItem[] = [];
@@ -188,6 +230,8 @@ export async function validateRemoteJobs(
       title: job.title,
       company: job.company,
       source: job.source,
+      scrape: job.scrape || job.source,
+      match_tier: job.match_tier || null,
       source_url: job.source_url || null,
       status: "skipped",
       reason: `fora do top ${enrichLimit}`,

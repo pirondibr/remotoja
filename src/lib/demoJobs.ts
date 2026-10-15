@@ -24,6 +24,8 @@ export type DemoJob = {
   from_remote_filter?: boolean;
   /** Alinhamento com o cargo pesquisado (feed pago / admin). */
   match_tier?: "exato" | "relacionado" | "fora" | null;
+  /** Motivo curto da classificação de cargo (ex.: LLM). */
+  match_reason?: string | null;
 };
 
 export type DemoJobsPayload = {

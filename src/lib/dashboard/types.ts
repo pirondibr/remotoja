@@ -95,6 +95,9 @@ export type ScrapeReport = {
   summary: ScrapeSummary;
   portals: PortalScrapeStat[];
   updated_at: string;
+  /** Análise de cargo usou OpenRouter (admin). */
+  cargo_llm?: boolean;
+  cargo_llm_error?: string | null;
 };
 
 export type DashboardJobsPayload = {

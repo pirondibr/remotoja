@@ -511,6 +511,11 @@ export function JobsDashboard() {
                 </p>
                 <p className="mt-1 text-[11px] text-moss/55">
                   Clique no portal para revisar as vagas puxadas e as tags.
+                  {scrapeReport.cargo_llm
+                    ? " · Cargo/remoto via OpenRouter (LLM barato)."
+                    : scrapeReport.cargo_llm_error
+                      ? ` · LLM indisponível: ${scrapeReport.cargo_llm_error}`
+                      : ""}
                 </p>
                 <table className="mt-3 min-w-full text-left text-xs">
                   <thead className="text-moss/55 uppercase tracking-wide">
@@ -792,9 +797,15 @@ export function JobsDashboard() {
                             <p className="mt-0.5 text-sm text-moss/70">
                               {job.company}
                             </p>
-                            {assessed?.reason && (
+                            {(assessed?.reason || job.match_reason) && (
                               <p className="mt-2 text-sm text-moss/80">
-                                Motivo: {assessed.reason}
+                                {assessed?.reason
+                                  ? `Motivo: ${assessed.reason}`
+                                  : null}
+                                {assessed?.reason && job.match_reason
+                                  ? " · "
+                                  : null}
+                                {job.match_reason || null}
                               </p>
                             )}
                             <div className="mt-3 flex flex-wrap gap-2">
