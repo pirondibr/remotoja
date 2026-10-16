@@ -87,6 +87,7 @@ const ANALYZE_SOURCE_KEYS = [
   "_analyze_at",
   "_pulled_jobs",
   "_scrape_report",
+  // `_validated_feed` fica: feed do membro já é só válidas
 ] as const;
 
 /** Remove só o relatório de análise; mantém o feed do membro/demo. */

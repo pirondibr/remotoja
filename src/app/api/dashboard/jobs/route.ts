@@ -25,7 +25,7 @@ function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
   return rankJobsForFeed(filtered, role) as DemoJob[];
 }
 
-/** Análise com scrapers + LLM + até 2 stealth Bee; 60s estourava. */
+/** Scrape + LLM cargo + validate remoto; 60s estourava. */
 export const maxDuration = 120;
 
 function extractValidation(
@@ -52,6 +52,14 @@ function extractPulledJobs(
   return raw as DemoJob[];
 }
 
+function hasValidatedFeed(
+  sources: Record<string, number | string | object> | null | undefined
+): boolean {
+  if (!sources) return false;
+  if (sources._validated_feed === 1) return true;
+  return Boolean(extractValidation(sources));
+}
+
 function sourcesPlainCounts(
   sources: Record<string, number | string | object> | null | undefined
 ): Record<string, number | string> {
@@ -66,6 +74,25 @@ function sourcesPlainCounts(
   return out;
 }
 
+function buildAnalyzeSources(
+  existing: Record<string, number | string | object> | null | undefined,
+  payload: Awaited<ReturnType<typeof fetchDashboardJobs>>
+): Record<string, number | string | object> {
+  const analyzeAt = new Date().toISOString();
+  return {
+    ...sourcesPlainCounts(existing),
+    ...sourcesPlainCounts(payload.sources),
+    ...(payload.scrape_report
+      ? { _scrape_report: payload.scrape_report }
+      : {}),
+    ...(payload.validation ? { _validation: payload.validation } : {}),
+    _analyze_jobs: payload.jobs,
+    ...(payload.pulled_jobs ? { _pulled_jobs: payload.pulled_jobs } : {}),
+    _analyze_at: analyzeAt,
+    _validated_feed: 1,
+  };
+}
+
 export async function GET(request: Request) {
   if (isAccessGateEnabled() && !(await hasMemberAccess())) {
     return NextResponse.json(
@@ -77,8 +104,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const bypassCache = searchParams.get("fresh") === "1";
-  /** Double-check remoto/link: só sob demanda (admin análise). */
-  const validate = searchParams.get("validate") === "1";
+  /**
+   * Admin analyze explícito (logs). Feed pago também valida — ver `runValidate`.
+   */
+  const analyzeFlag = searchParams.get("validate") === "1";
   /** Admin: só o que o usuário viu — não refaz scrapers. */
   const cacheOnly = searchParams.get("cache_only") === "1";
   /** Admin: demo = funil; paid = membro (default). */
@@ -89,6 +118,8 @@ export async function GET(request: Request) {
   ).toLowerCase();
   const cacheKind: CacheKind = scriptRaw === "demo" ? "demo" : "paid";
   const cacheLabel = cacheKind === "demo" ? "demo" : "pago";
+  /** Pago sempre valida; demo live só se admin pediu analyze. */
+  const runValidate = cacheKind === "paid" || analyzeFlag;
 
   if (role.length < 2) {
     return NextResponse.json(
@@ -97,41 +128,51 @@ export async function GET(request: Request) {
     );
   }
 
-  // Análise salva: validate sem fresh → devolve cache (compartilhável).
-  if (validate && !bypassCache && hasDatabase()) {
+  // Feed validado / análise em cache (sem fresh).
+  if (runValidate && !bypassCache && hasDatabase()) {
     try {
       const cached = await getCachedJobs(cacheKind, role);
-      const validation = extractValidation(cached?.sources);
-      if (cached && validation) {
-        const analyzeJobs = extractAnalyzeJobs(cached.sources);
-        const jobs =
-          analyzeJobs ?? filterByRole(cached.jobs as DemoJob[], role);
-        const pulled_jobs = extractPulledJobs(cached.sources) ?? undefined;
-        return NextResponse.json({
-          role,
-          count: jobs.length,
-          jobs,
-          ...(pulled_jobs ? { pulled_jobs } : {}),
-          fetched_via: "cache_analyze",
-          sources: sourcesPlainCounts(cached.sources),
-          validation,
-          scrape_report: extractScrapeReport(cached.sources),
-          cached: true,
-          script: cacheKind,
-          cache_updated_at: cached.updated_at,
-          analyze_at:
-            typeof cached.sources?._analyze_at === "string"
-              ? cached.sources._analyze_at
-              : cached.updated_at,
-        });
+      if (
+        cached &&
+        cached.jobs.length > 0 &&
+        hasValidatedFeed(cached.sources)
+      ) {
+        const validation = extractValidation(cached.sources);
+        // Admin analyze precisa do relatório; sem ele, reanalisa.
+        if (!analyzeFlag || validation) {
+          const analyzeJobs = extractAnalyzeJobs(cached.sources);
+          const jobs =
+            analyzeJobs ??
+            (cacheKind === "demo"
+              ? (cached.jobs as DemoJob[])
+              : filterByRole(cached.jobs as DemoJob[], role));
+          const pulled_jobs = extractPulledJobs(cached.sources) ?? undefined;
+          return NextResponse.json({
+            role,
+            count: jobs.length,
+            jobs,
+            ...(pulled_jobs ? { pulled_jobs } : {}),
+            fetched_via: analyzeFlag ? "cache_analyze" : "cache_paid_validated",
+            sources: sourcesPlainCounts(cached.sources),
+            validation: validation ?? null,
+            scrape_report: extractScrapeReport(cached.sources),
+            cached: true,
+            script: cacheKind,
+            cache_updated_at: cached.updated_at,
+            analyze_at:
+              typeof cached.sources?._analyze_at === "string"
+                ? cached.sources._analyze_at
+                : cached.updated_at,
+          });
+        }
       }
     } catch {
-      // segue para análise live
+      // segue para live
     }
   }
 
-  // Cache do membro/demo (sem validate) ou admin cache_only.
-  if ((!bypassCache && !validate) || cacheOnly) {
+  // Cache do demo (sem validate) ou admin cache_only.
+  if (cacheOnly || (!bypassCache && !runValidate)) {
     if (hasDatabase()) {
       try {
         const cached = await getCachedJobs(cacheKind, role);
@@ -151,6 +192,9 @@ export async function GET(request: Request) {
               sources: sourcesPlainCounts(cached.sources),
               validation: extractValidation(cached.sources),
               scrape_report: extractScrapeReport(cached.sources),
+              ...(extractPulledJobs(cached.sources)
+                ? { pulled_jobs: extractPulledJobs(cached.sources) }
+                : {}),
               cached: true,
               script: cacheKind,
               cache_updated_at: cached.updated_at,
@@ -198,43 +242,29 @@ export async function GET(request: Request) {
   }
 
   try {
-    const payload = await fetchDashboardJobs(role, { validate });
+    const payload = await fetchDashboardJobs(role, { validate: runValidate });
 
     try {
-      if (!validate && payload.jobs.length > 0) {
-        // Feed do membro + métricas de scrape
-        await setCachedJobs({
-          kind: cacheKind,
-          role,
-          jobs: payload.jobs,
-          fetched_via: payload.fetched_via,
-          sources: payload.sources,
-        });
-      } else if (validate) {
-        // Análise: grava relatório + jobs analisados; não troca o feed do membro
+      if (payload.jobs.length > 0 || payload.validation) {
         const existing = await getCachedJobs(cacheKind, role);
-        const analyzeAt = new Date().toISOString();
-        await setCachedJobs({
-          kind: cacheKind,
-          role,
-          jobs: existing?.jobs?.length ? existing.jobs : payload.jobs,
-          fetched_via: existing?.fetched_via || payload.fetched_via,
-          sources: {
-            ...sourcesPlainCounts(existing?.sources),
-            ...sourcesPlainCounts(payload.sources),
-            ...(payload.scrape_report
-              ? { _scrape_report: payload.scrape_report }
-              : {}),
-            ...(payload.validation
-              ? { _validation: payload.validation }
-              : {}),
-            _analyze_jobs: payload.jobs,
-            ...(payload.pulled_jobs
-              ? { _pulled_jobs: payload.pulled_jobs }
-              : {}),
-            _analyze_at: analyzeAt,
-          },
-        });
+        if (runValidate) {
+          // Feed = só válidas + logs completos para o admin acompanhar
+          await setCachedJobs({
+            kind: cacheKind,
+            role,
+            jobs: payload.jobs,
+            fetched_via: payload.fetched_via,
+            sources: buildAnalyzeSources(existing?.sources, payload),
+          });
+        } else {
+          await setCachedJobs({
+            kind: cacheKind,
+            role,
+            jobs: payload.jobs,
+            fetched_via: payload.fetched_via,
+            sources: payload.sources,
+          });
+        }
       }
     } catch {
       // ignore cache write

@@ -30,7 +30,10 @@ import type {
 } from "@/lib/dashboard/types";
 
 export type FetchDashboardOptions = {
-  /** Só para inspeção admin — não roda no fluxo do membro. */
+  /**
+   * Double-check remoto/link + LLM cargo.
+   * Default true (feed pago só com válidas). Admin usa o mesmo pipeline e lê os logs.
+   */
   validate?: boolean;
 };
 
@@ -173,7 +176,8 @@ export async function fetchDashboardJobs(
   options: FetchDashboardOptions = {}
 ): Promise<DashboardJobsPayload> {
   const term = role.trim();
-  const log = options.validate ? new AnalysisLogBuilder() : null;
+  const validate = options.validate !== false;
+  const log = validate ? new AnalysisLogBuilder() : null;
 
   const scrapeStarted = Date.now();
   const results = await Promise.all(FETCHERS.map((f) => runOne(f, term)));
@@ -265,7 +269,7 @@ export async function fetchDashboardJobs(
 
   let allTagged = tagJobsWithMatch(dedupeJobs(merged), term);
 
-  if (!options.validate) {
+  if (!validate || !log) {
     const relevant = rankJobsForFeed(
       allTagged.filter(
         (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
@@ -290,7 +294,7 @@ export async function fetchDashboardJobs(
     };
   }
 
-  const cargoLlm = await log!.timed(
+  const cargoLlm = await log.timed(
     "llm_cargo",
     "LLM cargo (OpenRouter)",
     () => classifyCargoWithLlm(term, allTagged),
@@ -320,17 +324,18 @@ export async function fetchDashboardJobs(
   );
 
   const { jobs, validation, stats } = await validateRemoteJobs(relevant);
-  for (const step of stats.steps) log!.add(step);
+  for (const step of stats.steps) log.add(step);
 
+  // Feed = só válidas (validateRemoteJobs já filtra)
   const ranked = rankJobsForFeed(jobs, term);
-  const analysis_log = log!.build();
+  const analysis_log = log.build();
   const scrape_report = {
     ...buildScrapeReport({
       foundByPortal,
       availableByPortal,
       errorsByPortal,
       allJobs: allTagged,
-      keptJobs: relevant,
+      keptJobs: ranked,
       validation,
     }),
     cargo_llm: Boolean(cargoLlm.usedLlm),
@@ -339,6 +344,7 @@ export async function fetchDashboardJobs(
   };
   sources._scrape_report = scrape_report;
   sources._validation = validation;
+  sources._validated_feed = 1;
 
   return {
     role: term,

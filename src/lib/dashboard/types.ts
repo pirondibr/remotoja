@@ -134,7 +134,7 @@ export type DashboardJobsPayload = {
   jobs: DashboardJob[];
   /**
    * Todas as vagas ingeridas (cap por portal), com match_tier — inclusive "fora".
-   * Só no fluxo de análise admin, para revisão manual por portal.
+   * Gerado no pipeline validado (pago + admin); a UI de logs fica no admin.
    */
   pulled_jobs?: DashboardJob[];
   fetched_via: "dashboard_multi";

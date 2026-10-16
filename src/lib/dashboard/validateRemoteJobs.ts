@@ -138,7 +138,7 @@ async function mapPool<T, R>(
 /**
  * - Top 10: double-check rigoroso (foco UI).
  * - Top 11–50: também valida remoto/link; se passar → status validated (conta em Válidas).
- * - Demais: passam sem fetch (skipped).
+ * - Demais: skipped (não entram no feed — só válidas retornam em `jobs`).
  * - Com OPENROUTER_API_KEY: modalidade remota via LLM barato (regex só como fallback).
  */
 export async function validateRemoteJobs(
@@ -146,6 +146,7 @@ export async function validateRemoteJobs(
   validateLimit = VALIDATE_LIMIT,
   enrichLimit = ENRICH_LIMIT
 ): Promise<{
+  /** Somente status `validated` — feed do membro e aba feed. */
   jobs: DashboardJob[];
   validation: ValidationReport;
   stats: ValidateRemoteStats;
@@ -386,11 +387,10 @@ export async function validateRemoteJobs(
       invalidLinks += 1;
     } else {
       skipped += 1;
-      if (result.job) kept.push(result.job);
+      // skipped não entra no feed — só válidas
     }
   }
 
-  kept.push(...untouched);
   for (const job of untouched) {
     items.push({
       title: job.title,

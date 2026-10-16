@@ -933,12 +933,14 @@ export function JobsDashboard() {
                 ? "Agregando portais e rodando double-check (admin)…"
                 : adminMode === "cache"
                   ? "Carregando cache pago…"
-                  : "Procurando vagas em diversos portais…"}
+                  : "Buscando vagas e validando links remotos…"}
             </p>
             <p className="mt-2 text-sm text-moss/60">
               {adminMode === "cache"
                 ? "Leitura rápida do que o usuário já viu"
-                : "Isso pode levar alguns segundos"}
+                : adminMode === "analyze"
+                  ? "Isso pode levar cerca de um minuto"
+                  : "Só entram vagas válidas — pode levar cerca de um minuto na 1ª busca"}
             </p>
           </div>
         )}
