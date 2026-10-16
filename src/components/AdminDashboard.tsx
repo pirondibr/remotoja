@@ -22,7 +22,10 @@ type SearchRow = {
   jobs_preview: JobPreview[];
 };
 
-type PaidFeed = {
+type FeedKind = "demo" | "paid";
+
+type CacheFeed = {
+  kind: FeedKind;
   role: string;
   jobs_count: number;
   sources: Record<string, number | string>;
@@ -64,7 +67,9 @@ type SearchesPayload = {
   rows: SearchRow[];
   total: number;
   cache: { demo: number; paid: number };
-  paid_feeds?: PaidFeed[];
+  feeds?: CacheFeed[];
+  /** compat */
+  paid_feeds?: CacheFeed[];
   warning?: string;
   error?: string;
 };
@@ -90,7 +95,8 @@ export function AdminDashboard() {
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [expandedFeed, setExpandedFeed] = useState<string | null>(null);
-  const [paidRole, setPaidRole] = useState("SEO");
+  const [inspectRole, setInspectRole] = useState("SEO");
+  const [inspectScript, setInspectScript] = useState<FeedKind>("paid");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,16 +153,23 @@ export function AdminDashboard() {
     await load();
   }
 
-  function openPaidFeed(mode: FeedMode) {
-    const role = paidRole.trim();
+  function openFeed(mode: FeedMode, kind: FeedKind = inspectScript) {
+    const role = inspectRole.trim();
     if (role.length < 2) return;
-    window.location.href = feedHref(role, mode);
+    window.location.href = feedHref(role, mode, kind);
   }
 
-  function feedHref(role: string, mode: FeedMode) {
-    const q = new URLSearchParams({ role, mode });
+  function feedHref(role: string, mode: FeedMode, kind: FeedKind = "paid") {
+    const q = new URLSearchParams({ role, mode, script: kind });
     return `/api/admin/open-feed?${q}`;
   }
+
+  const feeds: CacheFeed[] =
+    data?.feeds ||
+    (data?.paid_feeds || []).map((f) => ({
+      ...f,
+      kind: (f.kind || "paid") as FeedKind,
+    }));
 
   if (loading && !data) {
     return (
@@ -216,60 +229,71 @@ export function AdminDashboard() {
         </p>
       )}
 
-      {/* PAID FEED ACCESS */}
+      {/* FEEDS DEMO + PAGO */}
       <section className="mt-8 rounded-2xl border border-moss/10 bg-white p-5">
         <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-ink">
-          Feed pago (inspeção)
+          Feeds (demo / pago)
         </h2>
         <p className="mt-1 text-sm text-moss/70">
-          <strong>Cache</strong> = feed do membro. <strong>Ver análise</strong>{" "}
-          = relatório salvo (compartilhável, sem refazer).{" "}
-          <strong>Reanalisar</strong> = força scrape + double-check (não
-          compartilhe esse link — tem <code className="text-xs">fresh=1</code>
-          ).
+          Consultas em cache do funil <strong>demo</strong> e do script{" "}
+          <strong>pago</strong>. <strong>Cache</strong> = o que foi mostrado.{" "}
+          <strong>Análise</strong> = scrape + double-check (mesmas métricas nos
+          dois). <strong>Reanalisar</strong> tem{" "}
+          <code className="text-xs">fresh=1</code> — não compartilhe.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <select
+            value={inspectScript}
+            onChange={(e) =>
+              setInspectScript(e.target.value === "demo" ? "demo" : "paid")
+            }
+            className="rounded-xl border border-moss/15 bg-cream/50 px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:border-moss/40"
+          >
+            <option value="paid">Pago</option>
+            <option value="demo">Demo</option>
+          </select>
           <input
-            value={paidRole}
-            onChange={(e) => setPaidRole(e.target.value)}
+            value={inspectRole}
+            onChange={(e) => setInspectRole(e.target.value)}
             placeholder="Cargo, ex.: gestor de trafego"
             className="flex-1 rounded-xl border border-moss/15 bg-cream/50 px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
           <button
             type="button"
-            onClick={() => openPaidFeed("cache")}
+            onClick={() => openFeed("cache")}
             className="rounded-xl border border-moss/20 bg-white px-4 py-2.5 text-sm font-bold text-ink hover:border-moss/40"
           >
             Ver cache
           </button>
           <button
             type="button"
-            onClick={() => openPaidFeed("analyze")}
+            onClick={() => openFeed("analyze")}
             className="rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-cream hover:bg-forest"
           >
             Ver análise
           </button>
           <button
             type="button"
-            onClick={() => openPaidFeed("analyze_fresh")}
+            onClick={() => openFeed("analyze_fresh")}
             className="rounded-xl border border-moss/20 bg-white px-4 py-2.5 text-sm font-bold text-forest hover:border-forest/40"
           >
             Reanalisar
           </button>
           <button
             type="button"
-            onClick={() => openPaidFeed("clear_analyze")}
+            onClick={() => openFeed("clear_analyze")}
             className="rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900 hover:border-amber-400"
           >
             Limpar análise
           </button>
         </div>
 
-        {(data?.paid_feeds || []).length > 0 && (
+        {feeds.length > 0 && (
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-moss/10 text-xs uppercase tracking-wide text-moss/60">
                 <tr>
+                  <th className="py-2 pr-3 font-semibold">Demo/Pago</th>
                   <th className="py-2 pr-3 font-semibold">Cargo</th>
                   <th className="py-2 pr-3 font-semibold">No feed</th>
                   <th className="py-2 pr-3 font-semibold">Scrape</th>
@@ -278,24 +302,36 @@ export function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {(data?.paid_feeds || []).map((feed) => {
+                {feeds.map((feed) => {
                   const portals = feed.scrape_report?.portals || [];
                   const summary = feed.scrape_report?.summary;
                   const fps = portals.reduce(
                     (s, p) => s + (p.false_positives || 0),
                     0
                   );
-                  const open = expandedFeed === feed.role;
+                  const feedKey = `${feed.kind}:${feed.role}`;
+                  const open = expandedFeed === feedKey;
                   return (
-                    <Fragment key={feed.role}>
+                    <Fragment key={feedKey}>
                       <tr
                         className="cursor-pointer border-b border-moss/5 hover:bg-cream/40"
                         onClick={() =>
                           setExpandedFeed((r) =>
-                            r === feed.role ? null : feed.role
+                            r === feedKey ? null : feedKey
                           )
                         }
                       >
+                        <td className="py-2.5 pr-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                              feed.kind === "demo"
+                                ? "bg-sand text-moss"
+                                : "bg-forest/15 text-forest"
+                            }`}
+                          >
+                            {feed.kind === "demo" ? "Demo" : "Pago"}
+                          </span>
+                        </td>
                         <td className="py-2.5 pr-3 font-medium">{feed.role}</td>
                         <td className="py-2.5 pr-3">{feed.jobs_count}</td>
                         <td className="py-2.5 pr-3 text-xs text-moss/70">
@@ -316,26 +352,34 @@ export function AdminDashboard() {
                         >
                           <div className="flex flex-wrap justify-end gap-3">
                             <Link
-                              href={feedHref(feed.role, "cache")}
+                              href={feedHref(feed.role, "cache", feed.kind)}
                               className="text-xs font-semibold text-moss hover:underline"
                             >
                               Cache
                             </Link>
                             <Link
-                              href={feedHref(feed.role, "analyze")}
+                              href={feedHref(feed.role, "analyze", feed.kind)}
                               className="text-xs font-semibold text-forest hover:underline"
                             >
                               Análise
                               {feed.validation ? " ✓" : ""}
                             </Link>
                             <Link
-                              href={feedHref(feed.role, "analyze_fresh")}
+                              href={feedHref(
+                                feed.role,
+                                "analyze_fresh",
+                                feed.kind
+                              )}
                               className="text-xs font-semibold text-ink hover:underline"
                             >
                               Reanalisar
                             </Link>
                             <Link
-                              href={feedHref(feed.role, "clear_analyze")}
+                              href={feedHref(
+                                feed.role,
+                                "clear_analyze",
+                                feed.kind
+                              )}
                               className="text-xs font-semibold text-amber-800 hover:underline"
                             >
                               Limpar análise
@@ -345,7 +389,7 @@ export function AdminDashboard() {
                       </tr>
                       {open && (
                         <tr className="border-b border-moss/10 bg-cream/50">
-                          <td colSpan={5} className="px-3 py-3">
+                          <td colSpan={6} className="px-3 py-3">
                             {summary && (
                               <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                                 <div className="rounded-xl bg-white px-3 py-2">
@@ -596,16 +640,22 @@ export function AdminDashboard() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Link
-                            href={feedHref(row.role, "cache")}
+                            href={feedHref(row.role, "cache", "demo")}
                             className="text-xs font-semibold text-moss hover:underline"
                           >
-                            Ver cache →
+                            Ver cache demo →
                           </Link>
                           <Link
-                            href={feedHref(row.role, "analyze")}
+                            href={feedHref(row.role, "analyze", "demo")}
                             className="text-xs font-semibold text-forest hover:underline"
                           >
-                            Rodar análise →
+                            Análise demo →
+                          </Link>
+                          <Link
+                            href={feedHref(row.role, "analyze", "paid")}
+                            className="text-xs font-semibold text-ink hover:underline"
+                          >
+                            Análise pago →
                           </Link>
                         </div>
                       </div>

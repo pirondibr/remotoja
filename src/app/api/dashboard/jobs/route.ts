@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { hasMemberAccess, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
-import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
+import {
+  getCachedJobs,
+  setCachedJobs,
+  type CacheKind,
+} from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { rankJobsForFeed } from "@/lib/dashboard/common";
 import { classifyCargoMatch } from "@/lib/dashboard/jobMatch";
@@ -77,6 +81,14 @@ export async function GET(request: Request) {
   const validate = searchParams.get("validate") === "1";
   /** Admin: só o que o usuário viu — não refaz scrapers. */
   const cacheOnly = searchParams.get("cache_only") === "1";
+  /** Admin: demo = funil; paid = membro (default). */
+  const scriptRaw = (
+    searchParams.get("script") ||
+    searchParams.get("kind") ||
+    "paid"
+  ).toLowerCase();
+  const cacheKind: CacheKind = scriptRaw === "demo" ? "demo" : "paid";
+  const cacheLabel = cacheKind === "demo" ? "demo" : "pago";
 
   if (role.length < 2) {
     return NextResponse.json(
@@ -88,7 +100,7 @@ export async function GET(request: Request) {
   // Análise salva: validate sem fresh → devolve cache (compartilhável).
   if (validate && !bypassCache && hasDatabase()) {
     try {
-      const cached = await getCachedJobs("paid", role);
+      const cached = await getCachedJobs(cacheKind, role);
       const validation = extractValidation(cached?.sources);
       if (cached && validation) {
         const analyzeJobs = extractAnalyzeJobs(cached.sources);
@@ -105,6 +117,7 @@ export async function GET(request: Request) {
           validation,
           scrape_report: extractScrapeReport(cached.sources),
           cached: true,
+          script: cacheKind,
           cache_updated_at: cached.updated_at,
           analyze_at:
             typeof cached.sources?._analyze_at === "string"
@@ -117,25 +130,29 @@ export async function GET(request: Request) {
     }
   }
 
-  // Cache do membro (sem validate) ou admin cache_only.
+  // Cache do membro/demo (sem validate) ou admin cache_only.
   if ((!bypassCache && !validate) || cacheOnly) {
     if (hasDatabase()) {
       try {
-        const cached = await getCachedJobs("paid", role);
+        const cached = await getCachedJobs(cacheKind, role);
         if (cached && cached.jobs.length > 0) {
-          const jobs = filterByRole(cached.jobs as DemoJob[], role);
-          if (jobs.length === 0 && !cacheOnly) {
+          const jobs =
+            cacheKind === "demo"
+              ? (cached.jobs as DemoJob[])
+              : filterByRole(cached.jobs as DemoJob[], role);
+          if (jobs.length === 0 && !cacheOnly && cacheKind === "paid") {
             // Cache antigo misturado → força live (exceto cache_only)
           } else {
             return NextResponse.json({
               role,
               count: jobs.length,
               jobs,
-              fetched_via: cached.fetched_via || "cache_paid",
+              fetched_via: cached.fetched_via || `cache_${cacheKind}`,
               sources: sourcesPlainCounts(cached.sources),
               validation: extractValidation(cached.sources),
               scrape_report: extractScrapeReport(cached.sources),
               cached: true,
+              script: cacheKind,
               cache_updated_at: cached.updated_at,
             });
           }
@@ -145,10 +162,11 @@ export async function GET(request: Request) {
             role,
             count: 0,
             jobs: [],
-            fetched_via: "cache_paid",
+            fetched_via: `cache_${cacheKind}`,
             sources: {},
             cached: true,
-            error: "Sem cache pago para esse cargo ainda. O usuário ainda não gerou feed, ou o cache foi resetado.",
+            script: cacheKind,
+            error: `Sem cache ${cacheLabel} para esse cargo ainda. O usuário ainda não gerou feed, ou o cache foi resetado.`,
           });
         }
       } catch {
@@ -158,8 +176,9 @@ export async function GET(request: Request) {
               role,
               count: 0,
               jobs: [],
-              error: "Falha ao ler cache pago",
+              error: `Falha ao ler cache ${cacheLabel}`,
               cached: true,
+              script: cacheKind,
             },
             { status: 500 }
           );
@@ -173,6 +192,7 @@ export async function GET(request: Request) {
         jobs: [],
         error: "DATABASE_URL não configurada",
         cached: true,
+        script: cacheKind,
       });
     }
   }
@@ -184,7 +204,7 @@ export async function GET(request: Request) {
       if (!validate && payload.jobs.length > 0) {
         // Feed do membro + métricas de scrape
         await setCachedJobs({
-          kind: "paid",
+          kind: cacheKind,
           role,
           jobs: payload.jobs,
           fetched_via: payload.fetched_via,
@@ -192,10 +212,10 @@ export async function GET(request: Request) {
         });
       } else if (validate) {
         // Análise: grava relatório + jobs analisados; não troca o feed do membro
-        const existing = await getCachedJobs("paid", role);
+        const existing = await getCachedJobs(cacheKind, role);
         const analyzeAt = new Date().toISOString();
         await setCachedJobs({
-          kind: "paid",
+          kind: cacheKind,
           role,
           jobs: existing?.jobs?.length ? existing.jobs : payload.jobs,
           fetched_via: existing?.fetched_via || payload.fetched_via,
@@ -224,6 +244,7 @@ export async function GET(request: Request) {
       ...payload,
       sources: sourcesPlainCounts(payload.sources),
       cached: false,
+      script: cacheKind,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
@@ -236,6 +257,7 @@ export async function GET(request: Request) {
         sources: {},
         error: message,
         cached: false,
+        script: cacheKind,
       },
       { status: 500 }
     );

@@ -108,6 +108,11 @@ export function JobsDashboard() {
     searchParams.get("validate") === "1" || modeParam === "analyze";
   const forceFresh =
     searchParams.get("fresh") === "1" || modeParam === "analyze_fresh";
+  const scriptKind =
+    (searchParams.get("script") || searchParams.get("kind") || "paid").toLowerCase() ===
+    "demo"
+      ? "demo"
+      : "paid";
   const adminMode = inspect
     ? cacheOnly
       ? "cache"
@@ -177,6 +182,7 @@ export function JobsDashboard() {
 
       try {
         const params = new URLSearchParams({ role: trimmed });
+        if (inspect) params.set("script", scriptKind);
         if (cacheOnly) {
           params.set("cache_only", "1");
         } else if (analyze) {
@@ -256,7 +262,7 @@ export function JobsDashboard() {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [inspect, cacheOnly, analyze, forceFresh]
+    [inspect, cacheOnly, analyze, forceFresh, scriptKind]
   );
 
   useEffect(() => {
@@ -470,18 +476,23 @@ export function JobsDashboard() {
             </h1>
             <p className="mt-2 max-w-xl text-sm text-moss/70">
               {adminMode === "cache"
-                ? "Mesmo feed em cache que o membro vê — sem refazer scrapers."
+                ? scriptKind === "demo"
+                  ? "Cache do funil demo — sem refazer scrapers."
+                  : "Mesmo feed em cache que o membro vê — sem refazer scrapers."
                 : adminMode === "analyze"
                   ? forceFresh
                     ? "Reanálise ao vivo: scrape + double-check (salva ao terminar)."
                     : "Análise salva — reabre sem refazer scrapers. Use Reanalisar para atualizar."
                   : "Feed com as vagas que encontramos. Cada card mostra o portal de origem."}
             </p>
-            {inspect && fromCache && !loading && (
-              <p className="mt-1 text-xs font-medium text-forest">
-                {adminMode === "analyze"
-                  ? "Servindo análise em cache"
-                  : "Servindo do cache pago"}
+            {inspect && (
+              <p className="mt-1 text-xs font-semibold text-moss/70">
+                Script · {scriptKind === "demo" ? "Demo" : "Pago"}
+                {fromCache && !loading
+                  ? adminMode === "analyze"
+                    ? " · análise em cache"
+                    : " · cache"
+                  : ""}
               </p>
             )}
             {inspect && adminMode === "analyze" && !loading && (

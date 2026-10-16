@@ -85,14 +85,17 @@ const ANALYZE_SOURCE_KEYS = [
   "_validation",
   "_analyze_jobs",
   "_analyze_at",
+  "_pulled_jobs",
+  "_scrape_report",
 ] as const;
 
-/** Remove só o relatório de análise; mantém o feed pago do membro. */
+/** Remove só o relatório de análise; mantém o feed do membro/demo. */
 export async function clearAnalyzeCache(
-  role: string
+  role: string,
+  kind: CacheKind = "paid"
 ): Promise<{ cleared: boolean }> {
   if (!hasDatabase()) return { cleared: false };
-  const existing = await getCachedJobs("paid", role);
+  const existing = await getCachedJobs(kind, role);
   if (!existing) return { cleared: false };
 
   const sources = { ...(existing.sources || {}) };
@@ -106,7 +109,7 @@ export async function clearAnalyzeCache(
   if (!changed) return { cleared: false };
 
   await setCachedJobs({
-    kind: "paid",
+    kind,
     role,
     jobs: existing.jobs,
     fetched_via: existing.fetched_via,
@@ -135,35 +138,38 @@ export async function cacheStats(): Promise<{
   return out;
 }
 
-export async function listPaidCacheEntries(limit = 30): Promise<
-  Array<{
-    role_key: string;
-    jobs_count: number;
-    sources: Record<string, number | string | object> | null;
-    fetched_via: string | null;
-    updated_at: string;
-  }>
-> {
+export type CacheListEntry = {
+  kind: CacheKind;
+  role_key: string;
+  jobs_count: number;
+  sources: Record<string, number | string | object> | null;
+  fetched_via: string | null;
+  updated_at: string;
+};
+
+/** Lista caches demo + pago (mais recentes primeiro). */
+export async function listCacheEntries(limit = 50): Promise<CacheListEntry[]> {
   if (!hasDatabase()) return [];
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
     SELECT
+      kind,
       role_key,
       jsonb_array_length(jobs) AS jobs_count,
       sources,
       fetched_via,
       updated_at
     FROM job_cache
-    WHERE kind = 'paid'
+    WHERE kind IN ('demo', 'paid')
     ORDER BY updated_at DESC
     LIMIT ${limit}
   `;
-  return rows as unknown as Array<{
-    role_key: string;
-    jobs_count: number;
-    sources: Record<string, number | string | object> | null;
-    fetched_via: string | null;
-    updated_at: string;
-  }>;
+  return rows as unknown as CacheListEntry[];
+}
+
+/** @deprecated use listCacheEntries */
+export async function listPaidCacheEntries(limit = 30): Promise<CacheListEntry[]> {
+  const all = await listCacheEntries(limit * 2);
+  return all.filter((e) => e.kind === "paid").slice(0, limit);
 }

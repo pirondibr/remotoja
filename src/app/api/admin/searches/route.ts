@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { listLeadSearches } from "@/lib/leadLog";
-import { cacheStats, listPaidCacheEntries } from "@/lib/jobCache";
+import { cacheStats, listCacheEntries } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { originLabel } from "@/lib/attribution";
 import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
@@ -19,6 +19,7 @@ export async function GET(request: Request) {
         rows: [],
         total: 0,
         cache: { demo: 0, paid: 0 },
+        feeds: [],
         warning: "DATABASE_URL ausente",
       },
       { status: 200 }
@@ -30,13 +31,13 @@ export async function GET(request: Request) {
   const offset = Number(searchParams.get("offset") || 0);
 
   try {
-    const [{ rows, total }, cache, paidEntries] = await Promise.all([
+    const [{ rows, total }, cache, cacheEntries] = await Promise.all([
       listLeadSearches({ limit, offset }),
       cacheStats(),
-      listPaidCacheEntries(30),
+      listCacheEntries(60),
     ]);
 
-    const paid_feeds = paidEntries.map((entry) => {
+    const feeds = cacheEntries.map((entry) => {
       const sources = entry.sources || {};
       const validation = (
         typeof sources._validation === "object" && sources._validation
@@ -51,21 +52,25 @@ export async function GET(request: Request) {
           portalSources[key] = value;
         }
       }
+      const kind = entry.kind === "demo" ? "demo" : "paid";
       return {
+        kind,
         role: entry.role_key,
         jobs_count: Number(entry.jobs_count) || 0,
         sources: portalSources,
         validation,
         scrape_report,
         updated_at: entry.updated_at,
-        href: `/api/admin/open-feed?role=${encodeURIComponent(entry.role_key)}&mode=cache`,
+        href: `/api/admin/open-feed?role=${encodeURIComponent(entry.role_key)}&mode=cache&script=${kind}`,
       };
     });
 
     return NextResponse.json({
       total,
       cache,
-      paid_feeds,
+      feeds,
+      /** compat */
+      paid_feeds: feeds.filter((f) => f.kind === "paid"),
       rows: rows.map((row) => ({
         ...row,
         origin: originLabel(row),

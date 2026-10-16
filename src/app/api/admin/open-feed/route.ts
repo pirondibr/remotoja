@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { buildDemoToken, demoCookieOptions } from "@/lib/memberAuth";
-import { clearAnalyzeCache } from "@/lib/jobCache";
+import { clearAnalyzeCache, type CacheKind } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 
 /**
- * Libera cookie de inspeção e abre o feed pago.
+ * Libera cookie de inspeção e abre o feed (demo ou pago).
  *
  * Modes:
  *   ?mode=cache          → o que o usuário viu (só cache)
  *   ?mode=analyze        → análise salva (cache); se não houver, roda e salva
  *   ?mode=analyze_fresh  → força nova análise ao vivo e sobrescreve o cache
  *   ?mode=clear_analyze  → limpa só o cache da análise e volta ao admin
+ *   ?script=demo|paid    → qual cache usar (default paid)
  *
- * GET /api/admin/open-feed?role=seo&mode=cache
+ * GET /api/admin/open-feed?role=seo&mode=cache&script=demo
  */
 export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
@@ -22,6 +23,8 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const role = (url.searchParams.get("role") || "SEO").trim() || "SEO";
+  const scriptRaw = (url.searchParams.get("script") || "paid").toLowerCase();
+  const kind: CacheKind = scriptRaw === "demo" ? "demo" : "paid";
   const modeParam = (url.searchParams.get("mode") || "").toLowerCase();
   // Compat: validate=1 antigo = analyze
   const mode =
@@ -37,19 +40,20 @@ export async function GET(request: Request) {
   if (mode === "clear_analyze") {
     if (hasDatabase()) {
       try {
-        await clearAnalyzeCache(role);
+        await clearAnalyzeCache(role, kind);
       } catch {
         // ainda redireciona
       }
     }
     const admin = new URL("/admin", url.origin);
-    admin.searchParams.set("cleared_analyze", role);
+    admin.searchParams.set("cleared_analyze", `${kind}:${role}`);
     return NextResponse.redirect(admin);
   }
 
   const dest = new URL("/app", url.origin);
   dest.searchParams.set("role", role);
   dest.searchParams.set("inspect", "1");
+  dest.searchParams.set("script", kind);
 
   if (mode === "cache") {
     dest.searchParams.set("mode", "cache");
