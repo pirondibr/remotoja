@@ -7,10 +7,15 @@ import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
 import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { startCheckout } from "@/lib/startCheckout";
+import {
+  captureAttributionFromUrl,
+  loadAttribution,
+} from "@/lib/attribution";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
 
 const ROLE_STORAGE_KEY = "mvr_onboard_role";
+const ANSWERS_STORAGE_KEY = "mvr_funnel_answers";
 
 function postedLabel(job: DemoJob): string {
   return formatDemoJobAgo(job);
@@ -191,6 +196,10 @@ export function OnboardWizard() {
   }, [answers, draft, step, jobsLoading]);
 
   useEffect(() => {
+    captureAttributionFromUrl(searchParams);
+  }, [searchParams]);
+
+  useEffect(() => {
     if (step.kind !== "matches") return;
 
     const roleQuery =
@@ -202,6 +211,13 @@ export function OnboardWizard() {
       setJobsError("Informe um cargo para buscar vagas.");
       setJobsLoading(false);
       return;
+    }
+
+    try {
+      sessionStorage.setItem(ROLE_STORAGE_KEY, roleQuery);
+      sessionStorage.setItem(ANSWERS_STORAGE_KEY, JSON.stringify(answers));
+    } catch {
+      /* ignore */
     }
 
     const controller = new AbortController();
@@ -223,6 +239,21 @@ export function OnboardWizard() {
               `Não encontramos vagas remotas para “${roleQuery}” agora. Continue para o feed completo.`;
           setJobsError(friendly);
         }
+        // 1 registro por visita — mesmo se a API devolveu cache
+        const attr = loadAttribution() || {};
+        void fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: roleQuery,
+            channel: "demo",
+            jobs_shown: jobs.slice(0, 20),
+            cached: Boolean(data.cached),
+            answers,
+            ...attr,
+          }),
+          keepalive: true,
+        }).catch(() => {});
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
@@ -230,13 +261,27 @@ export function OnboardWizard() {
         setJobsError(
           "Não foi possível carregar a prévia agora. Continue para o feed completo.",
         );
+        const attr = loadAttribution() || {};
+        void fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: roleQuery,
+            channel: "demo",
+            jobs_shown: [],
+            cached: false,
+            answers,
+            ...attr,
+          }),
+          keepalive: true,
+        }).catch(() => {});
       })
       .finally(() => {
         if (!controller.signal.aborted) setJobsLoading(false);
       });
 
     return () => controller.abort();
-  }, [step.kind, answers.role, draft, prefillRole]);
+  }, [step.kind, answers, draft, prefillRole]);
 
   function toggleMulti(option: string) {
     const current = (answers[step.id] as string[] | undefined) ?? [];

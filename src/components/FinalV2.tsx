@@ -189,6 +189,13 @@ export function FinalV2() {
     cached: boolean
   ) {
     const attr = loadAttribution() || {};
+    let answers: Record<string, unknown> | null = null;
+    try {
+      const raw = sessionStorage.getItem("mvr_funnel_answers");
+      if (raw) answers = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      /* ignore */
+    }
     try {
       await fetch("/api/leads", {
         method: "POST",
@@ -198,6 +205,7 @@ export function FinalV2() {
           channel: "demo",
           jobs_shown: list.slice(0, 20),
           cached,
+          ...(answers ? { answers } : {}),
           ...attr,
         }),
         keepalive: true,

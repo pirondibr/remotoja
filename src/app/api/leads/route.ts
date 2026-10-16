@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { logLeadSearch } from "@/lib/leadLog";
+import { logLeadSearch, sanitizeFunnelAnswers } from "@/lib/leadLog";
 import { hasDatabase } from "@/lib/db";
 import type { DemoJob } from "@/lib/demoJobs";
 
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       jobs_shown,
       cached: Boolean(body.cached),
       user_agent: request.headers.get("user-agent"),
+      answers: sanitizeFunnelAnswers(body.answers),
     });
     return NextResponse.json({ ok: true, id: result?.id ?? null });
   } catch (error) {

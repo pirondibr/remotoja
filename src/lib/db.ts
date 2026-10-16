@@ -64,6 +64,11 @@ export async function ensureSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS lead_searches_created_at_idx
         ON lead_searches (created_at DESC)
       `;
+      // Respostas do formulário do funil (1 linha por visita, mesmo com cache)
+      await sql`
+        ALTER TABLE lead_searches
+        ADD COLUMN IF NOT EXISTS answers jsonb
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;

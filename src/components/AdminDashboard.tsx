@@ -8,6 +8,8 @@ import type { ScrapeReport } from "@/lib/dashboard/types";
 
 type JobPreview = { title: string; company: string; source?: string };
 
+type FormAnswer = { id: string; label: string; value: string };
+
 type SearchRow = {
   id: string;
   created_at: string;
@@ -20,6 +22,7 @@ type SearchRow = {
   jobs_count: number;
   cached: boolean;
   jobs_preview: JobPreview[];
+  form_answers?: FormAnswer[];
 };
 
 type FeedKind = "demo" | "paid";
@@ -593,6 +596,7 @@ export function AdminDashboard() {
               <th className="px-3 py-3 font-semibold">Quando</th>
               <th className="px-3 py-3 font-semibold">Origem</th>
               <th className="px-3 py-3 font-semibold">Cargo</th>
+              <th className="px-3 py-3 font-semibold">Formulário</th>
               <th className="px-3 py-3 font-semibold">Vagas</th>
               <th className="px-3 py-3 font-semibold">Cache</th>
               <th className="px-3 py-3 font-semibold">Campanha</th>
@@ -601,13 +605,20 @@ export function AdminDashboard() {
           <tbody>
             {(data?.rows || []).length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-moss/50">
+                <td colSpan={7} className="px-3 py-8 text-center text-moss/50">
                   Nenhuma pesquisa ainda. Abra o funil com UTMs (ex.:
                   ?utm_source=meta&role=SEO).
                 </td>
               </tr>
             )}
-            {(data?.rows || []).map((row) => (
+            {(data?.rows || []).map((row) => {
+              const form = row.form_answers || [];
+              const formShort = form
+                .filter((a) => a.id !== "role")
+                .slice(0, 2)
+                .map((a) => a.value)
+                .join(" · ");
+              return (
               <Fragment key={row.id}>
                 <tr
                   className="cursor-pointer border-b border-moss/5 hover:bg-cream/50"
@@ -620,6 +631,11 @@ export function AdminDashboard() {
                   </td>
                   <td className="px-3 py-3 font-medium text-ink">{row.origin}</td>
                   <td className="px-3 py-3">{row.role}</td>
+                  <td className="max-w-[200px] truncate px-3 py-3 text-xs text-moss/70">
+                    {form.length
+                      ? formShort || `${form.length} respostas`
+                      : "—"}
+                  </td>
                   <td className="px-3 py-3">{row.jobs_count}</td>
                   <td className="px-3 py-3 text-xs">
                     {row.cached ? "sim" : "live"}
@@ -630,10 +646,10 @@ export function AdminDashboard() {
                 </tr>
                 {expanded === row.id && (
                   <tr className="border-b border-moss/10 bg-cream/40">
-                    <td colSpan={6} className="px-4 py-3">
+                    <td colSpan={7} className="px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-moss/60">
-                          Vagas mostradas no demo
+                          O que a pessoa preencheu
                         </p>
                         <div
                           className="flex gap-3"
@@ -659,6 +675,31 @@ export function AdminDashboard() {
                           </Link>
                         </div>
                       </div>
+                      {form.length > 0 ? (
+                        <dl className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                          {form.map((a) => (
+                            <div
+                              key={a.id}
+                              className="rounded-lg bg-white px-3 py-2 text-sm"
+                            >
+                              <dt className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
+                                {a.label}
+                              </dt>
+                              <dd className="mt-0.5 font-medium text-ink">
+                                {a.value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : (
+                        <p className="mt-2 text-xs text-moss/50">
+                          Sem respostas de formulário (busca rápida / lead
+                          antigo).
+                        </p>
+                      )}
+                      <p className="mt-4 text-xs font-semibold text-moss/60">
+                        Vagas mostradas no demo
+                      </p>
                       <ul className="mt-2 space-y-1 text-sm">
                         {(row.jobs_preview || []).map((job, i) => (
                           <li key={`${row.id}-${i}`}>
@@ -688,7 +729,8 @@ export function AdminDashboard() {
                   </tr>
                 )}
               </Fragment>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

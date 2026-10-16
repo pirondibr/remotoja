@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
-import { listLeadSearches } from "@/lib/leadLog";
+import { formatAnswersForAdmin, listLeadSearches } from "@/lib/leadLog";
 import { cacheStats, listCacheEntries } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { originLabel } from "@/lib/attribution";
@@ -74,6 +74,7 @@ export async function GET(request: Request) {
       rows: rows.map((row) => ({
         ...row,
         origin: originLabel(row),
+        form_answers: formatAnswersForAdmin(row.answers),
         jobs_preview: (row.jobs_shown || []).slice(0, 5).map((j) => ({
           title: j.title,
           company: j.company,
