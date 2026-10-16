@@ -10,7 +10,7 @@ import {
   captureAttributionFromUrl,
   loadAttribution,
 } from "@/lib/attribution";
-import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
+import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 import { startCheckout } from "@/lib/startCheckout";
 
@@ -166,22 +166,27 @@ export function FinalV2() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  const uniqueJobs = useMemo(() => dedupeDemoJobs(jobs), [jobs]);
+
   /** Preview: 3 abertas + 1 bloqueada (blur). */
-  const previewJobs = jobs.slice(0, 3);
+  const previewJobs = uniqueJobs.slice(0, 3);
   const lockedJob: DemoJob | null =
-    jobs[3] ||
-    (jobs[0]
+    uniqueJobs[3] ||
+    (uniqueJobs[0]
       ? {
-          ...jobs[0],
-          title: jobs[0].title,
-          company: jobs[0].company,
+          ...uniqueJobs[0],
+          title: uniqueJobs[0].title,
+          company: uniqueJobs[0].company,
         }
       : null);
 
   /** Quando pagar, outros scrapers entram — mostramos o dobro do que achamos agora. */
-  const moreCount = Math.max(jobs.length * 2, 2);
+  const moreCount = Math.max(uniqueJobs.length * 2, 2);
 
-  const headlineTime = useMemo(() => freshestPostedLabel(jobs), [jobs]);
+  const headlineTime = useMemo(
+    () => freshestPostedLabel(uniqueJobs),
+    [uniqueJobs]
+  );
 
   async function logLead(
     trimmed: string,
@@ -227,7 +232,9 @@ export function FinalV2() {
     try {
       const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
       const data = await res.json().catch(() => ({}));
-      const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
+      const list: DemoJob[] = dedupeDemoJobs(
+        Array.isArray(data.jobs) ? data.jobs : []
+      );
       setJobs(list);
       saveJobSession(trimmed, list);
       setError(

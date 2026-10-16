@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
-import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
+import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { startCheckout } from "@/lib/startCheckout";
 import {
@@ -165,7 +165,7 @@ export function OnboardWizard() {
     prefillRole ||
     "seu cargo";
 
-  const matches = liveJobs;
+  const matches = dedupeDemoJobs(liveJobs);
   const previewJobs = matches.slice(0, 3);
   const lockedJob: DemoJob | null =
     matches[3] ||
@@ -230,7 +230,7 @@ export function OnboardWizard() {
       .then(async (res) => {
         const data = await res.json();
         const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
-        setLiveJobs(jobs.slice(0, 8));
+        setLiveJobs(dedupeDemoJobs(jobs).slice(0, 8));
         if (jobs.length === 0) {
           const raw = typeof data.error === "string" ? data.error : "";
           const friendly = /timeout|google jobs/i.test(raw)

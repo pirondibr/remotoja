@@ -5,7 +5,15 @@ import { termMatches } from "@/lib/dashboard/common";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
-import { withDemoFakePosted, type DemoJob } from "@/lib/demoJobs";
+import {
+  dedupeDemoJobs,
+  withDemoFakePosted,
+  type DemoJob,
+} from "@/lib/demoJobs";
+
+function prepareDemoJobs(jobs: DemoJob[]): DemoJob[] {
+  return withDemoFakePosted(dedupeDemoJobs(jobs));
+}
 
 export const maxDuration = 60;
 
@@ -58,7 +66,7 @@ export async function GET(request: Request) {
         cached.jobs.length > 0 &&
         isUsableDemoCache(cached.fetched_via)
       ) {
-        const jobs = withDemoFakePosted(cached.jobs);
+        const jobs = prepareDemoJobs(cached.jobs);
         return NextResponse.json({
           role,
           query: buildJobsQuery(role),
@@ -94,7 +102,7 @@ export async function GET(request: Request) {
       } catch {
         // ignore
       }
-      const jobs = withDemoFakePosted(result.jobs);
+      const jobs = prepareDemoJobs(result.jobs);
       return NextResponse.json({
         ...result,
         jobs,
@@ -120,7 +128,7 @@ export async function GET(request: Request) {
     } catch {
       // ignore
     }
-    const jobs = withDemoFakePosted(remotarJobs);
+    const jobs = prepareDemoJobs(remotarJobs);
     return NextResponse.json({
       role,
       query: buildJobsQuery(role),

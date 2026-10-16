@@ -42,6 +42,38 @@ export function getDemoJobs(limit = 5): DemoJob[] {
   return demoJobsPayload.jobs.slice(0, limit);
 }
 
+function demoDedupeKey(job: DemoJob): string {
+  const titleCompany = `${job.title || ""} ${job.company || ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  const id = (job.job_id || "").trim().toLowerCase();
+  const url = (job.source_url || "").split("?")[0].trim().toLowerCase();
+  return id ? `id:${id}` : url ? `url:${url}` : titleCompany;
+}
+
+/** Remove vagas repetidas (mesmo job_id / URL / título+empresa). */
+export function dedupeDemoJobs(jobs: DemoJob[]): DemoJob[] {
+  const seen = new Set<string>();
+  const out: DemoJob[] = [];
+  for (const job of jobs) {
+    const key = demoDedupeKey(job);
+    if (!key || seen.has(key)) continue;
+    // Também bloqueia título+empresa se já entrou por id/url
+    const titleKey = `${job.title || ""} ${job.company || ""}`
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+    if (titleKey && seen.has(`tc:${titleKey}`)) continue;
+    seen.add(key);
+    if (titleKey) seen.add(`tc:${titleKey}`);
+    out.push(job);
+  }
+  return out;
+}
+
 export function formatJobMeta(job: DemoJob): string {
   const parts = [
     job.remote ? "Remoto" : null,
