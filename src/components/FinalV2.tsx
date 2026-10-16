@@ -10,20 +10,23 @@ import {
   captureAttributionFromUrl,
   loadAttribution,
 } from "@/lib/attribution";
-import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
+import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 import { startCheckout } from "@/lib/startCheckout";
 
 function postedLabel(job: DemoJob): string {
-  return formatJobAgo(job);
+  return formatDemoJobAgo(job);
 }
 
 function freshestPostedLabel(jobs: DemoJob[]): string {
-  const withPosted = jobs.find((j) => j.posted);
-  if (withPosted?.posted) {
-    return withPosted.posted.replace(/^há\s+/i, "");
+  if (!jobs.length) return "algumas horas";
+  // Menor “horas atrás” fake da lista (mais fresco)
+  let best = 20;
+  for (const job of jobs) {
+    const m = formatDemoJobAgo(job).match(/^(\d+)/);
+    if (m) best = Math.min(best, Number(m[1]));
   }
-  return "algumas horas";
+  return best === 1 ? "1 hora" : `${best} horas`;
 }
 
 function Countdown({ seconds }: { seconds: number }) {

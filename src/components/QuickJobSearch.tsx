@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import {
-  formatJobAgo,
+  formatDemoJobAgo,
   formatJobBadge,
   formatJobMeta,
   type DemoJob,
@@ -158,7 +158,9 @@ export function QuickJobSearch() {
                     <span className="rounded-full bg-lime/15 px-2.5 py-0.5 text-xs font-medium text-lime">
                       {formatJobBadge(job)}
                     </span>
-                    <span className="text-xs text-sand/50">{formatJobAgo(job)}</span>
+                    <span className="text-xs text-sand/50">
+                      {formatDemoJobAgo(job)}
+                    </span>
                   </div>
                   <h2 className="font-semibold text-cream">{job.title}</h2>
                   <p className="text-sm text-sand/70">{job.company}</p>

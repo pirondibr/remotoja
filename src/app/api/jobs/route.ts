@@ -5,7 +5,7 @@ import { termMatches } from "@/lib/dashboard/common";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
-import type { DemoJob } from "@/lib/demoJobs";
+import { withDemoFakePosted, type DemoJob } from "@/lib/demoJobs";
 
 export const maxDuration = 60;
 
@@ -58,11 +58,12 @@ export async function GET(request: Request) {
         cached.jobs.length > 0 &&
         isUsableDemoCache(cached.fetched_via)
       ) {
+        const jobs = withDemoFakePosted(cached.jobs);
         return NextResponse.json({
           role,
           query: buildJobsQuery(role),
-          count: cached.jobs.length,
-          jobs: cached.jobs,
+          count: jobs.length,
+          jobs,
           fetched_via: cached.fetched_via || "cache_demo",
           cached: true,
           cache_updated_at: cached.updated_at,
@@ -93,7 +94,13 @@ export async function GET(request: Request) {
       } catch {
         // ignore
       }
-      return NextResponse.json({ ...result, cached: false });
+      const jobs = withDemoFakePosted(result.jobs);
+      return NextResponse.json({
+        ...result,
+        jobs,
+        count: jobs.length,
+        cached: false,
+      });
     }
   } catch (error) {
     googleError =
@@ -113,11 +120,12 @@ export async function GET(request: Request) {
     } catch {
       // ignore
     }
+    const jobs = withDemoFakePosted(remotarJobs);
     return NextResponse.json({
       role,
       query: buildJobsQuery(role),
-      count: remotarJobs.length,
-      jobs: remotarJobs,
+      count: jobs.length,
+      jobs,
       fetched_via: "fallback_remotar",
       note: googleError
         ? `Google Jobs indisponível (${googleError}). Prévia via Remotar.`

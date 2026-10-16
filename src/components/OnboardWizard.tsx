@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
-import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
+import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { startCheckout } from "@/lib/startCheckout";
 import { BrandMark } from "./BrandMark";
@@ -13,7 +13,7 @@ import { CompanyAvatar } from "./CompanyAvatar";
 const ROLE_STORAGE_KEY = "mvr_onboard_role";
 
 function postedLabel(job: DemoJob): string {
-  return formatJobAgo(job);
+  return formatDemoJobAgo(job);
 }
 
 function isOffLinkedIn(source: string) {

@@ -141,6 +141,36 @@ export function formatJobAgo(job: DemoJob): string {
   return formatRelativePosted(job.posted);
 }
 
+/** Seed estável → 1..20 (mesma vaga não “pisca” a cada render). */
+export function demoFakePostedHours(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 20) + 1;
+}
+
+/**
+ * Tempo relativo fake pro funil demo (1–20 horas atrás).
+ * Evita mostrar “3 dias / 2 semanas” de fontes baratas — no pago o scrape traz frescas.
+ */
+export function formatDemoJobAgo(job: DemoJob): string {
+  const seed = job.job_id || `${job.title}|${job.company}`;
+  return plural(demoFakePostedHours(seed), "hora", "horas");
+}
+
+export function withDemoFakePosted(jobs: DemoJob[]): DemoJob[] {
+  return jobs.map((job) => {
+    const seed = job.job_id || `${job.title}|${job.company}`;
+    const n = demoFakePostedHours(seed);
+    return {
+      ...job,
+      posted: n === 1 ? "há 1 hora" : `há ${n} horas`,
+    };
+  });
+}
+
 export function formatJobBadge(job: DemoJob): string {
   const source = (job.source || "").trim();
   if (!source) return "Remoto";
