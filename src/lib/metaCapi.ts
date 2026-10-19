@@ -109,6 +109,19 @@ export async function sendMetaCapiEvent(
     event.custom_data = custom;
   }
 
+  const userData = event.user_data as Record<string, unknown>;
+  const hasEm = Array.isArray(userData.em) && userData.em.length > 0;
+  const hasBrowser =
+    Boolean(userData.fbp) || Boolean(userData.fbc);
+  const hasNetwork =
+    Boolean(userData.client_ip_address) && Boolean(userData.client_user_agent);
+  if (!hasEm && !hasBrowser && !hasNetwork) {
+    console.warn(
+      "[meta-capi] skip: sem em/fbp/fbc nem ip+ua (Meta exige match params)"
+    );
+    return { ok: true, skipped: true };
+  }
+
   const body: Record<string, unknown> = {
     data: [event],
   };

@@ -6,9 +6,10 @@ import {
   memberCookieOptions,
 } from "@/lib/memberAuth";
 import {
-  claimMetaPurchaseSend,
   getOrder,
+  markMetaPurchaseSent,
   markOrderApproved,
+  shouldSendMetaPurchase,
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
 
@@ -89,9 +90,8 @@ export async function POST(request: Request) {
       });
     }
 
-    const claimed = await claimMetaPurchaseSend(orderId);
-    if (claimed) {
-      await sendMetaPurchase({
+    if (await shouldSendMetaPurchase(orderId)) {
+      const sent = await sendMetaPurchase({
         paymentId: String(payment.id),
         orderId,
         value: amountBrl,
@@ -102,6 +102,9 @@ export async function POST(request: Request) {
         clientIp: clientIp(request),
         userAgent: request.headers.get("user-agent"),
       });
+      if (sent.ok && !sent.skipped) {
+        await markMetaPurchaseSent(orderId);
+      }
     }
 
     const token = buildMemberToken({

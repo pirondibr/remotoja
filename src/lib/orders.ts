@@ -130,19 +130,32 @@ export async function markOrderStatus(
   `;
 }
 
-/** Marca Purchase CAPI enviado; retorna true só na 1ª vez (dedupe de retries). */
-export async function claimMetaPurchaseSend(
+/** True se Purchase CAPI ainda não foi gravado (pode tentar enviar). */
+export async function shouldSendMetaPurchase(
   orderId: string
 ): Promise<boolean> {
   if (!hasDatabase()) return true;
   await ensureOrdersSchema();
   const sql = getSql();
   const rows = await sql`
+    SELECT meta_purchase_sent_at
+    FROM orders
+    WHERE id = ${orderId}
+    LIMIT 1
+  `;
+  const row = rows[0] as { meta_purchase_sent_at?: string | null } | undefined;
+  return !row?.meta_purchase_sent_at;
+}
+
+/** Marca Purchase CAPI enviado com sucesso. */
+export async function markMetaPurchaseSent(orderId: string): Promise<void> {
+  if (!hasDatabase()) return;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  await sql`
     UPDATE orders
     SET meta_purchase_sent_at = now()
     WHERE id = ${orderId}
       AND meta_purchase_sent_at IS NULL
-    RETURNING id
   `;
-  return rows.length > 0;
 }
