@@ -29,6 +29,14 @@ export type FunnelStep =
       subheadline?: string;
       placeholder: string;
       cta: string;
+    }
+  | {
+      id: string;
+      kind: "contact";
+      progress: number;
+      headline: string;
+      subheadline?: string;
+      cta: string;
     };
 
 export const FUNNEL_STEPS: FunnelStep[] = [
@@ -161,11 +169,11 @@ export const FUNNEL_STEPS: FunnelStep[] = [
   },
   {
     id: "role",
-    kind: "text",
+    kind: "contact",
     progress: 94,
-    headline: "Última pergunta: qual cargo você busca?",
-    subheadline: "Ex.: Product Designer, CS, Dev Full Stack, Growth…",
-    placeholder: "Digite o cargo",
+    headline: "Última pergunta: seus dados e o cargo",
+    subheadline:
+      "Nome, e-mail e o cargo que você busca. Assim registramos seu perfil e liberamos as vagas certas.",
     cta: "Encontrar minhas vagas",
   },
   {

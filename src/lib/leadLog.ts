@@ -54,6 +54,8 @@ export const FUNNEL_ANSWER_LABELS: Record<string, string> = {
   salary: "Faixa salarial",
   location: "Localização",
   seniority: "Nível",
+  name: "Nome",
+  email: "E-mail",
   role: "Cargo",
 };
 

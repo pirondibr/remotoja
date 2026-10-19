@@ -17,6 +17,10 @@ import { CompanyAvatar } from "./CompanyAvatar";
 const ROLE_STORAGE_KEY = "mvr_onboard_role";
 const ANSWERS_STORAGE_KEY = "mvr_funnel_answers";
 
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 function postedLabel(job: DemoJob): string {
   return formatDemoJobAgo(job);
 }
@@ -139,6 +143,8 @@ export function OnboardWizard() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, FunnelAnswer>>({});
   const [draft, setDraft] = useState("");
+  const [nameDraft, setNameDraft] = useState("");
+  const [emailDraft, setEmailDraft] = useState("");
   const [selectedPlan, setSelectedPlan] =
     useState<(typeof RR_PLANS)[number]["id"]>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -154,10 +160,21 @@ export function OnboardWizard() {
   const isLast = index === FUNNEL_STEPS.length - 1;
 
   useEffect(() => {
-    if (step.id !== "role" || !prefillRole) return;
-    if (typeof answers.role === "string" && answers.role.trim()) return;
-    setDraft(prefillRole);
-  }, [step.id, prefillRole, answers.role]);
+    if (step.kind !== "contact") return;
+    if (typeof answers.name === "string" && answers.name && !nameDraft.trim()) {
+      setNameDraft(answers.name);
+    }
+    if (typeof answers.email === "string" && answers.email && !emailDraft.trim()) {
+      setEmailDraft(answers.email);
+    }
+    if (typeof answers.role === "string" && answers.role.trim() && !draft.trim()) {
+      setDraft(answers.role);
+    } else if (prefillRole && !draft.trim()) {
+      setDraft(prefillRole);
+    }
+    // Só ao entrar no step / prefill — não re-rodar a cada keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.kind, prefillRole]);
 
   const role =
     (typeof answers.role === "string" && answers.role) ||
@@ -189,11 +206,18 @@ export function OnboardWizard() {
         .toString()
         .trim().length > 1;
     }
+    if (step.kind === "contact") {
+      return (
+        nameDraft.trim().length >= 2 &&
+        isValidEmail(emailDraft) &&
+        draft.trim().length >= 2
+      );
+    }
     if (step.kind === "matches") {
       return !jobsLoading;
     }
     return true;
-  }, [answers, draft, step, jobsLoading]);
+  }, [answers, draft, nameDraft, emailDraft, step, jobsLoading]);
 
   useEffect(() => {
     captureAttributionFromUrl(searchParams);
@@ -299,6 +323,30 @@ export function OnboardWizard() {
     if (step.kind === "text" && draft.trim()) {
       setAnswers((prev) => ({ ...prev, [step.id]: draft.trim() }));
     }
+    if (step.kind === "contact") {
+      const name = nameDraft.trim();
+      const email = emailDraft.trim().toLowerCase();
+      const roleValue = draft.trim();
+      if (name.length < 2 || !isValidEmail(email) || roleValue.length < 2) {
+        return;
+      }
+      const nextAnswers = {
+        ...answers,
+        name,
+        email,
+        role: roleValue,
+      };
+      setAnswers(nextAnswers);
+      try {
+        sessionStorage.setItem(ROLE_STORAGE_KEY, roleValue);
+        sessionStorage.setItem(
+          ANSWERS_STORAGE_KEY,
+          JSON.stringify(nextAnswers)
+        );
+      } catch {
+        /* ignore */
+      }
+    }
     if (!isLast) setIndex((prev) => prev + 1);
   }
 
@@ -312,12 +360,17 @@ export function OnboardWizard() {
       draft.trim() ||
       prefillRole.trim() ||
       "SEO";
+    const email =
+      (typeof answers.email === "string" && answers.email.trim()) ||
+      emailDraft.trim() ||
+      undefined;
     setCheckoutError(null);
     setCheckoutLoading(true);
     try {
       const result = await startCheckout({
         planId: selectedPlan,
         role: nextRole,
+        email,
       });
       if ("error" in result) {
         setCheckoutError(result.error);
@@ -464,6 +517,36 @@ export function OnboardWizard() {
                 placeholder={step.placeholder}
                 className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
               />
+            </div>
+          )}
+
+          {step.kind === "contact" && (
+            <div className="mt-8 space-y-3">
+              <input
+                value={nameDraft}
+                onChange={(event) => setNameDraft(event.target.value)}
+                placeholder="Seu nome"
+                autoComplete="name"
+                className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
+              />
+              <input
+                type="email"
+                value={emailDraft}
+                onChange={(event) => setEmailDraft(event.target.value)}
+                placeholder="Seu e-mail"
+                autoComplete="email"
+                className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
+              />
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Cargo que você busca (ex.: SEO, Product Designer…)"
+                autoComplete="organization-title"
+                className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
+              />
+              {emailDraft.trim() && !isValidEmail(emailDraft) && (
+                <p className="text-xs text-sand/55">Informe um e-mail válido.</p>
+              )}
             </div>
           )}
 
