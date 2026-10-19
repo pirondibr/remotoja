@@ -1,4 +1,5 @@
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
+import { termMatches } from "@/lib/dashboard/common";
 import type { DemoJob } from "@/lib/demoJobs";
 
 const API_POST = "https://api.dataforseo.com/v3/serp/google/jobs/task_post";
@@ -127,12 +128,20 @@ export async function fetchGoogleJobsByRole(
     const status = data?.tasks?.[0]?.status_code;
     if (status === 20000) {
       const items: RawItem[] = data.tasks[0]?.result?.[0]?.items || [];
+      const roleTerm = role.trim();
       const jobs = items
         .map(normalizeItem)
-        .filter((job): job is DemoJob => Boolean(job));
+        .filter((job): job is DemoJob => Boolean(job))
+        // Google mistura vagas; só mantém o que casa com o cargo (ex.: SEO ≠ Full Stack)
+        .filter((job) =>
+          termMatches(
+            `${job.title} ${job.snippet || ""} ${job.company}`,
+            roleTerm
+          )
+        );
       return {
         query,
-        role: role.trim(),
+        role: roleTerm,
         count: jobs.length,
         jobs,
         fetched_via: "dataforseo_google_jobs",

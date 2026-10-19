@@ -66,16 +66,27 @@ export async function GET(request: Request) {
         cached.jobs.length > 0 &&
         isUsableDemoCache(cached.fetched_via)
       ) {
-        const jobs = prepareDemoJobs(cached.jobs);
-        return NextResponse.json({
-          role,
-          query: buildJobsQuery(role),
-          count: jobs.length,
-          jobs,
-          fetched_via: cached.fetched_via || "cache_demo",
-          cached: true,
-          cache_updated_at: cached.updated_at,
-        });
+        // Reaplica filtro de cargo (cache antigo podia ter Full Stack em busca SEO)
+        const filtered = (cached.jobs as DemoJob[]).filter((job) =>
+          termMatches(
+            `${job.title} ${job.snippet || ""} ${job.company}`,
+            role
+          )
+        );
+        if (filtered.length === 0) {
+          // Cache só com lixo → busca live
+        } else {
+          const jobs = prepareDemoJobs(filtered);
+          return NextResponse.json({
+            role,
+            query: buildJobsQuery(role),
+            count: jobs.length,
+            jobs,
+            fetched_via: cached.fetched_via || "cache_demo",
+            cached: true,
+            cache_updated_at: cached.updated_at,
+          });
+        }
       }
     } catch {
       // segue para busca live se o cache falhar

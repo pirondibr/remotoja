@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchMpPayment, hasMercadoPago } from "@/lib/mercadoPago";
+import { fetchMpPayment, getMpAccessToken, hasMercadoPago } from "@/lib/mercadoPago";
 import { sendMetaPurchase } from "@/lib/metaCapi";
 import {
   getOrder,
@@ -68,6 +68,28 @@ async function processPayment(paymentId: string) {
   }
 }
 
+/** Pix / IPN antigo frequentemente manda topic=merchant_order. */
+async function paymentIdsFromMerchantOrder(
+  merchantOrderId: string
+): Promise<string[]> {
+  const token = getMpAccessToken();
+  if (!token) return [];
+  const res = await fetch(
+    `https://api.mercadopago.com/merchant_orders/${merchantOrderId}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    }
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as {
+    payments?: Array<{ id?: number | string; status?: string }>;
+  };
+  return (data.payments || [])
+    .map((p) => (p.id != null ? String(p.id) : ""))
+    .filter(Boolean);
+}
+
 export async function POST(request: Request) {
   if (!hasMercadoPago()) {
     return NextResponse.json({ ok: true });
@@ -79,25 +101,56 @@ export async function POST(request: Request) {
       url.searchParams.get("topic") ||
       url.searchParams.get("type") ||
       "";
-    const idFromQuery = url.searchParams.get("id") || url.searchParams.get("data.id");
+    const idFromQuery =
+      url.searchParams.get("id") || url.searchParams.get("data.id") || "";
 
-    let paymentId = idFromQuery || "";
+    let paymentId = "";
+    let merchantOrderId = "";
+    let bodyType = "";
+
     try {
       const body = (await request.json()) as {
         type?: string;
+        topic?: string;
         action?: string;
         data?: { id?: string };
+        resource?: string;
       };
-      if (body?.data?.id) paymentId = String(body.data.id);
-      if (!topic && body?.type) {
-        // payment / topic.merchant_order
+      bodyType = String(body?.type || body?.topic || "");
+      if (body?.data?.id) {
+        if (
+          bodyType.includes("merchant_order") ||
+          topic.includes("merchant_order")
+        ) {
+          merchantOrderId = String(body.data.id);
+        } else {
+          paymentId = String(body.data.id);
+        }
       }
     } catch {
       // body vazio ok
     }
 
-    if (paymentId && (topic.includes("payment") || !topic || topic === "payment")) {
-      await processPayment(paymentId);
+    if (!paymentId && !merchantOrderId && idFromQuery) {
+      if (topic.includes("merchant_order") || bodyType.includes("merchant_order")) {
+        merchantOrderId = idFromQuery;
+      } else {
+        paymentId = idFromQuery;
+      }
+    }
+
+    const paymentIds: string[] = [];
+    if (paymentId) paymentIds.push(paymentId);
+    if (merchantOrderId) {
+      paymentIds.push(...(await paymentIdsFromMerchantOrder(merchantOrderId)));
+    }
+
+    for (const id of [...new Set(paymentIds)]) {
+      try {
+        await processPayment(id);
+      } catch (err) {
+        console.error("[mp webhook] payment", id, err);
+      }
     }
   } catch (err) {
     console.error("[mp webhook]", err);
