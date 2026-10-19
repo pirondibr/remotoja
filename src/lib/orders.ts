@@ -12,6 +12,7 @@ export type OrderRow = {
   mp_payment_id: string | null;
   payer_email: string | null;
   access_until: string | null;
+  meta_purchase_sent_at?: string | null;
 };
 
 export async function ensureOrdersSchema(): Promise<void> {
@@ -29,8 +30,13 @@ export async function ensureOrdersSchema(): Promise<void> {
       mp_preference_id text,
       mp_payment_id text,
       payer_email text,
-      access_until timestamptz
+      access_until timestamptz,
+      meta_purchase_sent_at timestamptz
     )
+  `;
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS meta_purchase_sent_at timestamptz
   `;
   await sql`
     CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC)
@@ -122,4 +128,21 @@ export async function markOrderStatus(
       mp_payment_id = COALESCE(${paymentId || null}, mp_payment_id)
     WHERE id = ${orderId}
   `;
+}
+
+/** Marca Purchase CAPI enviado; retorna true só na 1ª vez (dedupe de retries). */
+export async function claimMetaPurchaseSend(
+  orderId: string
+): Promise<boolean> {
+  if (!hasDatabase()) return true;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE orders
+    SET meta_purchase_sent_at = now()
+    WHERE id = ${orderId}
+      AND meta_purchase_sent_at IS NULL
+    RETURNING id
+  `;
+  return rows.length > 0;
 }

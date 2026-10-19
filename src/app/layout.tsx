@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Manrope, Syne } from "next/font/google";
 import { AttributionBoot } from "@/components/AttributionBoot";
+import { MetaPixel } from "@/components/MetaPixel";
 import "./globals.css";
 
 const display = Syne({
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${display.variable} ${body.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
+        <MetaPixel />
         <Suspense fallback={null}>
           <AttributionBoot />
         </Suspense>

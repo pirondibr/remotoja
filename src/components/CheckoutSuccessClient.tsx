@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
+import { loadAttribution } from "@/lib/attribution";
+import {
+  metaBrowserIds,
+  purchaseEventId,
+  trackMetaEvent,
+} from "@/lib/metaPixel";
 
 export function CheckoutSuccessClient() {
   const router = useRouter();
@@ -29,20 +35,46 @@ export function CheckoutSuccessClient() {
     let cancelled = false;
     (async () => {
       try {
+        const attr = loadAttribution();
+        const ids = metaBrowserIds(attr?.fbclid);
         const res = await fetch("/api/checkout/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentId, externalReference, status }),
+          body: JSON.stringify({
+            paymentId,
+            externalReference,
+            status,
+            fbp: ids.fbp,
+            fbc: ids.fbc,
+          }),
         });
         const data = (await res.json()) as {
           ok?: boolean;
           role?: string;
+          planId?: string;
+          amountBrl?: number;
+          paymentId?: string;
+          eventId?: string;
           error?: string;
         };
         if (!res.ok || !data.ok) {
           if (!cancelled) setError(data.error || "Não foi possível liberar o acesso.");
           return;
         }
+
+        const pid = data.paymentId || paymentId;
+        trackMetaEvent(
+          "Purchase",
+          {
+            value: data.amountBrl,
+            currency: "BRL",
+            content_ids: data.planId ? [data.planId] : undefined,
+            content_type: "product",
+            num_items: 1,
+          },
+          data.eventId || purchaseEventId(pid)
+        );
+
         const role = data.role || "SEO";
         if (!cancelled) {
           router.replace(`/app?role=${encodeURIComponent(role)}`);

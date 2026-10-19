@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { fetchMpPayment, hasMercadoPago } from "@/lib/mercadoPago";
-import { getOrder, markOrderApproved, markOrderStatus } from "@/lib/orders";
+import { sendMetaPurchase } from "@/lib/metaCapi";
+import {
+  claimMetaPurchaseSend,
+  getOrder,
+  markOrderApproved,
+  markOrderStatus,
+} from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
 
 async function processPayment(paymentId: string) {
@@ -15,16 +21,33 @@ async function processPayment(paymentId: string) {
   if (!order) return;
 
   if (payment.status === "approved") {
-    if (order.status === "approved") return;
-    const plan = getPlan(order.plan_id);
-    const days = plan?.durationDays ?? 30;
-    const accessUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-    await markOrderApproved({
-      orderId,
-      paymentId: String(payment.id),
-      payerEmail: payment.payer?.email,
-      accessUntil,
-    });
+    if (order.status !== "approved") {
+      const plan = getPlan(order.plan_id);
+      const days = plan?.durationDays ?? 30;
+      const accessUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      await markOrderApproved({
+        orderId,
+        paymentId: String(payment.id),
+        payerEmail: payment.payer?.email,
+        accessUntil,
+      });
+    }
+
+    const claimed = await claimMetaPurchaseSend(orderId);
+    if (claimed) {
+      const plan = getPlan(order.plan_id);
+      const value =
+        typeof order.amount_brl === "number"
+          ? Number(order.amount_brl)
+          : plan?.priceBrl ?? 0;
+      await sendMetaPurchase({
+        paymentId: String(payment.id),
+        orderId,
+        value,
+        planId: order.plan_id,
+        email: payment.payer?.email || order.payer_email,
+      });
+    }
     return;
   }
 

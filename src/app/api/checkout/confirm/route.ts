@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { fetchMpPayment, hasMercadoPago } from "@/lib/mercadoPago";
+import { sendMetaPurchase } from "@/lib/metaCapi";
 import {
   buildMemberToken,
   memberCookieOptions,
 } from "@/lib/memberAuth";
-import { getOrder, markOrderApproved } from "@/lib/orders";
+import {
+  claimMetaPurchaseSend,
+  getOrder,
+  markOrderApproved,
+} from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
+
+function clientIp(request: Request): string | undefined {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
+  return request.headers.get("x-real-ip")?.trim() || undefined;
+}
 
 /**
  * Chamado pela página de sucesso com payment_id / external_reference.
@@ -20,6 +31,8 @@ export async function POST(request: Request) {
     paymentId?: string;
     externalReference?: string;
     status?: string;
+    fbp?: string;
+    fbc?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -62,6 +75,10 @@ export async function POST(request: Request) {
     const plan = getPlan(planId);
     const days = plan?.durationDays ?? 30;
     const accessUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    const amountBrl =
+      order?.amount_brl != null
+        ? Number(order.amount_brl)
+        : plan?.priceBrl ?? 0;
 
     if (!order || order.status !== "approved") {
       order = await markOrderApproved({
@@ -69,6 +86,21 @@ export async function POST(request: Request) {
         paymentId: String(payment.id),
         payerEmail: payment.payer?.email,
         accessUntil,
+      });
+    }
+
+    const claimed = await claimMetaPurchaseSend(orderId);
+    if (claimed) {
+      await sendMetaPurchase({
+        paymentId: String(payment.id),
+        orderId,
+        value: amountBrl,
+        planId,
+        email: payment.payer?.email || order?.payer_email,
+        fbp: body.fbp,
+        fbc: body.fbc,
+        clientIp: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
       });
     }
 
@@ -83,6 +115,9 @@ export async function POST(request: Request) {
       ok: true,
       role,
       planId,
+      amountBrl,
+      paymentId: String(payment.id),
+      eventId: `purchase_${payment.id}`,
       accessUntil: accessUntil.toISOString(),
     });
     const cookie = memberCookieOptions(token);

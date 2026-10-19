@@ -4,9 +4,16 @@ import {
   createCheckoutPreference,
   hasMercadoPago,
 } from "@/lib/mercadoPago";
+import { sendMetaInitiateCheckout } from "@/lib/metaCapi";
 import { generateOrderId } from "@/lib/memberAuth";
 import { attachPreference, createOrder } from "@/lib/orders";
 import { getPlan, type PlanId } from "@/lib/rrPlans";
+
+function clientIp(request: Request): string | undefined {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
+  return request.headers.get("x-real-ip")?.trim() || undefined;
+}
 
 export async function POST(request: Request) {
   if (!hasMercadoPago()) {
@@ -16,7 +23,13 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { planId?: string; role?: string; email?: string };
+  let body: {
+    planId?: string;
+    role?: string;
+    email?: string;
+    fbp?: string;
+    fbc?: string;
+  };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -50,9 +63,23 @@ export async function POST(request: Request) {
 
     await attachPreference(orderId, preference.id);
 
+    // CAPI InitiateCheckout (browser dispara o mesmo event_id)
+    void sendMetaInitiateCheckout({
+      orderId,
+      value: plan.priceBrl,
+      planId: plan.id,
+      email,
+      fbp: body.fbp,
+      fbc: body.fbc,
+      clientIp: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    }).catch(() => {});
+
     return NextResponse.json({
       orderId,
       preferenceId: preference.id,
+      amountBrl: plan.priceBrl,
+      planId: plan.id,
       checkoutUrl: checkoutRedirectUrl(preference),
     });
   } catch (err) {
