@@ -14,15 +14,15 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      // Atalho antigo / marketing: feed do membro vive em /app
+      // Alias do painel interno (logs / análise) → /admin
       {
         source: "/dashboard",
-        destination: "/app",
+        destination: "/admin",
         permanent: false,
       },
       {
         source: "/dashboard/:path*",
-        destination: "/app",
+        destination: "/admin",
         permanent: false,
       },
     ];
