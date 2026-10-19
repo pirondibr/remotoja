@@ -7,6 +7,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * URLs:
  *   /lab?k=SEGREDO&role=seo
  *   /app?k=SEGREDO&role=seo
+ *   /dashboard?k=SEGREDO&role=seo  (alias → /app)
  */
 export function middleware(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("k");
@@ -27,5 +28,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app", "/lab"],
+  matcher: ["/app", "/lab", "/dashboard"],
 };

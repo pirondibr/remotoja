@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async redirects() {
+    return [
+      // Atalho antigo / marketing: feed do membro vive em /app
+      {
+        source: "/dashboard",
+        destination: "/app",
+        permanent: false,
+      },
+      {
+        source: "/dashboard/:path*",
+        destination: "/app",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
