@@ -6,6 +6,7 @@ import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS, type PlanId } from "@/lib/rrPlans";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
+import { PaywallExitSurvey, PaywallFeedbackBlock } from "./PaywallExitSurvey";
 
 const PORTALS = 7;
 const FREE_COUNT = 3;
@@ -138,6 +139,9 @@ export function FeedConvertV2({
   onCheckout,
   checkoutLoading,
   checkoutError,
+  email,
+  leadId,
+  funnelVariant,
 }: {
   role: string;
   jobs: DemoJob[];
@@ -148,6 +152,9 @@ export function FeedConvertV2({
   onCheckout: () => void;
   checkoutLoading: boolean;
   checkoutError: string | null;
+  email?: string;
+  leadId?: string | null;
+  funnelVariant?: string | null;
 }) {
   const lockedRef = useRef<HTMLDivElement>(null);
   const offerRef = useRef<HTMLElement>(null);
@@ -476,6 +483,14 @@ export function FeedConvertV2({
                 <span>7 dias para desistir com reembolso</span>
               </div>
             </section>
+            <PaywallFeedbackBlock
+              enabled={!loading}
+              blocked={checkoutLoading}
+              role={role}
+              email={email}
+              leadId={leadId}
+              funnelVariant={funnelVariant || "v2"}
+            />
 
             <section className="mt-8">
               <div className="mb-3 px-0.5">
@@ -567,6 +582,14 @@ export function FeedConvertV2({
           </a>
         </div>
       </div>
+      <PaywallExitSurvey
+        enabled={!loading}
+        blocked={checkoutLoading}
+        role={role}
+        email={email}
+        leadId={leadId}
+        funnelVariant={funnelVariant || "v2"}
+      />
     </div>
   );
 }

@@ -73,6 +73,22 @@ export async function ensureSchema(): Promise<void> {
         ALTER TABLE lead_searches
         ADD COLUMN IF NOT EXISTS funnel_variant text
       `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS paywall_feedback (
+          id uuid PRIMARY KEY,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          reason text NOT NULL,
+          detail text,
+          role text,
+          email text,
+          funnel_variant text,
+          lead_id uuid
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS paywall_feedback_created_at_idx
+        ON paywall_feedback (created_at DESC)
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;

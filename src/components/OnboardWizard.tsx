@@ -9,7 +9,9 @@ import { RR_PLANS } from "@/lib/rrPlans";
 import { assignFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import { startCheckout } from "@/lib/startCheckout";
 import { looksLikeMultipleRoles } from "@/lib/splitRoles";
+import { captureLeadId, loadLeadId } from "@/lib/leadClient";
 import { FeedConvertV2 } from "./FeedConvertV2";
+import { PaywallExitSurvey, PaywallFeedbackBlock } from "./PaywallExitSurvey";
 import { RoleChoiceHint } from "./RoleChoiceHint";
 import {
   demoJobsUrl,
@@ -164,6 +166,7 @@ export function OnboardWizard() {
     readPrefillRole(searchParams.get("role")),
   );
   const [feedAb, setFeedAb] = useState<FeedAbVariant | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(() => loadLeadId());
 
   const step = FUNNEL_STEPS[index];
   const isLast = index === FUNNEL_STEPS.length - 1;
@@ -190,6 +193,10 @@ export function OnboardWizard() {
     draft ||
     prefillRole ||
     "seu cargo";
+  const surveyEmail =
+    (typeof answers.email === "string" && answers.email.trim()) ||
+    emailDraft.trim() ||
+    "";
 
   const matches = dedupeDemoJobs(liveJobs);
   const previewJobs = matches.slice(0, 3);
@@ -297,7 +304,13 @@ export function OnboardWizard() {
             ...attr,
           }),
           keepalive: true,
-        }).catch(() => {});
+        })
+          .then((res) => res.json())
+          .then((payload) => {
+            const id = captureLeadId(payload);
+            if (id) setLeadId(id);
+          })
+          .catch(() => {});
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
@@ -320,7 +333,13 @@ export function OnboardWizard() {
             ...attr,
           }),
           keepalive: true,
-        }).catch(() => {});
+        })
+          .then((res) => res.json())
+          .then((payload) => {
+            const id = captureLeadId(payload);
+            if (id) setLeadId(id);
+          })
+          .catch(() => {});
       })
       .finally(() => {
         if (!controller.signal.aborted) setJobsLoading(false);
@@ -427,6 +446,9 @@ export function OnboardWizard() {
         onCheckout={() => void startPaidCheckout()}
         checkoutLoading={checkoutLoading}
         checkoutError={checkoutError}
+        email={surveyEmail}
+        leadId={leadId}
+        funnelVariant={feedAb}
       />
     );
   }
@@ -761,6 +783,14 @@ export function OnboardWizard() {
                   {checkoutError}
                 </p>
               )}
+              <PaywallFeedbackBlock
+                enabled
+                blocked={checkoutLoading}
+                role={role}
+                email={surveyEmail}
+                leadId={leadId}
+                funnelVariant={feedAb}
+              />
             </div>
           )}
 
@@ -798,6 +828,14 @@ export function OnboardWizard() {
           </div>
         </div>
       </div>
+      <PaywallExitSurvey
+        enabled={step.kind === "paywall"}
+        blocked={checkoutLoading}
+        role={role}
+        email={surveyEmail}
+        leadId={leadId}
+        funnelVariant={feedAb}
+      />
     </div>
   );
 }

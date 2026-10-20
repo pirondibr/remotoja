@@ -14,7 +14,12 @@ import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 import { startCheckout } from "@/lib/startCheckout";
 import { looksLikeMultipleRoles } from "@/lib/splitRoles";
+import { captureLeadId, loadLeadId } from "@/lib/leadClient";
 import { RoleChoiceHint } from "./RoleChoiceHint";
+import {
+  PaywallFeedbackBlock,
+  usePaywallExitSurvey,
+} from "./PaywallExitSurvey";
 import {
   demoJobsUrl,
   trackSearchFromJobsPayload,
@@ -171,6 +176,7 @@ export function FinalV2() {
     useState<(typeof RR_PLANS)[number]["id"]>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(() => loadLeadId());
 
   const uniqueJobs = useMemo(() => dedupeDemoJobs(jobs), [jobs]);
 
@@ -208,7 +214,7 @@ export function FinalV2() {
       /* ignore */
     }
     try {
-      await fetch("/api/leads", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -221,6 +227,9 @@ export function FinalV2() {
         }),
         keepalive: true,
       });
+      const payload = await res.json().catch(() => ({}));
+      const id = captureLeadId(payload);
+      if (id) setLeadId(id);
     } catch {
       // não bloqueia o funil
     }
@@ -285,6 +294,26 @@ export function FinalV2() {
   function openPaywall() {
     setPhase("paywall");
   }
+
+  const surveyEmail = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem("mvr_funnel_answers");
+      if (!raw) return "";
+      const answers = JSON.parse(raw) as Record<string, unknown>;
+      return typeof answers.email === "string" ? answers.email.trim() : "";
+    } catch {
+      return "";
+    }
+  }, [phase]);
+
+  const exitSurvey = usePaywallExitSurvey({
+    enabled: phase === "paywall",
+    blocked: checkoutLoading,
+    role: role.trim() || "seu cargo",
+    email: surveyEmail,
+    leadId,
+    funnelVariant: "v1",
+  });
 
   async function startPaidCheckout() {
     const nextRole = role.trim() || "SEO";
@@ -584,10 +613,20 @@ export function FinalV2() {
                 ? "Abrindo Mercado Pago…"
                 : "Pagar com cartão ou Pix"}
             </button>
+            <PaywallFeedbackBlock
+              enabled={phase === "paywall"}
+              blocked={checkoutLoading}
+              role={role.trim() || "seu cargo"}
+              email={surveyEmail}
+              leadId={leadId}
+              funnelVariant="v1"
+            />
 
             <button
               type="button"
-              onClick={() => setPhase("results")}
+              onClick={() =>
+                exitSurvey.confirmLeave(() => setPhase("results"))
+              }
               className="mt-4 text-center text-xs text-sand/45 hover:text-sand/70"
             >
               ← Voltar às vagas
@@ -595,6 +634,7 @@ export function FinalV2() {
           </section>
         )}
       </div>
+      {exitSurvey.modal}
     </div>
   );
 }

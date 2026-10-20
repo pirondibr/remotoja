@@ -8,6 +8,7 @@ import {
 import { countOrderFunnelAb, listRecentOrders } from "@/lib/orders";
 import { cacheStats, listCacheEntries } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
+import { countPaywallFeedback } from "@/lib/paywallFeedback";
 import { originLabel } from "@/lib/attribution";
 import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
         orders_total: 0,
         feeds_total: 0,
         page_size: 10,
+        paywall_feedback: [],
+        paywall_feedback_total: 0,
         warning: "DATABASE_URL ausente",
       },
       { status: 200 }
@@ -57,6 +60,7 @@ export async function GET(request: Request) {
       abLeads,
       abOrders,
       ordersPage,
+      paywallFeedback,
     ] = await Promise.all([
       listLeadSearches({ limit: pageSize, offset: leadsOffset }),
       cacheStats(),
@@ -64,6 +68,7 @@ export async function GET(request: Request) {
       countLeadFunnelAb(),
       countOrderFunnelAb(),
       listRecentOrders({ limit: pageSize, offset: ordersOffset }),
+      countPaywallFeedback(),
     ]);
 
     const feeds = cachePage.rows.map((entry) => {
@@ -98,6 +103,8 @@ export async function GET(request: Request) {
       total,
       cache,
       ab: { leads: abLeads, orders: abOrders },
+      paywall_feedback: paywallFeedback,
+      paywall_feedback_total: paywallFeedback.reduce((sum, row) => sum + row.n, 0),
       page_size: pageSize,
       feeds_total: cachePage.total,
       orders_total: ordersPage.total,

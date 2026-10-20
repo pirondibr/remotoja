@@ -61,6 +61,7 @@ export const FUNNEL_ANSWER_LABELS: Record<string, string> = {
   name: "Nome",
   email: "E-mail",
   role: "Cargo",
+  paywall_feedback: "Por que não comprou",
 };
 
 function clean(value?: string | null): string | null {
@@ -78,7 +79,8 @@ export function sanitizeFunnelAnswers(
     const id = key.trim().slice(0, 40);
     if (!id || !(id in FUNNEL_ANSWER_LABELS)) continue;
     if (typeof value === "string") {
-      const v = value.trim().slice(0, 200);
+      const max = id === "paywall_feedback" ? 400 : 200;
+      const v = value.trim().slice(0, max);
       if (v) out[id] = v;
     } else if (Array.isArray(value)) {
       const list = value

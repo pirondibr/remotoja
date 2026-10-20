@@ -97,6 +97,8 @@ type SearchesPayload = {
   orders_total?: number;
   feeds_total?: number;
   page_size?: number;
+  paywall_feedback?: Array<{ reason: string; label: string; n: number }>;
+  paywall_feedback_total?: number;
   warning?: string;
   error?: string;
 };
@@ -381,6 +383,36 @@ export function AdminDashboard() {
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {data && (
+        <section className="mt-6 rounded-2xl border border-moss/10 bg-white p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
+            Por que não compraram
+          </p>
+          <p className="mt-1 text-xs text-moss/60">
+            Mini pergunta depois dos preços e se a pessoa tenta sair ·{" "}
+            {data.paywall_feedback_total || 0} resposta
+            {(data.paywall_feedback_total || 0) === 1 ? "" : "s"}
+          </p>
+          {(data.paywall_feedback_total || 0) === 0 && (
+            <p className="mt-2 text-xs text-moss/50">
+              Aparece no bloco abaixo dos planos e no popup se a pessoa sai sem
+              desbloquear.
+            </p>
+          )}
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {(data.paywall_feedback || []).map((row) => (
+              <li
+                key={row.reason}
+                className="flex items-center justify-between gap-3 rounded-xl bg-cream/70 px-3 py-2"
+              >
+                <span className="text-sm text-ink">{row.label}</span>
+                <span className="text-lg font-bold text-forest">{row.n}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -850,11 +882,14 @@ export function AdminDashboard() {
             )}
             {(data?.rows || []).map((row) => {
               const form = row.form_answers || [];
-              const formShort = form
-                .filter((a) => a.id !== "role")
-                .slice(0, 2)
-                .map((a) => a.value)
-                .join(" · ");
+              const feedback = form.find((a) => a.id === "paywall_feedback");
+              const formShort = feedback
+                ? feedback.value
+                : form
+                    .filter((a) => a.id !== "role")
+                    .slice(0, 2)
+                    .map((a) => a.value)
+                    .join(" · ");
               return (
               <Fragment key={row.id}>
                 <tr
