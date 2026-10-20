@@ -88,7 +88,12 @@ function formatWhen(iso: string) {
   }
 }
 
-type FeedMode = "cache" | "analyze" | "analyze_fresh" | "clear_analyze";
+type FeedMode =
+  | "member"
+  | "cache"
+  | "analyze"
+  | "analyze_fresh"
+  | "clear_analyze";
 
 export function AdminDashboard() {
   const searchParams = useSearchParams();
@@ -239,9 +244,9 @@ export function AdminDashboard() {
         </h2>
         <p className="mt-1 text-sm text-moss/70">
           Consultas em cache do funil <strong>demo</strong> e do script{" "}
-          <strong>pago</strong>. <strong>Cache</strong> = o que foi mostrado.{" "}
-          <strong>Análise</strong> = scrape + double-check (mesmas métricas nos
-          dois). <strong>Reanalisar</strong> tem{" "}
+          <strong>pago</strong>. <strong>Como membro</strong> = tela do cliente
+          (sem logs). <strong>Cache</strong> / <strong>Análise</strong> = visão
+          admin. <strong>Reanalisar</strong> tem{" "}
           <code className="text-xs">fresh=1</code> — não compartilhe.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -261,6 +266,13 @@ export function AdminDashboard() {
             placeholder="Cargo, ex.: gestor de trafego"
             className="flex-1 rounded-xl border border-moss/15 bg-cream/50 px-4 py-2.5 text-sm outline-none focus:border-moss/40"
           />
+          <button
+            type="button"
+            onClick={() => openFeed("member")}
+            className="rounded-xl bg-forest px-4 py-2.5 text-sm font-bold text-cream hover:bg-ink"
+          >
+            Ver como membro
+          </button>
           <button
             type="button"
             onClick={() => openFeed("cache")}
@@ -354,6 +366,14 @@ export function AdminDashboard() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           <div className="flex flex-wrap justify-end gap-3">
+                            {feed.kind === "paid" && (
+                              <Link
+                                href={feedHref(feed.role, "member", "paid")}
+                                className="text-xs font-semibold text-forest hover:underline"
+                              >
+                                Como membro
+                              </Link>
+                            )}
                             <Link
                               href={feedHref(feed.role, "cache", feed.kind)}
                               className="text-xs font-semibold text-moss hover:underline"
@@ -666,6 +686,12 @@ export function AdminDashboard() {
                             className="text-xs font-semibold text-forest hover:underline"
                           >
                             Análise demo →
+                          </Link>
+                          <Link
+                            href={feedHref(row.role, "member", "paid")}
+                            className="text-xs font-semibold text-forest hover:underline"
+                          >
+                            Como membro →
                           </Link>
                           <Link
                             href={feedHref(row.role, "analyze", "paid")}

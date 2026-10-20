@@ -8,6 +8,7 @@ import { hasDatabase } from "@/lib/db";
  * Libera cookie de inspeção e abre o feed (demo ou pago).
  *
  * Modes:
+ *   ?mode=member         → visão do membro (sem inspect/logs)
  *   ?mode=cache          → o que o usuário viu (só cache)
  *   ?mode=analyze        → análise salva (cache); se não houver, roda e salva
  *   ?mode=analyze_fresh  → força nova análise ao vivo e sobrescreve o cache
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   const modeParam = (url.searchParams.get("mode") || "").toLowerCase();
   // Compat: validate=1 antigo = analyze
   const mode =
+    modeParam === "member" ||
     modeParam === "cache" ||
     modeParam === "analyze" ||
     modeParam === "analyze_fresh" ||
@@ -52,6 +54,15 @@ export async function GET(request: Request) {
 
   const dest = new URL("/app", url.origin);
   dest.searchParams.set("role", role);
+
+  if (mode === "member") {
+    // Mesma tela do membro pago — sem inspect, logs ou abas de análise
+    const res = NextResponse.redirect(dest);
+    const cookie = demoCookieOptions(buildDemoToken());
+    res.cookies.set(cookie.name, cookie.value, cookie);
+    return res;
+  }
+
   dest.searchParams.set("inspect", "1");
   dest.searchParams.set("script", kind);
 
