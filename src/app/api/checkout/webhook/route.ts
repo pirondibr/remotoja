@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { fetchMpPayment, getMpAccessToken, hasMercadoPago } from "@/lib/mercadoPago";
-import { sendMetaPurchase } from "@/lib/metaCapi";
+import { sendUniqueMetaPurchase } from "@/lib/metaCapi";
 import {
   getOrder,
-  markMetaPurchaseSent,
   markOrderApproved,
   markOrderStatus,
-  shouldSendMetaPurchase,
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
@@ -41,23 +39,20 @@ async function processPayment(paymentId: string) {
       funnelVariant: order.funnel_variant,
     });
 
-    if (await shouldSendMetaPurchase(orderId)) {
-      const plan = getPlan(order.plan_id);
-      const value =
-        typeof order.amount_brl === "number"
-          ? Number(order.amount_brl)
-          : plan?.priceBrl ?? 0;
-      const sent = await sendMetaPurchase({
-        paymentId: String(payment.id),
-        orderId,
-        value,
-        planId: order.plan_id,
-        email: payment.payer?.email || order.payer_email,
-      });
-      if (sent.ok && !sent.skipped) {
-        await markMetaPurchaseSent(orderId);
-      }
-    }
+    const plan = getPlan(order.plan_id);
+    const value =
+      typeof order.amount_brl === "number"
+        ? Number(order.amount_brl)
+        : plan?.priceBrl ?? 0;
+    await sendUniqueMetaPurchase({
+      paymentId: String(payment.id),
+      orderId,
+      value,
+      planId: order.plan_id,
+      email: payment.payer?.email || order.payer_email,
+      fbp: order.fbp,
+      fbc: order.fbc,
+    });
     return;
   }
 

@@ -77,8 +77,9 @@ export function metaBrowserIds(fbclid?: string | null): {
   };
 }
 
-export function purchaseEventId(paymentId: string): string {
-  return `purchase_${paymentId}`;
+/** Mesmo event_id no pixel e na CAPI — um por pedido, para a Meta deduplicar. */
+export function purchaseEventId(orderId: string): string {
+  return `purchase_${orderId}`;
 }
 
 export function initiateCheckoutEventId(orderId: string): string {
@@ -93,6 +94,64 @@ export function searchEventId(role: string): string {
     .replace(/[^a-z0-9_]/g, "")
     .slice(0, 40);
   return `search_${key || "cargo"}_${Date.now()}`;
+}
+
+export async function waitForMetaPixel(timeoutMs = 2500): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (typeof window.fbq === "function") return true;
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    if (typeof window.fbq === "function") return true;
+  }
+  return typeof window.fbq === "function";
+}
+
+export function trackPurchaseOnce(
+  orderId: string,
+  params: MetaEventParams,
+  eventId: string
+): void {
+  if (typeof window === "undefined") return;
+  const key = `mvr_px_purchase_${orderId}`;
+  try {
+    if (sessionStorage.getItem(key) === "1") return;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    /* segue o disparo */
+  }
+  trackMetaEvent("Purchase", params, eventId);
+}
+
+export async function firePurchasePixel(input: {
+  orderId?: string | null;
+  paymentId?: string | null;
+  eventId?: string | null;
+  value?: number;
+  planId?: string | null;
+}): Promise<void> {
+  const orderId = (input.orderId || "").trim();
+  const eventId =
+    (input.eventId || "").trim() ||
+    (orderId
+      ? purchaseEventId(orderId)
+      : input.paymentId
+        ? purchaseEventId(input.paymentId)
+        : "");
+  if (!eventId) return;
+  await waitForMetaPixel();
+  trackPurchaseOnce(
+    orderId || eventId,
+    {
+      value: input.value,
+      currency: "BRL",
+      content_ids: input.planId ? [input.planId] : undefined,
+      content_type: "product",
+      num_items: 1,
+    },
+    eventId
+  );
+  await new Promise((resolve) => window.setTimeout(resolve, 280));
 }
 
 export function trackJobSearch(role: string, eventId?: string): void {

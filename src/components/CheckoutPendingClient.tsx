@@ -5,11 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { loadAttribution } from "@/lib/attribution";
-import {
-  metaBrowserIds,
-  purchaseEventId,
-  trackMetaEvent,
-} from "@/lib/metaPixel";
+import { firePurchasePixel, metaBrowserIds } from "@/lib/metaPixel";
 
 /**
  * Pix: MP redireciona para pending antes de creditar.
@@ -61,23 +57,19 @@ export function CheckoutPendingClient() {
           amountBrl?: number;
           paymentId?: string;
           eventId?: string;
+          orderId?: string;
           status?: string;
           error?: string;
         };
 
         if (res.ok && data.ok) {
-          const pid = data.paymentId || paymentId;
-          trackMetaEvent(
-            "Purchase",
-            {
-              value: data.amountBrl,
-              currency: "BRL",
-              content_ids: data.planId ? [data.planId] : undefined,
-              content_type: "product",
-              num_items: 1,
-            },
-            data.eventId || purchaseEventId(pid)
-          );
+          await firePurchasePixel({
+            orderId: data.orderId || externalReference,
+            paymentId: data.paymentId || paymentId,
+            eventId: data.eventId,
+            value: data.amountBrl,
+            planId: data.planId,
+          });
           const role = data.role || "SEO";
           if (!cancelled) {
             router.replace(`/app?role=${encodeURIComponent(role)}`);

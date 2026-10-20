@@ -15,6 +15,8 @@ export type OrderRow = {
   access_until: string | null;
   meta_purchase_sent_at?: string | null;
   funnel_variant?: FeedAbVariant | null;
+  fbp?: string | null;
+  fbc?: string | null;
 };
 
 export async function ensureOrdersSchema(): Promise<void> {
@@ -45,6 +47,14 @@ export async function ensureOrdersSchema(): Promise<void> {
     ADD COLUMN IF NOT EXISTS funnel_variant text
   `;
   await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS fbp text
+  `;
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS fbc text
+  `;
+  await sql`
     CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC)
   `;
 }
@@ -56,6 +66,8 @@ export async function createOrder(input: {
   amountBrl: number;
   payerEmail?: string;
   funnelVariant?: FeedAbVariant | string | null;
+  fbp?: string | null;
+  fbc?: string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
   await ensureOrdersSchema();
@@ -63,7 +75,7 @@ export async function createOrder(input: {
   const funnelVariant = parseFeedAb(input.funnelVariant);
   await sql`
     INSERT INTO orders (
-      id, plan_id, role, amount_brl, status, payer_email, funnel_variant
+      id, plan_id, role, amount_brl, status, payer_email, funnel_variant, fbp, fbc
     )
     VALUES (
       ${input.id},
@@ -72,9 +84,36 @@ export async function createOrder(input: {
       ${input.amountBrl},
       'pending',
       ${input.payerEmail || null},
-      ${funnelVariant}
+      ${funnelVariant},
+      ${cleanClickId(input.fbp)},
+      ${cleanClickId(input.fbc)}
     )
     ON CONFLICT (id) DO NOTHING
+  `;
+}
+
+function cleanClickId(value?: string | null): string | null {
+  const next = (value || "").trim();
+  return next ? next.slice(0, 200) : null;
+}
+
+export async function saveOrderClickIds(input: {
+  orderId: string;
+  fbp?: string | null;
+  fbc?: string | null;
+}): Promise<void> {
+  if (!hasDatabase()) return;
+  const fbp = cleanClickId(input.fbp);
+  const fbc = cleanClickId(input.fbc);
+  if (!fbp && !fbc) return;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  await sql`
+    UPDATE orders
+    SET
+      fbp = COALESCE(${fbp}, fbp),
+      fbc = COALESCE(${fbc}, fbc)
+    WHERE id = ${input.orderId}
   `;
 }
 
@@ -141,33 +180,33 @@ export async function markOrderStatus(
   `;
 }
 
-/** True se Purchase CAPI ainda não foi gravado (pode tentar enviar). */
-export async function shouldSendMetaPurchase(
+/** Reserva o envio do Purchase: só um caller ganha, mesmo com webhook + confirm juntos. */
+export async function claimMetaPurchaseSend(
   orderId: string
 ): Promise<boolean> {
   if (!hasDatabase()) return true;
   await ensureOrdersSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT meta_purchase_sent_at
-    FROM orders
+    UPDATE orders
+    SET meta_purchase_sent_at = now()
     WHERE id = ${orderId}
-    LIMIT 1
+      AND meta_purchase_sent_at IS NULL
+    RETURNING id
   `;
-  const row = rows[0] as { meta_purchase_sent_at?: string | null } | undefined;
-  return !row?.meta_purchase_sent_at;
+  return rows.length > 0;
 }
 
-/** Marca Purchase CAPI enviado com sucesso. */
-export async function markMetaPurchaseSent(orderId: string): Promise<void> {
+export async function releaseMetaPurchaseSend(
+  orderId: string
+): Promise<void> {
   if (!hasDatabase()) return;
   await ensureOrdersSchema();
   const sql = getSql();
   await sql`
     UPDATE orders
-    SET meta_purchase_sent_at = now()
+    SET meta_purchase_sent_at = NULL
     WHERE id = ${orderId}
-      AND meta_purchase_sent_at IS NULL
   `;
 }
 

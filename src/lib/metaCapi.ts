@@ -1,6 +1,10 @@
 import { createHash } from "crypto";
 import { appBaseUrl } from "@/lib/mercadoPago";
 import {
+  claimMetaPurchaseSend,
+  releaseMetaPurchaseSend,
+} from "@/lib/orders";
+import {
   initiateCheckoutEventId,
   purchaseEventId,
   searchEventId,
@@ -178,7 +182,7 @@ export async function sendMetaPurchase(input: {
 }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   return sendMetaCapiEvent({
     eventName: "Purchase",
-    eventId: purchaseEventId(input.paymentId),
+    eventId: purchaseEventId(input.orderId),
     eventSourceUrl: input.eventSourceUrl || `${appBaseUrl()}/checkout/success`,
     userData: {
       email: input.email,
@@ -196,6 +200,20 @@ export async function sendMetaPurchase(input: {
       num_items: 1,
     },
   });
+}
+
+export async function sendUniqueMetaPurchase(
+  input: Parameters<typeof sendMetaPurchase>[0]
+): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const claimed = await claimMetaPurchaseSend(input.orderId);
+  if (!claimed) {
+    return { ok: true, skipped: true };
+  }
+  const sent = await sendMetaPurchase(input);
+  if (!sent.ok || sent.skipped) {
+    await releaseMetaPurchaseSend(input.orderId);
+  }
+  return sent;
 }
 
 export async function sendMetaInitiateCheckout(input: {

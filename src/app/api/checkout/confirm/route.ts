@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { fetchMpPayment, hasMercadoPago } from "@/lib/mercadoPago";
-import { sendMetaPurchase } from "@/lib/metaCapi";
+import { purchaseEventId, sendUniqueMetaPurchase } from "@/lib/metaCapi";
 import {
   buildMemberToken,
   memberCookieOptions,
 } from "@/lib/memberAuth";
 import {
   getOrder,
-  markMetaPurchaseSent,
   markOrderApproved,
-  shouldSendMetaPurchase,
+  saveOrderClickIds,
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
@@ -91,22 +90,24 @@ export async function POST(request: Request) {
       });
     }
 
-    if (await shouldSendMetaPurchase(orderId)) {
-      const sent = await sendMetaPurchase({
-        paymentId: String(payment.id),
-        orderId,
-        value: amountBrl,
-        planId,
-        email: payment.payer?.email || order?.payer_email,
-        fbp: body.fbp,
-        fbc: body.fbc,
-        clientIp: clientIp(request),
-        userAgent: request.headers.get("user-agent"),
-      });
-      if (sent.ok && !sent.skipped) {
-        await markMetaPurchaseSent(orderId);
-      }
-    }
+    await saveOrderClickIds({
+      orderId,
+      fbp: body.fbp,
+      fbc: body.fbc,
+    });
+    order = (await getOrder(orderId)) || order;
+
+    await sendUniqueMetaPurchase({
+      paymentId: String(payment.id),
+      orderId,
+      value: amountBrl,
+      planId,
+      email: payment.payer?.email || order?.payer_email,
+      fbp: body.fbp || order?.fbp,
+      fbc: body.fbc || order?.fbc,
+      clientIp: clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
 
     await logPaidPurchase({
       role,
@@ -128,7 +129,8 @@ export async function POST(request: Request) {
       planId,
       amountBrl,
       paymentId: String(payment.id),
-      eventId: `purchase_${payment.id}`,
+      eventId: purchaseEventId(orderId),
+      orderId,
       accessUntil: accessUntil.toISOString(),
     });
     const cookie = memberCookieOptions(token);

@@ -56,6 +56,8 @@ export async function POST(request: Request) {
       amountBrl: plan.priceBrl,
       payerEmail: email,
       funnelVariant,
+      fbp: body.fbp,
+      fbc: body.fbc,
     });
 
     const preference = await createCheckoutPreference({
