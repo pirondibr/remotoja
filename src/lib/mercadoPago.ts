@@ -73,7 +73,12 @@ export async function createCheckoutPreference(
       failure: `${base}/checkout/failure`,
       pending: `${base}/checkout/pending`,
     },
-    auto_return: "approved",
+    /**
+     * `approved` só volta sozinho no cartão aprovado (e o MP pode levar até 40s).
+     * `all` também devolve no Pix pendente — senão a pessoa fica na tela do MP
+     * e precisa clicar em “Voltar ao site”.
+     */
+    auto_return: "all",
     notification_url: `${base}/api/checkout/webhook`,
     statement_descriptor: "MINHAVAGAREM",
     // Cartão + PIX (exclui boleto/lotérica)
@@ -83,21 +88,43 @@ export async function createCheckoutPreference(
     },
   };
 
-  const res = await fetch(`${MP_API}/checkout/preferences`, {
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "X-Idempotency-Key": input.orderId,
+  };
+
+  let res = await fetch(`${MP_API}/checkout/preferences`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-Idempotency-Key": input.orderId,
-    },
+    headers,
     body: JSON.stringify(body),
     cache: "no-store",
   });
 
-  const data = (await res.json()) as PreferenceResult & {
+  let data = (await res.json()) as PreferenceResult & {
     message?: string;
     error?: string;
+    cause?: Array<{ code?: string; description?: string }>;
   };
+
+  const autoReturnRejected =
+    !res.ok &&
+    /auto_return/i.test(
+      `${data.message || ""} ${data.error || ""} ${JSON.stringify(data.cause || [])}`
+    );
+  if (autoReturnRejected) {
+    res = await fetch(`${MP_API}/checkout/preferences`, {
+      method: "POST",
+      headers: {
+        ...headers,
+        "X-Idempotency-Key": `${input.orderId}-approved`,
+      },
+      body: JSON.stringify({ ...body, auto_return: "approved" }),
+      cache: "no-store",
+    });
+    data = (await res.json()) as typeof data;
+  }
+
   if (!res.ok || !data.id || !data.init_point) {
     throw new Error(
       data.message || data.error || `Mercado Pago HTTP ${res.status}`
