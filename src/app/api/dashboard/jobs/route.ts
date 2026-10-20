@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasMemberAccess, isAccessGateEnabled } from "@/lib/access";
+import { canOpenPaidFeed, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import {
   getCachedJobs,
@@ -95,15 +95,14 @@ function buildAnalyzeSources(
 }
 
 export async function GET(request: Request) {
-  if (isAccessGateEnabled() && !(await hasMemberAccess())) {
+  const { searchParams } = new URL(request.url);
+  const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
+  if (isAccessGateEnabled() && !(await canOpenPaidFeed(role))) {
     return NextResponse.json(
       { error: "Acesso de membro necessário. Conclua o pagamento." },
       { status: 401 }
     );
   }
-
-  const { searchParams } = new URL(request.url);
-  const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const bypassCache = searchParams.get("fresh") === "1";
   /**
    * Admin analyze explícito (logs). Feed pago também valida — ver `runValidate`.

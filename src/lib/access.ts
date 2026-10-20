@@ -5,6 +5,7 @@ import {
   isValidDemoToken,
   parseMemberToken,
 } from "@/lib/memberAuth";
+import { hasApprovedOrderForRole } from "@/lib/orders";
 
 /** Sem token MP e sem segredo de demo → feed aberto (dev / pré-checkout). */
 export function isAccessGateEnabled(): boolean {
@@ -26,4 +27,9 @@ export async function hasMemberAccess(): Promise<boolean> {
   const jar = await cookies();
   if (isValidDemoToken(jar.get(DEMO_COOKIE)?.value)) return true;
   return false;
+}
+
+export async function canOpenPaidFeed(role?: string | null): Promise<boolean> {
+  if (await hasMemberAccess()) return true;
+  return hasApprovedOrderForRole(role || "");
 }

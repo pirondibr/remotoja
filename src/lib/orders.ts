@@ -1,4 +1,4 @@
-import { ensureSchema, getSql, hasDatabase } from "@/lib/db";
+import { ensureSchema, getSql, hasDatabase, normalizeRoleKey } from "@/lib/db";
 import { parseFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import type { PlanId } from "@/lib/rrPlans";
 
@@ -275,4 +275,21 @@ export async function listRecentOrders(options?: {
       funnel_variant: parseFeedAb(row.funnel_variant),
     })),
   };
+}
+
+/** Link /app?role=… funciona sem cookie se existir pedido aprovado vigente daquele cargo. */
+export async function hasApprovedOrderForRole(role: string): Promise<boolean> {
+  const needle = normalizeRoleKey(role);
+  if (needle.length < 2 || !hasDatabase()) return false;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT role
+    FROM orders
+    WHERE status = 'approved'
+      AND (access_until IS NULL OR access_until > now())
+    ORDER BY created_at DESC
+    LIMIT 200
+  `) as unknown as Array<{ role: string }>;
+  return rows.some((row) => normalizeRoleKey(row.role || "") === needle);
 }

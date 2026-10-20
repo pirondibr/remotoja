@@ -1,14 +1,4 @@
 import { Suspense } from "react";
-import { redirect } from "next/navigation";
-import { hasMemberAccess } from "@/lib/access";
-
-async function MemberGate({ children }: { children: React.ReactNode }) {
-  const ok = await hasMemberAccess();
-  if (!ok) {
-    redirect("/onboard");
-  }
-  return children;
-}
 
 export default function MemberAppLayout({
   children,
@@ -23,7 +13,7 @@ export default function MemberAppLayout({
         </div>
       }
     >
-      <MemberGate>{children}</MemberGate>
+      {children}
     </Suspense>
   );
 }
