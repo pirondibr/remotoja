@@ -51,6 +51,36 @@ const RELATED_BY_TERM: Record<string, string[]> = {
   desenvolvedor: ["programador", "developer", "software engineer"],
 };
 
+const STOPWORDS = new Set([
+  "a",
+  "o",
+  "os",
+  "as",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "em",
+  "no",
+  "na",
+  "ao",
+  "aos",
+  "para",
+  "por",
+  "com",
+  "e",
+  "ou",
+  "um",
+  "uma",
+]);
+
+function significantParts(term: string): string[] {
+  return term
+    .split(/\s+/)
+    .filter((p) => p.length >= 2 && !STOPWORDS.has(p));
+}
+
 function relatedHints(term: string): string[] {
   const t = norm(term);
   const hints = new Set<string>(RELATED_BY_TERM[t] || []);
@@ -79,10 +109,10 @@ export function classifyCargoMatch(
   const title = norm(job.title || "");
   const company = norm(job.company || "");
   const snippet = norm(job.snippet || "");
-  const parts = t.split(/\s+/).filter(Boolean);
+  const parts = significantParts(t);
 
   if (title.includes(t)) return "exato";
-  if (parts.length > 1 && parts.every((p) => title.includes(p))) return "exato";
+  if (parts.length > 0 && parts.every((p) => title.includes(p))) return "exato";
 
   const hints = relatedHints(t);
   if (hints.some((h) => h.length >= 3 && title.includes(h))) {
@@ -107,6 +137,15 @@ export function classifyCargoMatch(
   }
 
   return "fora";
+}
+
+/** Demo: aceita exato + relacionado (sinônimos), rejeita cargo misturado. */
+export function roleFitsDemoJob(
+  job: { title?: string; company?: string; snippet?: string | null },
+  term: string
+): boolean {
+  const tier = classifyCargoMatch(job, term);
+  return tier === "exato" || tier === "relacionado";
 }
 
 export function matchTierLabel(tier: MatchTier): string {

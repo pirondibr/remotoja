@@ -1,5 +1,5 @@
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
-import { termMatches } from "@/lib/dashboard/common";
+import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
 import type { DemoJob } from "@/lib/demoJobs";
 
 const API_POST = "https://api.dataforseo.com/v3/serp/google/jobs/task_post";
@@ -132,13 +132,8 @@ export async function fetchGoogleJobsByRole(
       const jobs = items
         .map(normalizeItem)
         .filter((job): job is DemoJob => Boolean(job))
-        // Google mistura vagas; só mantém o que casa com o cargo (ex.: SEO ≠ Full Stack)
-        .filter((job) =>
-          termMatches(
-            `${job.title} ${job.snippet || ""} ${job.company}`,
-            roleTerm
-          )
-        );
+        // Google mistura vagas; exato + sinônimos (atendente ↔ atendimento), não Full Stack em SEO
+        .filter((job) => roleFitsDemoJob(job, roleTerm));
       return {
         query,
         role: roleTerm,

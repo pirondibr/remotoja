@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
-import { termMatches } from "@/lib/dashboard/common";
+import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
@@ -10,6 +10,9 @@ import {
   withDemoFakePosted,
   type DemoJob,
 } from "@/lib/demoJobs";
+
+/** Funil mostra 3+1; abaixo disso a prévia parece quebrada. */
+const MIN_DEMO_JOBS = 4;
 
 function prepareDemoJobs(jobs: DemoJob[]): DemoJob[] {
   return withDemoFakePosted(dedupeDemoJobs(jobs));
@@ -27,11 +30,7 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
     const { jobs } = await fetchRemotar(role);
-    return jobs
-      .filter((job) =>
-        termMatches(`${job.title} ${job.snippet || ""} ${job.company}`, role)
-      )
-      .slice(0, 10);
+    return jobs.filter((job) => roleFitsDemoJob(job, role)).slice(0, 12);
   } catch {
     return [];
   }
@@ -68,13 +67,10 @@ export async function GET(request: Request) {
       ) {
         // Reaplica filtro de cargo (cache antigo podia ter Full Stack em busca SEO)
         const filtered = (cached.jobs as DemoJob[]).filter((job) =>
-          termMatches(
-            `${job.title} ${job.snippet || ""} ${job.company}`,
-            role
-          )
+          roleFitsDemoJob(job, role)
         );
-        if (filtered.length === 0) {
-          // Cache só com lixo → busca live
+        if (filtered.length < MIN_DEMO_JOBS) {
+          // Poucas vagas / cache antigo estreito → busca live e completa
         } else {
           const jobs = prepareDemoJobs(filtered);
           return NextResponse.json({
@@ -97,27 +93,40 @@ export async function GET(request: Request) {
 
   try {
     const result = await fetchGoogleJobsByRole(role, {
-      depth: 10,
+      depth: 20,
       maxAttempts: 14,
       pollMs: 2000,
     });
 
-    if (result.jobs.length > 0) {
+    let merged = result.jobs;
+    if (merged.length < MIN_DEMO_JOBS) {
+      const extra = await fetchRemotarFallback(role);
+      merged = dedupeDemoJobs([...merged, ...extra]);
+    }
+
+    if (merged.length > 0) {
       try {
         await setCachedJobs({
           kind: "demo",
           role,
-          jobs: result.jobs,
-          fetched_via: result.fetched_via,
+          jobs: merged,
+          fetched_via:
+            merged.length > result.jobs.length
+              ? "dataforseo_google_jobs+remotar"
+              : result.fetched_via,
         });
       } catch {
         // ignore
       }
-      const jobs = prepareDemoJobs(result.jobs);
+      const jobs = prepareDemoJobs(merged);
       return NextResponse.json({
         ...result,
         jobs,
         count: jobs.length,
+        fetched_via:
+          merged.length > result.jobs.length
+            ? "dataforseo_google_jobs+remotar"
+            : result.fetched_via,
         cached: false,
       });
     }

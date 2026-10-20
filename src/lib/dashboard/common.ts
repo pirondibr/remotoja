@@ -268,15 +268,42 @@ const NON_DEV_ROLE =
 const DEV_TITLE_NOISE =
   /\b(desenvolvedor|developer|programador|full\s*stack|front[\s-]?end|back[\s-]?end|software\s*engineer|engenheiro\s+de\s+software|react\s*native|mobile\s*developer)\b/i;
 
+const MATCH_STOPWORDS = new Set([
+  "a",
+  "o",
+  "os",
+  "as",
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "em",
+  "no",
+  "na",
+  "ao",
+  "aos",
+  "para",
+  "por",
+  "com",
+  "e",
+  "ou",
+  "um",
+  "uma",
+]);
+
 export function termMatches(title: string, term: string): boolean {
   const t = term.trim().toLowerCase();
   if (!t) return true;
   const hay = title.toLowerCase();
 
+  const parts = t
+    .split(/\s+/)
+    .filter((p) => p.length >= 2 && !MATCH_STOPWORDS.has(p));
+
   const hitsTerm =
     hay.includes(t) ||
-    (t.split(/\s+/).filter(Boolean).length > 1 &&
-      t.split(/\s+/).filter(Boolean).every((p) => hay.includes(p)));
+    (parts.length > 0 && parts.every((p) => hay.includes(p)));
 
   if (!hitsTerm) return false;
 
