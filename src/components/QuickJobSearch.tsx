@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import {
+  demoJobsUrl,
+  trackSearchFromJobsPayload,
+} from "@/lib/fetchDemoJobsClient";
+import {
   formatDemoJobAgo,
   formatJobBadge,
   formatJobMeta,
@@ -36,8 +40,10 @@ export function QuickJobSearch() {
     setSource(null);
 
     try {
-      const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
+      const { url: jobsUrl, eventId: searchId } = demoJobsUrl(trimmed);
+      const res = await fetch(jobsUrl);
       const data = await res.json();
+      trackSearchFromJobsPayload(trimmed, data, searchId);
       const list: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
       setJobs(list);
       setQuery(data.query || buildJobsQuery(trimmed));

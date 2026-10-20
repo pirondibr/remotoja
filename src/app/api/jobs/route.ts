@@ -5,6 +5,9 @@ import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
+import { sendMetaSearch } from "@/lib/metaCapi";
+import { searchEventId } from "@/lib/metaPixel";
+import { appBaseUrl } from "@/lib/mercadoPago";
 import {
   dedupeDemoJobs,
   withDemoFakePosted,
@@ -34,6 +37,33 @@ async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   } catch {
     return [];
   }
+}
+
+function clientIp(request: Request): string | undefined {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
+  return request.headers.get("x-real-ip")?.trim() || undefined;
+}
+
+/** Search padrão Meta (CAPI). Não mexe no Purchase / otimização do conjunto. */
+function jsonWithSearch(
+  request: Request,
+  role: string,
+  payload: Record<string, unknown>
+) {
+  const url = new URL(request.url);
+  const eventId =
+    url.searchParams.get("event_id")?.trim() || searchEventId(role);
+  void sendMetaSearch({
+    eventId,
+    searchString: role,
+    fbp: url.searchParams.get("fbp"),
+    fbc: url.searchParams.get("fbc"),
+    clientIp: clientIp(request),
+    userAgent: request.headers.get("user-agent"),
+    eventSourceUrl: `${appBaseUrl()}/onboard`,
+  }).catch(() => {});
+  return NextResponse.json({ ...payload, eventId });
 }
 
 export async function GET(request: Request) {
@@ -73,7 +103,7 @@ export async function GET(request: Request) {
           // Poucas vagas / cache antigo estreito → busca live e completa
         } else {
           const jobs = prepareDemoJobs(filtered);
-          return NextResponse.json({
+          return jsonWithSearch(request, role, {
             role,
             query: buildJobsQuery(role),
             count: jobs.length,
@@ -119,7 +149,7 @@ export async function GET(request: Request) {
         // ignore
       }
       const jobs = prepareDemoJobs(merged);
-      return NextResponse.json({
+      return jsonWithSearch(request, role, {
         ...result,
         jobs,
         count: jobs.length,
@@ -149,7 +179,7 @@ export async function GET(request: Request) {
       // ignore
     }
     const jobs = prepareDemoJobs(remotarJobs);
-    return NextResponse.json({
+    return jsonWithSearch(request, role, {
       role,
       query: buildJobsQuery(role),
       count: jobs.length,
@@ -162,7 +192,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({
+  return jsonWithSearch(request, role, {
     role,
     query: buildJobsQuery(role),
     count: 0,

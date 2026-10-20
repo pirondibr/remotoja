@@ -7,6 +7,8 @@ export type MetaEventParams = {
   content_type?: string;
   contents?: Array<{ id: string; quantity: number }>;
   num_items?: number;
+  search_string?: string;
+  content_category?: string;
 };
 
 declare global {
@@ -81,4 +83,27 @@ export function purchaseEventId(paymentId: string): string {
 
 export function initiateCheckoutEventId(orderId: string): string {
   return `initiate_checkout_${orderId}`;
+}
+
+export function searchEventId(role: string): string {
+  const key = role
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 40);
+  return `search_${key || "cargo"}_${Date.now()}`;
+}
+
+export function trackJobSearch(role: string, eventId?: string): void {
+  const search_string = role.trim().slice(0, 120);
+  if (search_string.length < 2) return;
+  trackMetaEvent(
+    "Search",
+    {
+      search_string,
+      content_category: "vagas_remotas",
+    },
+    eventId
+  );
 }

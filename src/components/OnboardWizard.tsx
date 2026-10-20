@@ -8,6 +8,10 @@ import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { startCheckout } from "@/lib/startCheckout";
 import {
+  demoJobsUrl,
+  trackSearchFromJobsPayload,
+} from "@/lib/fetchDemoJobsClient";
+import {
   captureAttributionFromUrl,
   loadAttribution,
 } from "@/lib/attribution";
@@ -248,11 +252,13 @@ export function OnboardWizard() {
     setJobsLoading(true);
     setJobsError(null);
 
-    fetch(`/api/jobs?role=${encodeURIComponent(roleQuery)}`, {
+    const { url: jobsUrl, eventId: searchId } = demoJobsUrl(roleQuery);
+    fetch(jobsUrl, {
       signal: controller.signal,
     })
       .then(async (res) => {
         const data = await res.json();
+        trackSearchFromJobsPayload(roleQuery, data, searchId);
         const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
         setLiveJobs(dedupeDemoJobs(jobs).slice(0, 8));
         if (jobs.length === 0) {

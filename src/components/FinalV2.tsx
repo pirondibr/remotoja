@@ -13,6 +13,10 @@ import {
 import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 import { startCheckout } from "@/lib/startCheckout";
+import {
+  demoJobsUrl,
+  trackSearchFromJobsPayload,
+} from "@/lib/fetchDemoJobsClient";
 
 function postedLabel(job: DemoJob): string {
   return formatDemoJobAgo(job);
@@ -230,8 +234,10 @@ export function FinalV2() {
     setPhase("results");
 
     try {
-      const res = await fetch(`/api/jobs?role=${encodeURIComponent(trimmed)}`);
+      const { url: jobsUrl, eventId: searchId } = demoJobsUrl(trimmed);
+      const res = await fetch(jobsUrl);
       const data = await res.json().catch(() => ({}));
+      trackSearchFromJobsPayload(trimmed, data, searchId);
       const list: DemoJob[] = dedupeDemoJobs(
         Array.isArray(data.jobs) ? data.jobs : []
       );

@@ -3,9 +3,10 @@ import { appBaseUrl } from "@/lib/mercadoPago";
 import {
   initiateCheckoutEventId,
   purchaseEventId,
+  searchEventId,
 } from "@/lib/metaPixel";
 
-export { initiateCheckoutEventId, purchaseEventId };
+export { initiateCheckoutEventId, purchaseEventId, searchEventId };
 
 const GRAPH_VERSION = "v21.0";
 
@@ -48,6 +49,8 @@ export type MetaCapiCustomData = {
   content_type?: string;
   order_id?: string;
   num_items?: number;
+  search_string?: string;
+  content_category?: string;
 };
 
 export type SendMetaEventInput = {
@@ -105,6 +108,12 @@ export async function sendMetaCapiEvent(
     if (input.customData.order_id) custom.order_id = input.customData.order_id;
     if (typeof input.customData.num_items === "number") {
       custom.num_items = input.customData.num_items;
+    }
+    if (input.customData.search_string) {
+      custom.search_string = input.customData.search_string;
+    }
+    if (input.customData.content_category) {
+      custom.content_category = input.customData.content_category;
     }
     event.custom_data = custom;
   }
@@ -218,6 +227,38 @@ export async function sendMetaInitiateCheckout(input: {
       content_type: "product",
       order_id: input.orderId,
       num_items: 1,
+    },
+  });
+}
+
+export async function sendMetaSearch(input: {
+  eventId: string;
+  searchString: string;
+  contentCategory?: string;
+  fbp?: string | null;
+  fbc?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  eventSourceUrl?: string;
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  const search_string = input.searchString.trim().slice(0, 120);
+  if (search_string.length < 2) {
+    return { ok: true, skipped: true };
+  }
+  return sendMetaCapiEvent({
+    eventName: "Search",
+    eventId: input.eventId,
+    eventSourceUrl: input.eventSourceUrl || `${appBaseUrl()}/onboard`,
+    userData: {
+      fbp: input.fbp,
+      fbc: input.fbc,
+      clientIp: input.clientIp,
+      userAgent: input.userAgent,
+    },
+    customData: {
+      search_string,
+      content_category: input.contentCategory || "vagas_remotas",
+      content_type: "product",
     },
   });
 }
