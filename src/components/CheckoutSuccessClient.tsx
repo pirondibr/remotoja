@@ -52,6 +52,7 @@ export function CheckoutSuccessClient() {
           paymentId?: string;
           eventId?: string;
           orderId?: string;
+          hasAccount?: boolean;
           error?: string;
         };
         if (!res.ok || !data.ok) {
@@ -69,7 +70,11 @@ export function CheckoutSuccessClient() {
 
         const role = data.role || "SEO";
         if (!cancelled) {
-          router.replace(`/app?role=${encodeURIComponent(role)}`);
+          router.replace(
+            data.hasAccount
+              ? `/app?role=${encodeURIComponent(role)}`
+              : `/conta/criar?role=${encodeURIComponent(role)}`
+          );
         }
       } catch {
         if (!cancelled) setError("Falha de rede ao confirmar o pagamento.");

@@ -131,6 +131,24 @@ export async function attachPreference(
   `;
 }
 
+export async function findLatestApprovedOrderByEmail(
+  email: string
+): Promise<OrderRow | null> {
+  const needle = email.trim().toLowerCase();
+  if (!needle || !hasDatabase()) return null;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM orders
+    WHERE status = 'approved'
+      AND payer_email ILIKE ${needle}
+      AND (access_until IS NULL OR access_until > now())
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  return (rows[0] as OrderRow | undefined) || null;
+}
+
 export async function getOrder(orderId: string): Promise<OrderRow | null> {
   if (!hasDatabase()) return null;
   await ensureOrdersSchema();

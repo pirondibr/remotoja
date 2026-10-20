@@ -58,6 +58,7 @@ export function CheckoutPendingClient() {
           paymentId?: string;
           eventId?: string;
           orderId?: string;
+          hasAccount?: boolean;
           status?: string;
           error?: string;
         };
@@ -72,7 +73,11 @@ export function CheckoutPendingClient() {
           });
           const role = data.role || "SEO";
           if (!cancelled) {
-            router.replace(`/app?role=${encodeURIComponent(role)}`);
+            router.replace(
+              data.hasAccount
+                ? `/app?role=${encodeURIComponent(role)}`
+                : `/conta/criar?role=${encodeURIComponent(role)}`
+            );
           }
           return;
         }

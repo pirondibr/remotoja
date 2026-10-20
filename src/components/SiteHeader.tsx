@@ -9,6 +9,14 @@ export function SiteHeader({ dark = false }: { dark?: boolean }) {
       </Link>
       <nav className="flex items-center gap-3 md:gap-5">
         <Link
+          href="/entrar"
+          className={`text-sm font-medium transition ${
+            dark ? "text-sand/80 hover:text-cream" : "text-moss hover:text-ink"
+          }`}
+        >
+          Entrar
+        </Link>
+        <Link
           href="/precos"
           className={`text-sm font-medium transition ${
             dark ? "text-sand/80 hover:text-cream" : "text-moss hover:text-ink"

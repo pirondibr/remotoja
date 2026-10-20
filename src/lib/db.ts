@@ -89,6 +89,27 @@ export async function ensureSchema(): Promise<void> {
         CREATE INDEX IF NOT EXISTS paywall_feedback_created_at_idx
         ON paywall_feedback (created_at DESC)
       `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS member_accounts (
+          id uuid PRIMARY KEY,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          username text NOT NULL UNIQUE,
+          email text,
+          password_hash text NOT NULL,
+          order_id text NOT NULL,
+          role text NOT NULL DEFAULT '',
+          plan_id text,
+          access_until timestamptz
+        )
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS member_accounts_email_idx
+        ON member_accounts (email)
+      `;
+      await sql`
+        CREATE INDEX IF NOT EXISTS member_accounts_order_id_idx
+        ON member_accounts (order_id)
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;

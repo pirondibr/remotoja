@@ -470,10 +470,10 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
               </Link>
             ) : (
               <Link
-                href="/final/v2"
+                href="/entrar"
                 className="text-xs font-medium text-moss/70 hover:text-ink"
               >
-                ← Funil teste
+                Entrar
               </Link>
             )}
           </div>

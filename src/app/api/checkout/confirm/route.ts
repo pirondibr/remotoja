@@ -12,6 +12,7 @@ import {
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
+import { findAccountByOrderId } from "@/lib/memberAccounts";
 
 function clientIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
       exp: accessUntil.getTime(),
     });
 
+    const account = await findAccountByOrderId(orderId);
     const res = NextResponse.json({
       ok: true,
       role,
@@ -131,6 +133,8 @@ export async function POST(request: Request) {
       paymentId: String(payment.id),
       eventId: purchaseEventId(orderId),
       orderId,
+      email: payment.payer?.email || order?.payer_email || "",
+      hasAccount: Boolean(account),
       accessUntil: accessUntil.toISOString(),
     });
     const cookie = memberCookieOptions(token);
