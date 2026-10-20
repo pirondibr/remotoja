@@ -94,9 +94,54 @@ type SearchesPayload = {
     };
   };
   orders?: OrderRow[];
+  orders_total?: number;
+  feeds_total?: number;
+  page_size?: number;
   warning?: string;
   error?: string;
 };
+
+const PAGE_SIZE = 10;
+
+function TablePager({
+  page,
+  total,
+  onPage,
+}: {
+  page: number;
+  total: number;
+  onPage: (next: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (total <= PAGE_SIZE) return null;
+  const from = page * PAGE_SIZE + 1;
+  const to = Math.min((page + 1) * PAGE_SIZE, total);
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-moss/10 px-3 py-2">
+      <p className="text-xs text-moss/60">
+        {from}–{to} de {total}
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={page <= 0}
+          onClick={() => onPage(page - 1)}
+          className="rounded-lg border border-moss/15 bg-white px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-40"
+        >
+          Anterior
+        </button>
+        <button
+          type="button"
+          disabled={page >= pages - 1}
+          onClick={() => onPage(page + 1)}
+          className="rounded-lg border border-moss/15 bg-white px-3 py-1.5 text-xs font-semibold text-ink disabled:opacity-40"
+        >
+          Próxima
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function variantBadge(variant?: string | null) {
   if (variant === "v2") {
@@ -144,12 +189,20 @@ export function AdminDashboard() {
   const [expandedFeed, setExpandedFeed] = useState<string | null>(null);
   const [inspectRole, setInspectRole] = useState("SEO");
   const [inspectScript, setInspectScript] = useState<FeedKind>("paid");
+  const [leadsPage, setLeadsPage] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(0);
+  const [feedsPage, setFeedsPage] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/searches?limit=50");
+      const qs = new URLSearchParams({
+        leads_offset: String(leadsPage * PAGE_SIZE),
+        orders_offset: String(ordersPage * PAGE_SIZE),
+        feeds_offset: String(feedsPage * PAGE_SIZE),
+      });
+      const res = await fetch(`/api/admin/searches?${qs}`);
       const json = (await res.json()) as SearchesPayload;
       if (!res.ok) {
         setError(json.error || "Falha ao carregar");
@@ -163,7 +216,7 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [leadsPage, ordersPage, feedsPage]);
 
   useEffect(() => {
     void load();
@@ -331,7 +384,7 @@ export function AdminDashboard() {
         </section>
       )}
 
-      {(data?.orders || []).length > 0 && (
+      {(data?.orders_total || data?.orders?.length || 0) > 0 && (
         <section className="mt-6 overflow-x-auto rounded-2xl border border-moss/10 bg-white">
           <div className="border-b border-moss/10 px-4 py-3">
             <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-ink">
@@ -354,6 +407,13 @@ export function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
+              {(data?.orders || []).length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-3 py-6 text-center text-moss/50">
+                    Nenhum pedido nesta página.
+                  </td>
+                </tr>
+              )}
               {(data?.orders || []).map((order) => (
                 <tr key={order.id} className="border-b border-moss/5">
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-moss/70">
@@ -379,6 +439,11 @@ export function AdminDashboard() {
               ))}
             </tbody>
           </table>
+          <TablePager
+            page={ordersPage}
+            total={data?.orders_total || data?.orders?.length || 0}
+            onPage={setOrdersPage}
+          />
         </section>
       )}
 
@@ -448,7 +513,7 @@ export function AdminDashboard() {
           </button>
         </div>
 
-        {feeds.length > 0 && (
+        {(feeds.length > 0 || (data?.feeds_total || 0) > 0) && (
           <div className="mt-5 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-moss/10 text-xs uppercase tracking-wide text-moss/60">
@@ -750,6 +815,11 @@ export function AdminDashboard() {
                 })}
               </tbody>
             </table>
+            <TablePager
+              page={feedsPage}
+              total={data?.feeds_total || feeds.length}
+              onPage={setFeedsPage}
+            />
           </div>
         )}
       </section>
@@ -759,6 +829,7 @@ export function AdminDashboard() {
           <thead className="border-b border-moss/10 bg-cream/80 text-xs uppercase tracking-wide text-moss/60">
             <tr>
               <th className="px-3 py-3 font-semibold">Quando</th>
+              <th className="px-3 py-3 font-semibold">Canal</th>
               <th className="px-3 py-3 font-semibold">Página</th>
               <th className="px-3 py-3 font-semibold">Origem</th>
               <th className="px-3 py-3 font-semibold">Cargo</th>
@@ -771,7 +842,7 @@ export function AdminDashboard() {
           <tbody>
             {(data?.rows || []).length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-moss/50">
+                <td colSpan={9} className="px-3 py-8 text-center text-moss/50">
                   Nenhuma pesquisa ainda. Abra o funil com UTMs (ex.:
                   ?utm_source=meta&role=SEO).
                 </td>
@@ -795,6 +866,17 @@ export function AdminDashboard() {
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-moss/70">
                     {formatWhen(row.created_at)}
                   </td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                        row.channel === "paid"
+                          ? "bg-forest/15 text-forest"
+                          : "bg-sand text-moss"
+                      }`}
+                    >
+                      {row.channel === "paid" ? "Pago" : "Demo"}
+                    </span>
+                  </td>
                   <td className="px-3 py-3">{variantBadge(row.funnel_variant)}</td>
                   <td className="px-3 py-3 font-medium text-ink">{row.origin}</td>
                   <td className="px-3 py-3">{row.role}</td>
@@ -813,7 +895,7 @@ export function AdminDashboard() {
                 </tr>
                 {expanded === row.id && (
                   <tr className="border-b border-moss/10 bg-cream/40">
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-moss/60">
                           Página {row.funnel_variant === "v2" ? "V2 (feed + oferta)" : row.funnel_variant === "v1" ? "V1 (matches + plano)" : "não registrada"}
@@ -907,6 +989,11 @@ export function AdminDashboard() {
             })}
           </tbody>
         </table>
+        <TablePager
+          page={leadsPage}
+          total={data?.total || 0}
+          onPage={setLeadsPage}
+        />
       </div>
     </div>
   );

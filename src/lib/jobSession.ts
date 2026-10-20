@@ -6,14 +6,20 @@ export type JobSessionPayload = {
   role: string;
   jobs: DemoJob[];
   savedAt: number;
+  kind?: "demo" | "paid";
 };
 
-export function saveJobSession(role: string, jobs: DemoJob[]) {
+export function saveJobSession(
+  role: string,
+  jobs: DemoJob[],
+  kind: "demo" | "paid" = "demo"
+) {
   if (typeof window === "undefined") return;
   const payload: JobSessionPayload = {
     role: role.trim(),
     jobs,
     savedAt: Date.now(),
+    kind,
   };
   try {
     sessionStorage.setItem(KEY, JSON.stringify(payload));

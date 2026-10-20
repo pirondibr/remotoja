@@ -172,12 +172,13 @@ export function JobsDashboard() {
 
       if (preferCache && !inspect && !analyze) {
         const cached = loadJobSession(trimmed);
+        // Só reusa sessão gravada neste feed pago — não a prévia do demo.
         if (
           cached &&
+          cached.kind === "paid" &&
           cached.jobs.length > 0 &&
           cached.role.toLowerCase() === trimmed.toLowerCase()
         ) {
-          // Descarta sessão antiga misturada com outro cargo
           const relevant = cached.jobs.filter((job) =>
             termMatches(
               `${job.title} ${job.snippet || ""} ${job.company}`,
@@ -247,7 +248,7 @@ export function JobsDashboard() {
         );
         setFromCache(Boolean(data.cached));
         if (!cacheOnly && !analyze) {
-          saveJobSession(trimmed, list);
+          saveJobSession(trimmed, list, "paid");
         }
         // Após reanalisar: tira fresh da URL para o link ficar compartilhável (cache).
         if (inspect && analyze && forceFresh && typeof window !== "undefined") {

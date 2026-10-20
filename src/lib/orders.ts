@@ -208,11 +208,17 @@ export async function countOrderFunnelAb(): Promise<OrderAbCounts> {
   return out;
 }
 
-export async function listRecentOrders(limit = 40): Promise<OrderRow[]> {
-  if (!hasDatabase()) return [];
+export async function listRecentOrders(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ rows: OrderRow[]; total: number }> {
+  if (!hasDatabase()) return { rows: [], total: 0 };
   await ensureOrdersSchema();
   const sql = getSql();
-  const cap = Math.min(Math.max(limit, 1), 100);
+  const limit = Math.min(Math.max(options?.limit ?? 40, 1), 100);
+  const offset = Math.max(options?.offset ?? 0, 0);
+  const countRows = await sql`SELECT COUNT(*)::int AS total FROM orders`;
+  const total = Number((countRows[0] as { total: number })?.total || 0);
   const rows = (await sql`
     SELECT
       id, created_at, plan_id, role, amount_brl, status,
@@ -220,11 +226,14 @@ export async function listRecentOrders(limit = 40): Promise<OrderRow[]> {
       funnel_variant
     FROM orders
     ORDER BY created_at DESC
-    LIMIT ${cap}
+    LIMIT ${limit} OFFSET ${offset}
   `) as unknown as OrderRow[];
-  return rows.map((row) => ({
-    ...row,
-    amount_brl: Number(row.amount_brl),
-    funnel_variant: parseFeedAb(row.funnel_variant),
-  }));
+  return {
+    total,
+    rows: rows.map((row) => ({
+      ...row,
+      amount_brl: Number(row.amount_brl),
+      funnel_variant: parseFeedAb(row.funnel_variant),
+    })),
+  };
 }

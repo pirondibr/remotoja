@@ -13,6 +13,7 @@ import { extractScrapeReport } from "@/lib/dashboard/scrapeReport";
 import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJob } from "@/lib/dashboard/types";
+import { logPaidMemberView } from "@/lib/paidLeadLog";
 
 function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
   const tagged = (jobs as DashboardJob[]).map((job) => ({
@@ -120,6 +121,18 @@ export async function GET(request: Request) {
   const cacheLabel = cacheKind === "demo" ? "demo" : "pago";
   /** Pago sempre valida; demo live só se admin pediu analyze. */
   const runValidate = cacheKind === "paid" || analyzeFlag;
+  const adminInspect =
+    searchParams.get("inspect") === "1" ||
+    cacheOnly ||
+    analyzeFlag ||
+    cacheKind === "demo";
+
+  const reply = (body: Record<string, unknown>, jobs: DemoJob[], cached: boolean) => {
+    if (!adminInspect) {
+      void logPaidMemberView({ request, role, jobs, cached });
+    }
+    return NextResponse.json(body);
+  };
 
   if (role.length < 2) {
     return NextResponse.json(
@@ -147,23 +160,27 @@ export async function GET(request: Request) {
               ? (cached.jobs as DemoJob[])
               : filterByRole(cached.jobs as DemoJob[], role));
           const pulled_jobs = extractPulledJobs(cached.sources) ?? undefined;
-          return NextResponse.json({
-            role,
-            count: jobs.length,
+          return reply(
+            {
+              role,
+              count: jobs.length,
+              jobs,
+              ...(pulled_jobs ? { pulled_jobs } : {}),
+              fetched_via: analyzeFlag ? "cache_analyze" : "cache_paid_validated",
+              sources: sourcesPlainCounts(cached.sources),
+              validation: validation ?? null,
+              scrape_report: extractScrapeReport(cached.sources),
+              cached: true,
+              script: cacheKind,
+              cache_updated_at: cached.updated_at,
+              analyze_at:
+                typeof cached.sources?._analyze_at === "string"
+                  ? cached.sources._analyze_at
+                  : cached.updated_at,
+            },
             jobs,
-            ...(pulled_jobs ? { pulled_jobs } : {}),
-            fetched_via: analyzeFlag ? "cache_analyze" : "cache_paid_validated",
-            sources: sourcesPlainCounts(cached.sources),
-            validation: validation ?? null,
-            scrape_report: extractScrapeReport(cached.sources),
-            cached: true,
-            script: cacheKind,
-            cache_updated_at: cached.updated_at,
-            analyze_at:
-              typeof cached.sources?._analyze_at === "string"
-                ? cached.sources._analyze_at
-                : cached.updated_at,
-          });
+            true
+          );
         }
       }
     } catch {
@@ -184,21 +201,25 @@ export async function GET(request: Request) {
           if (jobs.length === 0 && !cacheOnly && cacheKind === "paid") {
             // Cache antigo misturado → força live (exceto cache_only)
           } else {
-            return NextResponse.json({
-              role,
-              count: jobs.length,
+            return reply(
+              {
+                role,
+                count: jobs.length,
+                jobs,
+                fetched_via: cached.fetched_via || `cache_${cacheKind}`,
+                sources: sourcesPlainCounts(cached.sources),
+                validation: extractValidation(cached.sources),
+                scrape_report: extractScrapeReport(cached.sources),
+                ...(extractPulledJobs(cached.sources)
+                  ? { pulled_jobs: extractPulledJobs(cached.sources) }
+                  : {}),
+                cached: true,
+                script: cacheKind,
+                cache_updated_at: cached.updated_at,
+              },
               jobs,
-              fetched_via: cached.fetched_via || `cache_${cacheKind}`,
-              sources: sourcesPlainCounts(cached.sources),
-              validation: extractValidation(cached.sources),
-              scrape_report: extractScrapeReport(cached.sources),
-              ...(extractPulledJobs(cached.sources)
-                ? { pulled_jobs: extractPulledJobs(cached.sources) }
-                : {}),
-              cached: true,
-              script: cacheKind,
-              cache_updated_at: cached.updated_at,
-            });
+              true
+            );
           }
         }
         if (cacheOnly) {
@@ -270,12 +291,16 @@ export async function GET(request: Request) {
       // ignore cache write
     }
 
-    return NextResponse.json({
-      ...payload,
-      sources: sourcesPlainCounts(payload.sources),
-      cached: false,
-      script: cacheKind,
-    });
+    return reply(
+      {
+        ...payload,
+        sources: sourcesPlainCounts(payload.sources),
+        cached: false,
+        script: cacheKind,
+      },
+      payload.jobs as DemoJob[],
+      false
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido";
     return NextResponse.json(

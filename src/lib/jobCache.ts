@@ -149,10 +149,21 @@ export type CacheListEntry = {
 };
 
 /** Lista caches demo + pago (mais recentes primeiro). */
-export async function listCacheEntries(limit = 50): Promise<CacheListEntry[]> {
-  if (!hasDatabase()) return [];
+export async function listCacheEntries(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ rows: CacheListEntry[]; total: number }> {
+  if (!hasDatabase()) return { rows: [], total: 0 };
   await ensureSchema();
   const sql = getSql();
+  const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
+  const offset = Math.max(options?.offset ?? 0, 0);
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM job_cache
+    WHERE kind IN ('demo', 'paid')
+  `;
+  const total = Number((countRows[0] as { total: number })?.total || 0);
   const rows = await sql`
     SELECT
       kind,
@@ -164,13 +175,13 @@ export async function listCacheEntries(limit = 50): Promise<CacheListEntry[]> {
     FROM job_cache
     WHERE kind IN ('demo', 'paid')
     ORDER BY updated_at DESC
-    LIMIT ${limit}
+    LIMIT ${limit} OFFSET ${offset}
   `;
-  return rows as unknown as CacheListEntry[];
+  return { rows: rows as unknown as CacheListEntry[], total };
 }
 
 /** @deprecated use listCacheEntries */
 export async function listPaidCacheEntries(limit = 30): Promise<CacheListEntry[]> {
-  const all = await listCacheEntries(limit * 2);
-  return all.filter((e) => e.kind === "paid").slice(0, limit);
+  const { rows } = await listCacheEntries({ limit: limit * 2, offset: 0 });
+  return rows.filter((e) => e.kind === "paid").slice(0, limit);
 }

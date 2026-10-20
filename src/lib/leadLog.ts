@@ -145,6 +145,47 @@ export async function logLeadSearch(
   return { id };
 }
 
+export async function findLatestLeadAnswersByEmail(
+  email: string
+): Promise<FunnelAnswers | null> {
+  if (!hasDatabase()) return null;
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT answers
+    FROM lead_searches
+    WHERE answers->>'email' ILIKE ${needle}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+  const row = rows[0] as { answers?: unknown } | undefined;
+  return sanitizeFunnelAnswers(row?.answers);
+}
+
+export async function hasRecentPaidLead(input: {
+  email?: string | null;
+  role: string;
+}): Promise<boolean> {
+  if (!hasDatabase()) return false;
+  const email = (input.email || "").trim().toLowerCase();
+  const role = input.role.trim();
+  if (!email || role.length < 2) return false;
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id
+    FROM lead_searches
+    WHERE channel = 'paid'
+      AND lower(role) = lower(${role})
+      AND answers->>'email' ILIKE ${email}
+      AND created_at > now() - interval '6 hours'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 export async function listLeadSearches(options?: {
   limit?: number;
   offset?: number;

@@ -34,6 +34,9 @@ export async function GET(request: Request) {
           },
         },
         orders: [],
+        orders_total: 0,
+        feeds_total: 0,
+        page_size: 10,
         warning: "DATABASE_URL ausente",
       },
       { status: 200 }
@@ -41,27 +44,29 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const limit = Number(searchParams.get("limit") || 50);
-  const offset = Number(searchParams.get("offset") || 0);
+  const pageSize = 10;
+  const leadsOffset = Number(searchParams.get("leads_offset") || 0);
+  const ordersOffset = Number(searchParams.get("orders_offset") || 0);
+  const feedsOffset = Number(searchParams.get("feeds_offset") || 0);
 
   try {
     const [
       { rows, total },
       cache,
-      cacheEntries,
+      cachePage,
       abLeads,
       abOrders,
-      orders,
+      ordersPage,
     ] = await Promise.all([
-      listLeadSearches({ limit, offset }),
+      listLeadSearches({ limit: pageSize, offset: leadsOffset }),
       cacheStats(),
-      listCacheEntries(60),
+      listCacheEntries({ limit: pageSize, offset: feedsOffset }),
       countLeadFunnelAb(),
       countOrderFunnelAb(),
-      listRecentOrders(40),
+      listRecentOrders({ limit: pageSize, offset: ordersOffset }),
     ]);
 
-    const feeds = cacheEntries.map((entry) => {
+    const feeds = cachePage.rows.map((entry) => {
       const sources = entry.sources || {};
       const validation = (
         typeof sources._validation === "object" && sources._validation
@@ -93,7 +98,10 @@ export async function GET(request: Request) {
       total,
       cache,
       ab: { leads: abLeads, orders: abOrders },
-      orders: orders.map((order) => ({
+      page_size: pageSize,
+      feeds_total: cachePage.total,
+      orders_total: ordersPage.total,
+      orders: ordersPage.rows.map((order) => ({
         id: order.id,
         created_at: order.created_at,
         plan_id: order.plan_id,
