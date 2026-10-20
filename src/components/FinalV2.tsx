@@ -13,6 +13,8 @@ import {
 import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { saveJobSession } from "@/lib/jobSession";
 import { startCheckout } from "@/lib/startCheckout";
+import { looksLikeMultipleRoles } from "@/lib/splitRoles";
+import { RoleChoiceHint } from "./RoleChoiceHint";
 import {
   demoJobsUrl,
   trackSearchFromJobsPayload,
@@ -227,6 +229,11 @@ export function FinalV2() {
   async function runSearch(value: string) {
     const trimmed = value.trim();
     if (trimmed.length < 2) return;
+    if (looksLikeMultipleRoles(trimmed)) {
+      setRole(trimmed);
+      setError(null);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -332,7 +339,7 @@ export function FinalV2() {
               <input
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                placeholder="Cargo… ex: SEO, programador"
+                placeholder="Um cargo. Ex.: Recrutamento e seleção"
                 className="flex-1 rounded-2xl border border-white/15 bg-white/5 px-4 py-3.5 text-cream outline-none placeholder:text-sand/40 focus:border-lime/50"
                 autoFocus
               />
@@ -344,6 +351,12 @@ export function FinalV2() {
                 {loading ? "…" : "Buscar"}
               </button>
             </form>
+            <div className="mt-3">
+              <RoleChoiceHint
+                value={role}
+                onPick={(picked) => void runSearch(picked)}
+              />
+            </div>
             {error && <p className="mt-3 text-xs text-sand/50">{error}</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               {["SEO", "programador", "designer"].map((chip) => (

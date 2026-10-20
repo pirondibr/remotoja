@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
+import { RoleChoiceHint } from "@/components/RoleChoiceHint";
+import { looksLikeMultipleRoles } from "@/lib/splitRoles";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import {
   demoJobsUrl,
@@ -31,6 +33,10 @@ export function QuickJobSearch() {
   async function runSearch(value: string) {
     const trimmed = value.trim();
     if (trimmed.length < 2) return;
+    if (looksLikeMultipleRoles(trimmed)) {
+      setRole(trimmed);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -96,11 +102,18 @@ export function QuickJobSearch() {
           <input
             value={role}
             onChange={(event) => setRole(event.target.value)}
-            placeholder="Ex.: programador, SEO, designer, CS…"
+            placeholder="Um cargo. Ex.: Recrutamento e seleção"
             className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
             autoFocus
           />
-          {role.trim().length > 1 && (
+          <RoleChoiceHint
+            value={role}
+            onPick={(picked) => {
+              setRole(picked);
+              void runSearch(picked);
+            }}
+          />
+          {role.trim().length > 1 && !looksLikeMultipleRoles(role) && (
             <p className="text-xs text-sand/50">
               Query:{" "}
               <span className="text-lime">{buildJobsQuery(role)}</span>

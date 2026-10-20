@@ -173,7 +173,7 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     progress: 94,
     headline: "Última pergunta: seus dados e o cargo",
     subheadline:
-      "Nome, e-mail e o cargo que você busca. Assim registramos seu perfil e liberamos as vagas certas.",
+      "Nome, e-mail e um cargo — só um por busca, para as vagas não se misturarem.",
     cta: "Encontrar minhas vagas",
   },
   {

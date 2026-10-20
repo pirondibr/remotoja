@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { looksLikeMultipleRoles } from "@/lib/splitRoles";
+import { RoleChoiceHint } from "./RoleChoiceHint";
 
 const POPULAR_ROLES = [
   "Analista de SEO",
@@ -30,6 +32,10 @@ export function HomeSearch({
     setPending(true);
 
     if (trimmed.length >= 2) {
+      if (looksLikeMultipleRoles(trimmed)) {
+        setPending(false);
+        return;
+      }
       try {
         sessionStorage.setItem(ROLE_STORAGE_KEY, trimmed);
       } catch {
@@ -60,7 +66,7 @@ export function HomeSearch({
           id={`${id ?? "busca"}-input`}
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          placeholder="Qual cargo você busca? Ex.: Analista de SEO"
+          placeholder="Qual cargo você busca? Um só. Ex.: Analista de SEO"
           autoFocus={autoFocus}
           autoComplete="off"
           className="min-w-0 flex-1 rounded-xl bg-white px-4 py-3.5 text-base text-ink outline-none placeholder:text-moss/50 focus:ring-2 focus:ring-lime"
@@ -72,7 +78,19 @@ export function HomeSearch({
         >
           {pending ? "Abrindo…" : "Começar"}
         </button>
-      </form>
+        </form>
+
+      {role.trim() && (
+        <div className="mt-3">
+          <RoleChoiceHint
+            value={role}
+            onPick={(picked) => {
+              setRole(picked);
+              go(picked);
+            }}
+          />
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-sand/60">Mais buscados:</span>

@@ -8,7 +8,9 @@ import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
 import { assignFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import { startCheckout } from "@/lib/startCheckout";
+import { looksLikeMultipleRoles } from "@/lib/splitRoles";
 import { FeedConvertV2 } from "./FeedConvertV2";
+import { RoleChoiceHint } from "./RoleChoiceHint";
 import {
   demoJobsUrl,
   trackSearchFromJobsPayload,
@@ -217,7 +219,8 @@ export function OnboardWizard() {
       return (
         nameDraft.trim().length >= 2 &&
         isValidEmail(emailDraft) &&
-        draft.trim().length >= 2
+        draft.trim().length >= 2 &&
+        !looksLikeMultipleRoles(draft)
       );
     }
     if (step.kind === "matches") {
@@ -346,7 +349,12 @@ export function OnboardWizard() {
       const name = nameDraft.trim();
       const email = emailDraft.trim().toLowerCase();
       const roleValue = draft.trim();
-      if (name.length < 2 || !isValidEmail(email) || roleValue.length < 2) {
+      if (
+        name.length < 2 ||
+        !isValidEmail(email) ||
+        roleValue.length < 2 ||
+        looksLikeMultipleRoles(roleValue)
+      ) {
         return;
       }
       const nextAnswers = {
@@ -576,9 +584,13 @@ export function OnboardWizard() {
               <input
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                placeholder="Cargo que você busca (ex.: SEO, Product Designer…)"
+                placeholder="Um cargo. Ex.: Recrutamento e seleção"
                 autoComplete="organization-title"
                 className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-4 text-cream outline-none placeholder:text-sand/40 focus:border-lime/60"
+              />
+              <RoleChoiceHint
+                value={draft}
+                onPick={(role) => setDraft(role)}
               />
               {emailDraft.trim() && !isValidEmail(emailDraft) && (
                 <p className="text-xs text-sand/55">Informe um e-mail válido.</p>

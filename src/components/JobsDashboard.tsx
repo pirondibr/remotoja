@@ -8,6 +8,8 @@ import { CompanyAvatar } from "@/components/CompanyAvatar";
 import { formatJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { termMatches } from "@/lib/dashboard/common";
 import { loadJobSession, saveJobSession } from "@/lib/jobSession";
+import { looksLikeMultipleRoles } from "@/lib/splitRoles";
+import { RoleChoiceHint } from "@/components/RoleChoiceHint";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import {
   formatMs,
@@ -146,6 +148,12 @@ export function JobsDashboard() {
       if (trimmed.length < 2) {
         setLoading(false);
         setError("Informe um cargo para buscar vagas.");
+        return;
+      }
+      if (looksLikeMultipleRoles(trimmed)) {
+        setLoading(false);
+        setDraft(trimmed);
+        setError(null);
         return;
       }
 
@@ -525,17 +533,31 @@ export function JobsDashboard() {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Buscar outro cargo…"
+            placeholder="Buscar outro cargo (um por vez)"
             className="flex-1 rounded-xl border border-moss/10 bg-cream/60 px-4 py-3 text-sm outline-none focus:border-moss/40"
           />
           <button
             type="submit"
-            disabled={loading || draft.trim().length < 2}
+            disabled={
+              loading ||
+              draft.trim().length < 2 ||
+              looksLikeMultipleRoles(draft)
+            }
             className="rounded-xl bg-ink px-5 py-3 text-sm font-bold text-cream transition hover:bg-forest disabled:opacity-40"
           >
             {loading ? "Buscando…" : "Atualizar feed"}
           </button>
         </form>
+        <div className="mt-2">
+          <RoleChoiceHint
+            value={draft}
+            tone="light"
+            onPick={(picked) => {
+              setDraft(picked);
+              void loadJobs(picked, false, undefined);
+            }}
+          />
+        </div>
 
         {inspect && scrapeReport && !loading && (
           <div className="mt-4 space-y-3">
