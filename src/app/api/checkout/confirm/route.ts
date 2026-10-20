@@ -12,6 +12,7 @@ import {
   shouldSendMetaPurchase,
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
+import { logPaidPurchase } from "@/lib/paidLeadLog";
 
 function clientIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -106,6 +107,13 @@ export async function POST(request: Request) {
         await markMetaPurchaseSent(orderId);
       }
     }
+
+    await logPaidPurchase({
+      role,
+      email: payment.payer?.email || order?.payer_email,
+      funnelVariant: order?.funnel_variant,
+      userAgent: request.headers.get("user-agent"),
+    });
 
     const token = buildMemberToken({
       orderId,

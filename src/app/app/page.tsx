@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { getMemberSession } from "@/lib/access";
 import { JobsDashboard } from "@/components/JobsDashboard";
 
 export const metadata: Metadata = {
@@ -8,7 +9,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function MemberAppPage() {
+export default async function MemberAppPage() {
+  const member = await getMemberSession();
+  const defaultRole = (member?.role || "").trim();
   return (
     <Suspense
       fallback={
@@ -17,7 +20,7 @@ export default function MemberAppPage() {
         </div>
       }
     >
-      <JobsDashboard />
+      <JobsDashboard defaultRole={defaultRole} />
     </Suspense>
   );
 }

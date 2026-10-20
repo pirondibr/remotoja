@@ -920,7 +920,11 @@ export function AdminDashboard() {
                       ? formShort || `${form.length} respostas`
                       : "—"}
                   </td>
-                  <td className="px-3 py-3">{row.jobs_count}</td>
+                  <td className="px-3 py-3">
+                    {row.channel === "paid" && row.jobs_count === 0
+                      ? "aguardando feed"
+                      : row.jobs_count}
+                  </td>
                   <td className="px-3 py-3 text-xs">
                     {row.cached ? "sim" : "live"}
                   </td>

@@ -15,10 +15,15 @@ export function isAccessGateEnabled(): boolean {
   );
 }
 
+export async function getMemberSession() {
+  const jar = await cookies();
+  return parseMemberToken(jar.get(MEMBER_COOKIE)?.value);
+}
+
 export async function hasMemberAccess(): Promise<boolean> {
   if (!isAccessGateEnabled()) return true;
+  if (await getMemberSession()) return true;
   const jar = await cookies();
-  if (parseMemberToken(jar.get(MEMBER_COOKIE)?.value)) return true;
   if (isValidDemoToken(jar.get(DEMO_COOKIE)?.value)) return true;
   return false;
 }

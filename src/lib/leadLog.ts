@@ -166,26 +166,55 @@ export async function findLatestLeadAnswersByEmail(
   return sanitizeFunnelAnswers(row?.answers);
 }
 
-export async function hasRecentPaidLead(input: {
+export async function findRecentPaidLead(input: {
   email?: string | null;
   role: string;
-}): Promise<boolean> {
-  if (!hasDatabase()) return false;
+}): Promise<{ id: string; jobs_count: number } | null> {
+  if (!hasDatabase()) return null;
   const email = (input.email || "").trim().toLowerCase();
   const role = input.role.trim();
-  if (!email || role.length < 2) return false;
+  if (!email || role.length < 2) return null;
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT id
+    SELECT id, jobs_count
     FROM lead_searches
     WHERE channel = 'paid'
       AND lower(role) = lower(${role})
       AND answers->>'email' ILIKE ${email}
       AND created_at > now() - interval '6 hours'
+    ORDER BY created_at DESC
     LIMIT 1
   `;
-  return rows.length > 0;
+  const row = rows[0] as { id?: string; jobs_count?: number } | undefined;
+  if (!row?.id) return null;
+  return { id: row.id, jobs_count: Number(row.jobs_count) || 0 };
+}
+
+export async function hasRecentPaidLead(input: {
+  email?: string | null;
+  role: string;
+}): Promise<boolean> {
+  return Boolean(await findRecentPaidLead(input));
+}
+
+export async function updateLeadSearchJobs(input: {
+  id: string;
+  jobs: DemoJob[];
+  cached?: boolean;
+}): Promise<void> {
+  if (!hasDatabase()) return;
+  await ensureSchema();
+  const sql = getSql();
+  const jobs = Array.isArray(input.jobs) ? input.jobs : [];
+  await sql`
+    UPDATE lead_searches
+    SET
+      jobs_shown = ${sql.json(jobs)},
+      jobs_count = ${jobs.length},
+      cached = ${Boolean(input.cached)}
+    WHERE id = ${input.id}
+  `;
 }
 
 export async function listLeadSearches(options?: {

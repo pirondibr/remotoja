@@ -9,6 +9,7 @@ import {
   shouldSendMetaPurchase,
 } from "@/lib/orders";
 import { getPlan } from "@/lib/rrPlans";
+import { logPaidPurchase } from "@/lib/paidLeadLog";
 
 async function processPayment(paymentId: string) {
   const payment = await fetchMpPayment(paymentId);
@@ -33,6 +34,12 @@ async function processPayment(paymentId: string) {
         accessUntil,
       });
     }
+
+    await logPaidPurchase({
+      role: order.role,
+      email: payment.payer?.email || order.payer_email,
+      funnelVariant: order.funnel_variant,
+    });
 
     if (await shouldSendMetaPurchase(orderId)) {
       const plan = getPlan(order.plan_id);

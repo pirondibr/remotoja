@@ -99,9 +99,10 @@ function formatSourceBreakdown(
   return { short, full, mixed: list.length > 1 };
 }
 
-export function JobsDashboard() {
+export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
   const searchParams = useSearchParams();
   const roleFromUrl = searchParams.get("role") || searchParams.get("q") || "";
+  const bootRole = roleFromUrl.trim() || defaultRole.trim();
   const inspect = searchParams.get("inspect") === "1";
   const modeParam = (searchParams.get("mode") || "").toLowerCase();
   const cacheOnly =
@@ -123,10 +124,10 @@ export function JobsDashboard() {
         : "cache"
     : null;
 
-  const [role, setRole] = useState(roleFromUrl);
-  const [draft, setDraft] = useState(roleFromUrl);
+  const [role, setRole] = useState(bootRole);
+  const [draft, setDraft] = useState(bootRole);
   const [jobs, setJobs] = useState<DemoJob[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(bootRole.length >= 2);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [sources, setSources] = useState<Record<string, number | string>>({});
@@ -275,12 +276,16 @@ export function JobsDashboard() {
   );
 
   useEffect(() => {
-    const initial = roleFromUrl.trim() || "SEO";
+    const initial = roleFromUrl.trim() || defaultRole.trim();
+    if (initial.length < 2) {
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     // Admin análise: API decide cache vs live (fresh só se forceFresh).
     void loadJobs(initial, true, controller.signal);
     return () => controller.abort();
-  }, [roleFromUrl, loadJobs, adminMode, forceFresh]);
+  }, [roleFromUrl, defaultRole, loadJobs, adminMode, forceFresh]);
 
   const validationByKey = useMemo(() => {
     const map = new Map<string, ValidationItem>();
