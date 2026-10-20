@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
-import { formatAnswersForAdmin, listLeadSearches } from "@/lib/leadLog";
+import {
+  countLeadFunnelAb,
+  formatAnswersForAdmin,
+  listLeadSearches,
+} from "@/lib/leadLog";
+import { countOrderFunnelAb, listRecentOrders } from "@/lib/orders";
 import { cacheStats, listCacheEntries } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { originLabel } from "@/lib/attribution";
@@ -20,6 +25,15 @@ export async function GET(request: Request) {
         total: 0,
         cache: { demo: 0, paid: 0 },
         feeds: [],
+        ab: {
+          leads: { v1: 0, v2: 0, unknown: 0 },
+          orders: {
+            v1: { total: 0, approved: 0 },
+            v2: { total: 0, approved: 0 },
+            unknown: { total: 0, approved: 0 },
+          },
+        },
+        orders: [],
         warning: "DATABASE_URL ausente",
       },
       { status: 200 }
@@ -31,10 +45,20 @@ export async function GET(request: Request) {
   const offset = Number(searchParams.get("offset") || 0);
 
   try {
-    const [{ rows, total }, cache, cacheEntries] = await Promise.all([
+    const [
+      { rows, total },
+      cache,
+      cacheEntries,
+      abLeads,
+      abOrders,
+      orders,
+    ] = await Promise.all([
       listLeadSearches({ limit, offset }),
       cacheStats(),
       listCacheEntries(60),
+      countLeadFunnelAb(),
+      countOrderFunnelAb(),
+      listRecentOrders(40),
     ]);
 
     const feeds = cacheEntries.map((entry) => {
@@ -68,6 +92,17 @@ export async function GET(request: Request) {
     return NextResponse.json({
       total,
       cache,
+      ab: { leads: abLeads, orders: abOrders },
+      orders: orders.map((order) => ({
+        id: order.id,
+        created_at: order.created_at,
+        plan_id: order.plan_id,
+        role: order.role,
+        amount_brl: Number(order.amount_brl),
+        status: order.status,
+        payer_email: order.payer_email,
+        funnel_variant: order.funnel_variant || null,
+      })),
       feeds,
       /** compat */
       paid_feeds: feeds.filter((f) => f.kind === "paid"),

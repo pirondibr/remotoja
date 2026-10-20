@@ -23,6 +23,18 @@ type SearchRow = {
   cached: boolean;
   jobs_preview: JobPreview[];
   form_answers?: FormAnswer[];
+  funnel_variant?: "v1" | "v2" | null;
+};
+
+type OrderRow = {
+  id: string;
+  created_at: string;
+  plan_id: string;
+  role: string;
+  amount_brl: number;
+  status: string;
+  payer_email: string | null;
+  funnel_variant: "v1" | "v2" | null;
 };
 
 type FeedKind = "demo" | "paid";
@@ -73,9 +85,36 @@ type SearchesPayload = {
   feeds?: CacheFeed[];
   /** compat */
   paid_feeds?: CacheFeed[];
+  ab?: {
+    leads: { v1: number; v2: number; unknown: number };
+    orders: {
+      v1: { total: number; approved: number };
+      v2: { total: number; approved: number };
+      unknown: { total: number; approved: number };
+    };
+  };
+  orders?: OrderRow[];
   warning?: string;
   error?: string;
 };
+
+function variantBadge(variant?: string | null) {
+  if (variant === "v2") {
+    return (
+      <span className="rounded-full bg-forest/10 px-2 py-0.5 text-[11px] font-bold tracking-wide text-forest">
+        V2
+      </span>
+    );
+  }
+  if (variant === "v1") {
+    return (
+      <span className="rounded-full bg-moss/10 px-2 py-0.5 text-[11px] font-bold tracking-wide text-moss">
+        V1
+      </span>
+    );
+  }
+  return <span className="text-moss/40">—</span>;
+}
 
 function formatWhen(iso: string) {
   try {
@@ -235,6 +274,112 @@ export function AdminDashboard() {
         <p className="mt-4 rounded-xl bg-mint/30 px-3 py-2 text-xs text-moss">
           {resetMsg}
         </p>
+      )}
+
+      {data?.ab && (
+        <section className="mt-8 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-moss/10 bg-white p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
+              Teste A/B — páginas vistas
+            </p>
+            <div className="mt-3 flex gap-6">
+              <div>
+                <p className="text-2xl font-bold text-ink">{data.ab.leads.v1}</p>
+                <p className="text-xs text-moss/60">V1 (matches + plano)</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-forest">
+                  {data.ab.leads.v2}
+                </p>
+                <p className="text-xs text-moss/60">V2 (feed + oferta)</p>
+              </div>
+              {data.ab.leads.unknown > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-moss/40">
+                    {data.ab.leads.unknown}
+                  </p>
+                  <p className="text-xs text-moss/50">sem variante</p>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-moss/10 bg-white p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
+              Pedidos por página
+            </p>
+            <div className="mt-3 flex gap-6">
+              <div>
+                <p className="text-2xl font-bold text-ink">
+                  {data.ab.orders.v1.approved}
+                  <span className="text-sm font-medium text-moss/40">
+                    /{data.ab.orders.v1.total}
+                  </span>
+                </p>
+                <p className="text-xs text-moss/60">V1 pagos / iniciados</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-forest">
+                  {data.ab.orders.v2.approved}
+                  <span className="text-sm font-medium text-moss/40">
+                    /{data.ab.orders.v2.total}
+                  </span>
+                </p>
+                <p className="text-xs text-moss/60">V2 pagos / iniciados</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(data?.orders || []).length > 0 && (
+        <section className="mt-6 overflow-x-auto rounded-2xl border border-moss/10 bg-white">
+          <div className="border-b border-moss/10 px-4 py-3">
+            <h2 className="font-[family-name:var(--font-display)] text-lg font-bold text-ink">
+              Pedidos recentes
+            </h2>
+            <p className="text-xs text-moss/60">
+              Qual página de conversão estava na tela quando a pessoa foi ao
+              checkout.
+            </p>
+          </div>
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-moss/10 bg-cream/80 text-xs uppercase tracking-wide text-moss/60">
+              <tr>
+                <th className="px-3 py-3 font-semibold">Quando</th>
+                <th className="px-3 py-3 font-semibold">Página</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Plano</th>
+                <th className="px-3 py-3 font-semibold">E-mail</th>
+                <th className="px-3 py-3 font-semibold">Cargo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.orders || []).map((order) => (
+                <tr key={order.id} className="border-b border-moss/5">
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-moss/70">
+                    {formatWhen(order.created_at)}
+                  </td>
+                  <td className="px-3 py-3">{variantBadge(order.funnel_variant)}</td>
+                  <td className="px-3 py-3 text-xs">
+                    {order.status === "approved" ? "pago" : order.status}
+                  </td>
+                  <td className="px-3 py-3 text-xs">
+                    {order.plan_id === "quarterly"
+                      ? "Trimestral"
+                      : order.plan_id === "monthly"
+                        ? "Mensal"
+                        : order.plan_id}{" "}
+                    · R$ {Number(order.amount_brl).toFixed(0)}
+                  </td>
+                  <td className="max-w-[180px] truncate px-3 py-3 text-xs">
+                    {order.payer_email || "—"}
+                  </td>
+                  <td className="px-3 py-3">{order.role}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
       )}
 
       {/* FEEDS DEMO + PAGO */}
@@ -614,6 +759,7 @@ export function AdminDashboard() {
           <thead className="border-b border-moss/10 bg-cream/80 text-xs uppercase tracking-wide text-moss/60">
             <tr>
               <th className="px-3 py-3 font-semibold">Quando</th>
+              <th className="px-3 py-3 font-semibold">Página</th>
               <th className="px-3 py-3 font-semibold">Origem</th>
               <th className="px-3 py-3 font-semibold">Cargo</th>
               <th className="px-3 py-3 font-semibold">Formulário</th>
@@ -625,7 +771,7 @@ export function AdminDashboard() {
           <tbody>
             {(data?.rows || []).length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-moss/50">
+                <td colSpan={8} className="px-3 py-8 text-center text-moss/50">
                   Nenhuma pesquisa ainda. Abra o funil com UTMs (ex.:
                   ?utm_source=meta&role=SEO).
                 </td>
@@ -649,6 +795,7 @@ export function AdminDashboard() {
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-moss/70">
                     {formatWhen(row.created_at)}
                   </td>
+                  <td className="px-3 py-3">{variantBadge(row.funnel_variant)}</td>
                   <td className="px-3 py-3 font-medium text-ink">{row.origin}</td>
                   <td className="px-3 py-3">{row.role}</td>
                   <td className="max-w-[200px] truncate px-3 py-3 text-xs text-moss/70">
@@ -666,10 +813,11 @@ export function AdminDashboard() {
                 </tr>
                 {expanded === row.id && (
                   <tr className="border-b border-moss/10 bg-cream/40">
-                    <td colSpan={7} className="px-4 py-3">
+                    <td colSpan={8} className="px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-moss/60">
-                          O que a pessoa preencheu
+                          Página {row.funnel_variant === "v2" ? "V2 (feed + oferta)" : row.funnel_variant === "v1" ? "V1 (matches + plano)" : "não registrada"}
+                          {" · "}O que a pessoa preencheu
                         </p>
                         <div
                           className="flex gap-3"

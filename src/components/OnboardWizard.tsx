@@ -6,7 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { FUNNEL_STEPS, type FunnelAnswer } from "@/lib/funnel";
 import { dedupeDemoJobs, formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
 import { RR_PLANS } from "@/lib/rrPlans";
+import { assignFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import { startCheckout } from "@/lib/startCheckout";
+import { FeedConvertV2 } from "./FeedConvertV2";
 import {
   demoJobsUrl,
   trackSearchFromJobsPayload,
@@ -159,6 +161,7 @@ export function OnboardWizard() {
   const [prefillRole] = useState(() =>
     readPrefillRole(searchParams.get("role")),
   );
+  const [feedAb, setFeedAb] = useState<FeedAbVariant | null>(null);
 
   const step = FUNNEL_STEPS[index];
   const isLast = index === FUNNEL_STEPS.length - 1;
@@ -228,6 +231,12 @@ export function OnboardWizard() {
   }, [searchParams]);
 
   useEffect(() => {
+    const variant = assignFeedAb(searchParams.get("ab"));
+    setFeedAb(variant);
+    if (variant === "v2") setSelectedPlan("quarterly");
+  }, [searchParams]);
+
+  useEffect(() => {
     if (step.kind !== "matches") return;
 
     const roleQuery =
@@ -271,6 +280,7 @@ export function OnboardWizard() {
         }
         // 1 registro por visita — mesmo se a API devolveu cache
         const attr = loadAttribution() || {};
+        const variant = feedAb || assignFeedAb(searchParams.get("ab"));
         void fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -280,6 +290,7 @@ export function OnboardWizard() {
             jobs_shown: jobs.slice(0, 20),
             cached: Boolean(data.cached),
             answers,
+            funnel_variant: variant,
             ...attr,
           }),
           keepalive: true,
@@ -292,6 +303,7 @@ export function OnboardWizard() {
           "Não foi possível carregar a prévia agora. Continue para o feed completo.",
         );
         const attr = loadAttribution() || {};
+        const variant = feedAb || assignFeedAb(searchParams.get("ab"));
         void fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -301,6 +313,7 @@ export function OnboardWizard() {
             jobs_shown: [],
             cached: false,
             answers,
+            funnel_variant: variant,
             ...attr,
           }),
           keepalive: true,
@@ -377,6 +390,7 @@ export function OnboardWizard() {
         planId: selectedPlan,
         role: nextRole,
         email,
+        funnelVariant: feedAb || assignFeedAb(searchParams.get("ab")),
       });
       if ("error" in result) {
         setCheckoutError(result.error);
@@ -392,6 +406,22 @@ export function OnboardWizard() {
 
   const hideDefaultHeader =
     step.kind === "matches" || step.kind === "paywall";
+
+  if (step.kind === "matches" && feedAb === "v2") {
+    return (
+      <FeedConvertV2
+        role={role}
+        jobs={matches}
+        loading={jobsLoading}
+        error={jobsError}
+        selectedPlan={selectedPlan}
+        onSelectPlan={setSelectedPlan}
+        onCheckout={() => void startPaidCheckout()}
+        checkoutLoading={checkoutLoading}
+        checkoutError={checkoutError}
+      />
+    );
+  }
 
   return (
     <div className="bg-mesh relative min-h-screen text-cream">

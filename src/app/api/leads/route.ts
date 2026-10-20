@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseFeedAb } from "@/lib/funnelAb";
 import { logLeadSearch, sanitizeFunnelAnswers } from "@/lib/leadLog";
 import { hasDatabase } from "@/lib/db";
 import type { DemoJob } from "@/lib/demoJobs";
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       cached: Boolean(body.cached),
       user_agent: request.headers.get("user-agent"),
       answers: sanitizeFunnelAnswers(body.answers),
+      funnel_variant: parseFeedAb(body.funnel_variant),
     });
     return NextResponse.json({ ok: true, id: result?.id ?? null });
   } catch (error) {

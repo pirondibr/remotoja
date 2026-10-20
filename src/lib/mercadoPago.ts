@@ -1,3 +1,4 @@
+import type { FeedAbVariant } from "@/lib/funnelAb";
 import { getPlan, type PlanId } from "@/lib/rrPlans";
 
 const MP_API = "https://api.mercadopago.com";
@@ -25,6 +26,7 @@ export type CreatePreferenceInput = {
   planId: PlanId;
   role: string;
   payerEmail?: string;
+  funnelVariant?: FeedAbVariant | null;
 };
 
 export type PreferenceResult = {
@@ -64,6 +66,7 @@ export async function createCheckoutPreference(
       order_id: input.orderId,
       plan_id: plan.id,
       role,
+      funnel_variant: input.funnelVariant || null,
     },
     back_urls: {
       success: `${base}/checkout/success`,

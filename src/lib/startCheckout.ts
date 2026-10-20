@@ -4,6 +4,7 @@ import {
   metaBrowserIds,
   trackMetaEvent,
 } from "@/lib/metaPixel";
+import type { FeedAbVariant } from "@/lib/funnelAb";
 import type { PlanId } from "@/lib/rrPlans";
 import { getPlan } from "@/lib/rrPlans";
 
@@ -11,6 +12,7 @@ export async function startCheckout(input: {
   planId: PlanId;
   role: string;
   email?: string;
+  funnelVariant?: FeedAbVariant | null;
 }): Promise<{ checkoutUrl: string; orderId?: string } | { error: string }> {
   const attr = loadAttribution();
   const ids = metaBrowserIds(attr?.fbclid);
@@ -24,6 +26,7 @@ export async function startCheckout(input: {
       email: input.email,
       fbp: ids.fbp,
       fbc: ids.fbc,
+      funnel_variant: input.funnelVariant || undefined,
     }),
   });
   const data = (await res.json()) as {

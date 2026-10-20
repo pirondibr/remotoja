@@ -1,4 +1,5 @@
 import { ensureSchema, getSql, hasDatabase } from "@/lib/db";
+import { parseFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import type { PlanId } from "@/lib/rrPlans";
 
 export type OrderRow = {
@@ -13,6 +14,7 @@ export type OrderRow = {
   payer_email: string | null;
   access_until: string | null;
   meta_purchase_sent_at?: string | null;
+  funnel_variant?: FeedAbVariant | null;
 };
 
 export async function ensureOrdersSchema(): Promise<void> {
@@ -39,6 +41,10 @@ export async function ensureOrdersSchema(): Promise<void> {
     ADD COLUMN IF NOT EXISTS meta_purchase_sent_at timestamptz
   `;
   await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS funnel_variant text
+  `;
+  await sql`
     CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC)
   `;
 }
@@ -49,19 +55,24 @@ export async function createOrder(input: {
   role: string;
   amountBrl: number;
   payerEmail?: string;
+  funnelVariant?: FeedAbVariant | string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
   await ensureOrdersSchema();
   const sql = getSql();
+  const funnelVariant = parseFeedAb(input.funnelVariant);
   await sql`
-    INSERT INTO orders (id, plan_id, role, amount_brl, status, payer_email)
+    INSERT INTO orders (
+      id, plan_id, role, amount_brl, status, payer_email, funnel_variant
+    )
     VALUES (
       ${input.id},
       ${input.planId},
       ${input.role},
       ${input.amountBrl},
       'pending',
-      ${input.payerEmail || null}
+      ${input.payerEmail || null},
+      ${funnelVariant}
     )
     ON CONFLICT (id) DO NOTHING
   `;
@@ -158,4 +169,62 @@ export async function markMetaPurchaseSent(orderId: string): Promise<void> {
     WHERE id = ${orderId}
       AND meta_purchase_sent_at IS NULL
   `;
+}
+
+export type OrderAbCounts = {
+  v1: { total: number; approved: number };
+  v2: { total: number; approved: number };
+  unknown: { total: number; approved: number };
+};
+
+export async function countOrderFunnelAb(): Promise<OrderAbCounts> {
+  const empty = {
+    v1: { total: 0, approved: 0 },
+    v2: { total: 0, approved: 0 },
+    unknown: { total: 0, approved: 0 },
+  };
+  if (!hasDatabase()) return empty;
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT
+      COALESCE(funnel_variant, '') AS funnel_variant,
+      status,
+      COUNT(*)::int AS n
+    FROM orders
+    GROUP BY 1, 2
+  `) as unknown as Array<{
+    funnel_variant: string;
+    status: string;
+    n: number;
+  }>;
+  const out: OrderAbCounts = empty;
+  for (const row of rows) {
+    const key = parseFeedAb(row.funnel_variant) ?? "unknown";
+    const n = Number(row.n) || 0;
+    out[key].total += n;
+    if (row.status === "approved") out[key].approved += n;
+  }
+  return out;
+}
+
+export async function listRecentOrders(limit = 40): Promise<OrderRow[]> {
+  if (!hasDatabase()) return [];
+  await ensureOrdersSchema();
+  const sql = getSql();
+  const cap = Math.min(Math.max(limit, 1), 100);
+  const rows = (await sql`
+    SELECT
+      id, created_at, plan_id, role, amount_brl, status,
+      mp_preference_id, mp_payment_id, payer_email, access_until,
+      funnel_variant
+    FROM orders
+    ORDER BY created_at DESC
+    LIMIT ${cap}
+  `) as unknown as OrderRow[];
+  return rows.map((row) => ({
+    ...row,
+    amount_brl: Number(row.amount_brl),
+    funnel_variant: parseFeedAb(row.funnel_variant),
+  }));
 }

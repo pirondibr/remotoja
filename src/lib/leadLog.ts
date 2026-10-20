@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import type { DemoJob } from "@/lib/demoJobs";
 import type { FunnelAnswer } from "@/lib/funnel";
+import { parseFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import { ensureSchema, getSql, hasDatabase } from "@/lib/db";
 
 export type LeadAttribution = {
@@ -24,6 +25,8 @@ export type LeadSearchInput = LeadAttribution & {
   user_agent?: string | null;
   /** Respostas do formulário do funil (work_type, salary, …). */
   answers?: FunnelAnswers | null;
+  /** Página de conversão A/B (v1 matches+paywall vs v2 feed). */
+  funnel_variant?: FeedAbVariant | string | null;
 };
 
 export type LeadSearchRow = {
@@ -44,6 +47,7 @@ export type LeadSearchRow = {
   cached: boolean;
   user_agent: string | null;
   answers: FunnelAnswers | null;
+  funnel_variant: FeedAbVariant | null;
 };
 
 /** Labels amigáveis pras chaves do funil (admin). */
@@ -111,12 +115,13 @@ export async function logLeadSearch(
   const id = randomUUID();
   const jobs = Array.isArray(input.jobs_shown) ? input.jobs_shown : [];
   const answers = sanitizeFunnelAnswers(input.answers);
+  const funnelVariant = parseFeedAb(input.funnel_variant);
   await sql`
     INSERT INTO lead_searches (
       id, role, channel,
       utm_source, utm_medium, utm_campaign, utm_content, utm_term,
       fbclid, gclid, referrer,
-      jobs_shown, jobs_count, cached, user_agent, answers
+      jobs_shown, jobs_count, cached, user_agent, answers, funnel_variant
     ) VALUES (
       ${id},
       ${input.role.trim().slice(0, 120)},
@@ -133,7 +138,8 @@ export async function logLeadSearch(
       ${jobs.length},
       ${Boolean(input.cached)},
       ${clean(input.user_agent)},
-      ${answers ? sql.json(answers as never) : null}
+      ${answers ? sql.json(answers as never) : null},
+      ${funnelVariant}
     )
   `;
   return { id };
@@ -157,7 +163,7 @@ export async function listLeadSearches(options?: {
       id, created_at, role, channel,
       utm_source, utm_medium, utm_campaign, utm_content, utm_term,
       fbclid, gclid, referrer,
-      jobs_shown, jobs_count, cached, user_agent, answers
+      jobs_shown, jobs_count, cached, user_agent, answers, funnel_variant
     FROM lead_searches
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -171,6 +177,35 @@ export async function listLeadSearches(options?: {
         ? row.jobs_shown
         : []) as DemoJob[],
       answers: sanitizeFunnelAnswers(row.answers),
+      funnel_variant: parseFeedAb(row.funnel_variant),
     })),
   };
+}
+
+export type FunnelAbCounts = {
+  v1: number;
+  v2: number;
+  unknown: number;
+};
+
+export async function countLeadFunnelAb(): Promise<FunnelAbCounts> {
+  if (!hasDatabase()) return { v1: 0, v2: 0, unknown: 0 };
+  await ensureSchema();
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT
+      COALESCE(funnel_variant, '') AS funnel_variant,
+      COUNT(*)::int AS n
+    FROM lead_searches
+    GROUP BY 1
+  `) as unknown as Array<{ funnel_variant: string; n: number }>;
+  const out: FunnelAbCounts = { v1: 0, v2: 0, unknown: 0 };
+  for (const row of rows) {
+    const variant = parseFeedAb(row.funnel_variant);
+    const n = Number(row.n) || 0;
+    if (variant === "v1") out.v1 += n;
+    else if (variant === "v2") out.v2 += n;
+    else out.unknown += n;
+  }
+  return out;
 }

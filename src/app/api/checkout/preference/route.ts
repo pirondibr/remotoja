@@ -7,6 +7,7 @@ import {
 import { sendMetaInitiateCheckout } from "@/lib/metaCapi";
 import { generateOrderId } from "@/lib/memberAuth";
 import { attachPreference, createOrder } from "@/lib/orders";
+import { parseFeedAb } from "@/lib/funnelAb";
 import { getPlan, type PlanId } from "@/lib/rrPlans";
 
 function clientIp(request: Request): string | undefined {
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     email?: string;
     fbp?: string;
     fbc?: string;
+    funnel_variant?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
 
   const role = String(body.role || "SEO").trim() || "SEO";
   const email = String(body.email || "").trim() || undefined;
+  const funnelVariant = parseFeedAb(body.funnel_variant);
   const orderId = generateOrderId();
 
   try {
@@ -52,6 +55,7 @@ export async function POST(request: Request) {
       role,
       amountBrl: plan.priceBrl,
       payerEmail: email,
+      funnelVariant,
     });
 
     const preference = await createCheckoutPreference({
@@ -59,6 +63,7 @@ export async function POST(request: Request) {
       planId: plan.id as PlanId,
       role,
       payerEmail: email,
+      funnelVariant,
     });
 
     await attachPreference(orderId, preference.id);

@@ -69,6 +69,10 @@ export async function ensureSchema(): Promise<void> {
         ALTER TABLE lead_searches
         ADD COLUMN IF NOT EXISTS answers jsonb
       `;
+      await sql`
+        ALTER TABLE lead_searches
+        ADD COLUMN IF NOT EXISTS funnel_variant text
+      `;
     })().catch((err) => {
       schemaReady = null;
       throw err;
