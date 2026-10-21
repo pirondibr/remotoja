@@ -55,6 +55,15 @@ function LockIcon({ size = 16, stroke = "#c6ef78" }: { size?: number; stroke?: s
   );
 }
 
+function HiddenPortal({ name }: { name: string }) {
+  const label = (name || "Portal").trim() || "Portal";
+  return (
+    <span className="inline-block max-w-[7.5rem] truncate align-bottom select-none blur-[6px]" aria-hidden>
+      {label}
+    </span>
+  );
+}
+
 function JobCard({
   job,
   free,
@@ -125,8 +134,9 @@ function LockedRow({ job }: { job: LockedPreviewJob }) {
           <span className="inline-flex items-center rounded-full border border-dashed border-[#2b5640] bg-[#0a1d15] px-2 py-0.5 text-xs text-[#7f978b]">
             Empresa
           </span>
-          <span>
-            {job.portal} · {job.when}
+          <span className="inline-flex items-center gap-1">
+            <HiddenPortal name={job.portal} />
+            <span>· {job.when}</span>
           </span>
         </div>
       </div>
@@ -351,11 +361,11 @@ export function FeedConvertV3({
                   </div>
                   <div className="mb-2.5 flex flex-wrap gap-x-3.5 gap-y-1.5 px-0.5 text-[12.5px] text-[#9db3a8]">
                     <span className="inline-flex items-center gap-1.5">
-                      Título, portal e data estão abertos.
+                      Título e data estão abertos.
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <LockIcon size={16} />
-                      Empresa e link para se candidatar liberam no feed.
+                      Portal, empresa e link para se candidatar liberam no feed.
                     </span>
                   </div>
                   <div className="overflow-hidden rounded-[20px] border border-[#1d3a2e] bg-[#0d241b]">
