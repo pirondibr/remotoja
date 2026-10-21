@@ -220,6 +220,10 @@ export function QuickJobSearch() {
             v3 pré-checkout
           </Link>
           {" · "}
+          <Link href="/final/pago" className="underline hover:text-sand/70">
+            feed pago
+          </Link>
+          {" · "}
           <Link href="/onboard" className="underline hover:text-sand/70">
             funil
           </Link>

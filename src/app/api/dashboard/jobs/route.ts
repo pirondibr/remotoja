@@ -107,7 +107,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const plan = planRoleSearch(role);
-  if (isAccessGateEnabled() && !(await canOpenPaidFeed(role))) {
+  const openPreview = searchParams.get("preview") === "1";
+  if (isAccessGateEnabled() && !openPreview && !(await canOpenPaidFeed(role))) {
     return NextResponse.json(
       { error: "Acesso de membro necessário. Conclua o pagamento." },
       { status: 401 }
@@ -137,7 +138,7 @@ export async function GET(request: Request) {
     cacheKind === "demo";
 
   const reply = (body: Record<string, unknown>, jobs: DemoJob[], cached: boolean) => {
-    if (!adminInspect) {
+    if (!adminInspect && !openPreview) {
       void logPaidMemberView({ request, role, jobs, cached });
     }
     return NextResponse.json(body);

@@ -99,7 +99,13 @@ function formatSourceBreakdown(
   return { short, full, mixed: list.length > 1 };
 }
 
-export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
+export function JobsDashboard({
+  defaultRole = "",
+  openPreview = false,
+}: {
+  defaultRole?: string;
+  openPreview?: boolean;
+}) {
   const searchParams = useSearchParams();
   const roleFromUrl = searchParams.get("role") || searchParams.get("q") || "";
   const bootRole = roleFromUrl.trim() || defaultRole.trim();
@@ -192,6 +198,7 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
 
       try {
         const params = new URLSearchParams({ role: trimmed });
+        if (openPreview) params.set("preview", "1");
         if (inspect) params.set("script", scriptKind);
         if (cacheOnly) {
           params.set("cache_only", "1");
@@ -272,7 +279,7 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [inspect, cacheOnly, analyze, forceFresh, scriptKind]
+    [inspect, cacheOnly, analyze, forceFresh, scriptKind, openPreview]
   );
 
   useEffect(() => {
@@ -459,7 +466,9 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
                     : fromCache
                       ? "Admin · análise (cache)"
                       : "Admin · análise"
-                  : "Membro · MVP"}
+                  : openPreview
+                    ? "Teste · feed pago"
+                    : "Membro · MVP"}
             </span>
             {inspect ? (
               <Link
@@ -539,7 +548,11 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Buscar outro cargo (um por vez)"
+            placeholder={
+              openPreview && !role
+                ? "Digite o cargo. Ex.: Assistente administrativo"
+                : "Buscar outro cargo (um por vez)"
+            }
             className="flex-1 rounded-xl border border-moss/10 bg-cream/60 px-4 py-3 text-sm outline-none focus:border-moss/40"
           />
           <button
@@ -551,7 +564,7 @@ export function JobsDashboard({ defaultRole = "" }: { defaultRole?: string }) {
             }
             className="rounded-xl bg-ink px-5 py-3 text-sm font-bold text-cream transition hover:bg-forest disabled:opacity-40"
           >
-            {loading ? "Buscando…" : "Atualizar feed"}
+            {loading ? "Buscando…" : openPreview && !role ? "Buscar" : "Atualizar feed"}
           </button>
         </form>
         <div className="mt-2">
