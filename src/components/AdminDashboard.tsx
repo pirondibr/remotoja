@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { ScrapeReport } from "@/lib/dashboard/types";
+import { formatBrl, planLabel } from "@/lib/rrPlans";
 
 type JobPreview = { title: string; company: string; source?: string };
 
@@ -35,6 +36,7 @@ type OrderRow = {
   status: string;
   payer_email: string | null;
   funnel_variant: "v1" | "v2" | null;
+  checkout_ui?: "v1" | "brick" | null;
 };
 
 type FeedKind = "demo" | "paid";
@@ -432,6 +434,7 @@ export function AdminDashboard() {
               <tr>
                 <th className="px-3 py-3 font-semibold">Quando</th>
                 <th className="px-3 py-3 font-semibold">Página</th>
+                <th className="px-3 py-3 font-semibold">Checkout</th>
                 <th className="px-3 py-3 font-semibold">Status</th>
                 <th className="px-3 py-3 font-semibold">Plano</th>
                 <th className="px-3 py-3 font-semibold">E-mail</th>
@@ -441,9 +444,9 @@ export function AdminDashboard() {
             <tbody>
               {(data?.orders || []).length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-moss/50">
-                    Nenhum pedido nesta página.
-                  </td>
+                    <td colSpan={7} className="px-3 py-6 text-center text-moss/50">
+                      Nenhum pedido nesta página.
+                    </td>
                 </tr>
               )}
               {(data?.orders || []).map((order) => (
@@ -452,16 +455,14 @@ export function AdminDashboard() {
                     {formatWhen(order.created_at)}
                   </td>
                   <td className="px-3 py-3">{variantBadge(order.funnel_variant)}</td>
+                  <td className="px-3 py-3 text-xs text-moss/70">
+                    {order.checkout_ui === "brick" ? "Brick" : "Pro"}
+                  </td>
                   <td className="px-3 py-3 text-xs">
                     {order.status === "approved" ? "pago" : order.status}
                   </td>
                   <td className="px-3 py-3 text-xs">
-                    {order.plan_id === "quarterly"
-                      ? "Trimestral"
-                      : order.plan_id === "monthly"
-                        ? "Mensal"
-                        : order.plan_id}{" "}
-                    · R$ {Number(order.amount_brl).toFixed(0)}
+                    {planLabel(order.plan_id)} · {formatBrl(Number(order.amount_brl))}
                   </td>
                   <td className="max-w-[180px] truncate px-3 py-3 text-xs">
                     {order.payer_email || "—"}

@@ -6,7 +6,7 @@ import {
   markOrderApproved,
   markOrderStatus,
 } from "@/lib/orders";
-import { getPlan } from "@/lib/rrPlans";
+import { getPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
 
 async function processPayment(paymentId: string) {
@@ -22,9 +22,7 @@ async function processPayment(paymentId: string) {
 
   if (payment.status === "approved") {
     if (order.status !== "approved") {
-      const plan = getPlan(order.plan_id);
-      const days = plan?.durationDays ?? 30;
-      const accessUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      const accessUntil = planAccessUntil(order.plan_id);
       await markOrderApproved({
         orderId,
         paymentId: String(payment.id),

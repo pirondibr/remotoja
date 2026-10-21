@@ -1,4 +1,5 @@
 import { ensureSchema, getSql, hasDatabase, normalizeRoleKey } from "@/lib/db";
+import { parseCheckoutUi, type CheckoutUi } from "@/lib/checkoutUi";
 import { parseFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
 import type { PlanId } from "@/lib/rrPlans";
 
@@ -17,6 +18,7 @@ export type OrderRow = {
   funnel_variant?: FeedAbVariant | null;
   fbp?: string | null;
   fbc?: string | null;
+  checkout_ui?: CheckoutUi | null;
 };
 
 export async function ensureOrdersSchema(): Promise<void> {
@@ -55,6 +57,10 @@ export async function ensureOrdersSchema(): Promise<void> {
     ADD COLUMN IF NOT EXISTS fbc text
   `;
   await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS checkout_ui text
+  `;
+  await sql`
     CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC)
   `;
 }
@@ -68,14 +74,16 @@ export async function createOrder(input: {
   funnelVariant?: FeedAbVariant | string | null;
   fbp?: string | null;
   fbc?: string | null;
+  checkoutUi?: CheckoutUi | string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
   await ensureOrdersSchema();
   const sql = getSql();
   const funnelVariant = parseFeedAb(input.funnelVariant);
+  const checkoutUi = parseCheckoutUi(input.checkoutUi);
   await sql`
     INSERT INTO orders (
-      id, plan_id, role, amount_brl, status, payer_email, funnel_variant, fbp, fbc
+      id, plan_id, role, amount_brl, status, payer_email, funnel_variant, fbp, fbc, checkout_ui
     )
     VALUES (
       ${input.id},
@@ -86,7 +94,8 @@ export async function createOrder(input: {
       ${input.payerEmail || null},
       ${funnelVariant},
       ${cleanClickId(input.fbp)},
-      ${cleanClickId(input.fbc)}
+      ${cleanClickId(input.fbc)},
+      ${checkoutUi}
     )
     ON CONFLICT (id) DO NOTHING
   `;
@@ -280,7 +289,7 @@ export async function listRecentOrders(options?: {
     SELECT
       id, created_at, plan_id, role, amount_brl, status,
       mp_preference_id, mp_payment_id, payer_email, access_until,
-      funnel_variant
+      funnel_variant, checkout_ui
     FROM orders
     ORDER BY created_at DESC
     LIMIT ${limit} OFFSET ${offset}
@@ -291,6 +300,7 @@ export async function listRecentOrders(options?: {
       ...row,
       amount_brl: Number(row.amount_brl),
       funnel_variant: parseFeedAb(row.funnel_variant),
+      checkout_ui: parseCheckoutUi(row.checkout_ui),
     })),
   };
 }

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const token = buildMemberToken({
     orderId: account.order_id,
-    planId: account.plan_id || order?.plan_id || "monthly",
+    planId: account.plan_id || order?.plan_id || "access",
     role: account.role || order?.role || "",
     exp,
   });

@@ -155,8 +155,6 @@ export function OnboardWizard() {
   const [draft, setDraft] = useState("");
   const [nameDraft, setNameDraft] = useState("");
   const [emailDraft, setEmailDraft] = useState("");
-  const [selectedPlan, setSelectedPlan] =
-    useState<(typeof RR_PLANS)[number]["id"]>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [liveJobs, setLiveJobs] = useState<DemoJob[]>([]);
@@ -241,9 +239,7 @@ export function OnboardWizard() {
   }, [searchParams]);
 
   useEffect(() => {
-    const variant = assignFeedAb(searchParams.get("ab"));
-    setFeedAb(variant);
-    if (variant === "v2") setSelectedPlan("quarterly");
+    setFeedAb(assignFeedAb(searchParams.get("ab")));
   }, [searchParams]);
 
   useEffect(() => {
@@ -414,7 +410,6 @@ export function OnboardWizard() {
     setCheckoutLoading(true);
     try {
       const result = await startCheckout({
-        planId: selectedPlan,
         role: nextRole,
         email,
         funnelVariant: feedAb || assignFeedAb(searchParams.get("ab")),
@@ -425,7 +420,7 @@ export function OnboardWizard() {
       }
       window.location.href = result.checkoutUrl;
     } catch {
-      setCheckoutError("Falha ao abrir o Mercado Pago. Tente de novo.");
+      setCheckoutError("Falha ao abrir o pagamento. Tente de novo.");
     } finally {
       setCheckoutLoading(false);
     }
@@ -441,8 +436,6 @@ export function OnboardWizard() {
         jobs={matches}
         loading={jobsLoading}
         error={jobsError}
-        selectedPlan={selectedPlan}
-        onSelectPlan={setSelectedPlan}
         onCheckout={() => void startPaidCheckout()}
         checkoutLoading={checkoutLoading}
         checkoutError={checkoutError}
@@ -715,68 +708,39 @@ export function OnboardWizard() {
               </div>
 
               <h1 className="text-center font-[family-name:var(--font-display)] text-3xl font-bold">
-                Escolha seu plano
+                Libere o feed
               </h1>
 
               <div className="mt-6 space-y-3">
-                {RR_PLANS.map((plan) => {
-                  const selected = selectedPlan === plan.id;
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedPlan(plan.id)}
-                      className={`relative w-full overflow-hidden rounded-2xl border p-4 text-left transition ${
-                        selected
-                          ? "border-lime bg-lime/10"
-                          : "border-white/12 bg-white/5 hover:border-white/25"
-                      }`}
-                    >
-                      {plan.popular && (
-                        <div className="absolute inset-x-0 top-0 bg-lime py-1 text-center text-[10px] font-extrabold tracking-[0.14em] text-ink uppercase">
-                          Mais popular
-                        </div>
-                      )}
-                      <div
-                        className={`flex items-start justify-between gap-3 ${plan.popular ? "pt-5" : ""}`}
-                      >
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-cream">
-                              {plan.name}
-                            </span>
-                            {plan.badge && (
-                              <span className="rounded-full border border-lime/40 px-2 py-0.5 text-[10px] font-semibold text-lime">
-                                {plan.badge}
-                              </span>
-                            )}
-                          </div>
-                          {plan.strikethrough && (
-                            <p className="mt-1 text-sm text-sand/40 line-through">
-                              {plan.strikethrough}
-                            </p>
-                          )}
-                          {plan.billed && (
-                            <p className="text-sm text-sand/80">{plan.billed}</p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="font-[family-name:var(--font-display)] text-2xl font-bold">
-                            {plan.perMonth}
-                          </p>
-                          <p className="text-xs text-sand/50">por mês</p>
-                        </div>
+                {RR_PLANS.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="relative w-full overflow-hidden rounded-2xl border border-lime bg-lime/10 p-4 text-left"
+                  >
+                    <div className="absolute inset-x-0 top-0 bg-lime py-1 text-center text-[10px] font-extrabold tracking-[0.14em] text-ink uppercase">
+                      Pagamento único
+                    </div>
+                    <div className="flex items-start justify-between gap-3 pt-5">
+                      <div>
+                        <span className="font-bold text-cream">{plan.name}</span>
+                        <p className="mt-1 text-sm text-sand/80">{plan.billed}</p>
                       </div>
-                    </button>
-                  );
-                })}
+                      <div className="text-right">
+                        <p className="font-[family-name:var(--font-display)] text-2xl font-bold">
+                          {plan.perMonth}
+                        </p>
+                        <p className="text-xs text-sand/50">uma vez</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <p className="mt-5 flex items-center justify-center gap-2 text-sm text-sand/70">
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-mint text-[11px] font-bold text-ink">
                   ✓
                 </span>
-                Cartão ou Pix · Sem fidelidade
+                Cartão ou Pix · pagamento único
               </p>
               {checkoutError && (
                 <p className="mt-3 text-center text-sm text-red-300">

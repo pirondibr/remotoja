@@ -192,27 +192,18 @@ export const FUNNEL_STEPS: FunnelStep[] = [
     subheadline:
       "Nossos scrapers rodam o tempo todo. Por isso a Minha Vaga Remota é um produto pago: você é o cliente, não as empresas.",
     cta: "Acessar todas as vagas",
-    note: "Sem fidelidade · Cancele quando quiser · 7 dias de garantia",
+    note: "Pagamento único · Cartão ou Pix · 7 dias de garantia",
   },
 ];
 
 export const PLANS = [
   {
-    id: "monthly",
-    name: "Mensal",
-    priceLabel: "R$ 39",
-    period: "/mês",
-    detail: "De R$ 55,70 · 30% OFF",
-    savings: "30% OFF",
-    popular: true,
-  },
-  {
-    id: "quarterly",
-    name: "Trimestral",
-    priceLabel: "R$ 33",
-    period: "/mês",
-    detail: "R$ 99 a cada 3 meses",
+    id: "access",
+    name: "Acesso às vagas",
+    priceLabel: "R$ 29,90",
+    period: "",
+    detail: "Pagamento único. Sem mensalidade.",
     savings: null,
-    popular: false,
+    popular: true,
   },
 ] as const;

@@ -117,6 +117,7 @@ export async function GET(request: Request) {
         status: order.status,
         payer_email: order.payer_email,
         funnel_variant: order.funnel_variant || null,
+        checkout_ui: order.checkout_ui || null,
       })),
       feeds,
       /** compat */

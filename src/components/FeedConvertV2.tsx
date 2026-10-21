@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDemoJobAgo, type DemoJob } from "@/lib/demoJobs";
-import { RR_PLANS, type PlanId } from "@/lib/rrPlans";
+import { RR_PLANS } from "@/lib/rrPlans";
 import { BrandMark } from "./BrandMark";
 import { CompanyAvatar } from "./CompanyAvatar";
 import { PaywallExitSurvey, PaywallFeedbackBlock } from "./PaywallExitSurvey";
 
 const PORTALS = 7;
 const FREE_COUNT = 3;
-const V2_PLAN_ORDER: PlanId[] = ["quarterly", "monthly"];
 
 function isOffLinkedIn(source: string) {
   return !source.toLowerCase().includes("linkedin");
@@ -134,8 +133,6 @@ export function FeedConvertV2({
   jobs,
   loading,
   error,
-  selectedPlan,
-  onSelectPlan,
   onCheckout,
   checkoutLoading,
   checkoutError,
@@ -147,8 +144,6 @@ export function FeedConvertV2({
   jobs: DemoJob[];
   loading: boolean;
   error: string | null;
-  selectedPlan: PlanId;
-  onSelectPlan: (id: PlanId) => void;
   onCheckout: () => void;
   checkoutLoading: boolean;
   checkoutError: string | null;
@@ -239,8 +234,7 @@ export function FeedConvertV2({
     };
   }, [loading]);
 
-  const selected =
-    RR_PLANS.find((plan) => plan.id === selectedPlan) ?? RR_PLANS[0];
+  const selected = RR_PLANS[0];
 
   const benefits = [
     `Todas as ${stats.totalVagas} vagas de hoje, com link direto para se candidatar`,
@@ -394,60 +388,19 @@ export function FeedConvertV2({
                 portais.
               </p>
 
-              <div className="mb-4 grid gap-2.5" role="radiogroup" aria-label="Escolha seu plano">
-                {V2_PLAN_ORDER.map((id) => {
-                  const plan = RR_PLANS.find((item) => item.id === id);
-                  if (!plan) return null;
-                  const checked = selectedPlan === plan.id;
-                  const selo =
-                    plan.id === "quarterly"
-                      ? "Economize 15%"
-                      : plan.badge;
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={checked}
-                      onClick={() => onSelectPlan(plan.id)}
-                      className={`flex w-full items-center gap-3 rounded-[18px] border-2 px-4 py-3.5 text-left ${
-                        checked
-                          ? "border-[#c6ef78] bg-[#12301f]"
-                          : "border-[#1d3a2e] bg-[#0d241b]"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 ${
-                          checked ? "border-[#c6ef78]" : "border-[#5d7a6c]"
-                        }`}
-                      >
-                        {checked && (
-                          <span className="h-2.5 w-2.5 rounded-full bg-[#c6ef78]" />
-                        )}
-                      </span>
-                      <span>
-                        <span className="font-bold">{plan.name.replace("Plano ", "")}</span>
-                        {selo ? (
-                          <span className="ml-1.5 inline-block rounded-full bg-[#c6ef78] px-2 py-0.5 align-[2px] text-[11.5px] font-extrabold text-[#071511]">
-                            {selo}
-                          </span>
-                        ) : null}
-                        <br />
-                        <span className="text-[13px] text-[#9db3a8]">
-                          {plan.id === "quarterly"
-                            ? "R$ 99 a cada 3 meses"
-                            : "Cobrado todo mês"}
-                        </span>
-                      </span>
-                      <span className="ml-auto whitespace-nowrap text-right text-[22px] font-extrabold">
-                        {plan.perMonth}
-                        <small className="block font-[family-name:var(--font-body)] text-[13px] font-semibold text-[#9db3a8]">
-                          /mês
-                        </small>
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="mb-4 rounded-[18px] border-2 border-[#c6ef78] bg-[#12301f] px-4 py-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-bold">{selected.name}</p>
+                    <p className="text-[13px] text-[#9db3a8]">{selected.billed}</p>
+                  </div>
+                  <p className="whitespace-nowrap text-right text-[22px] font-extrabold">
+                    {selected.perMonth}
+                    <small className="block font-[family-name:var(--font-body)] text-[13px] font-semibold text-[#9db3a8]">
+                      uma vez
+                    </small>
+                  </p>
+                </div>
               </div>
 
               <ul className="mb-[18px] grid list-none gap-2.5 p-0">
@@ -467,7 +420,7 @@ export function FeedConvertV2({
               >
                 {checkoutLoading
                   ? "Abrindo Mercado Pago…"
-                  : `Liberar minhas ${stats.lockedCount} vagas · ${selected.perMonth}/mês`}
+                  : `Liberar minhas ${stats.lockedCount} vagas · ${selected.perMonth}`}
               </button>
               {checkoutError && (
                 <p className="mt-3 text-center text-sm text-red-300">
@@ -479,7 +432,7 @@ export function FeedConvertV2({
                   <ShieldIcon />
                   Pagamento seguro
                 </span>
-                <span>Cancele quando quiser</span>
+                <span>Pagamento único</span>
                 <span>7 dias para desistir com reembolso</span>
               </div>
             </section>
@@ -542,8 +495,8 @@ export function FeedConvertV2({
                   "Usamos o filtro de remoto de cada portal e descartamos as marcadas como híbridas ou presenciais. Se um portal classificar errado, a vaga pode escapar, mas o link sempre leva à página original para você conferir.",
                 ],
                 [
-                  "Posso cancelar?",
-                  "Sim, a qualquer momento, sem multa. E nos primeiros 7 dias você pode desistir e receber o valor de volta.",
+                  "É mensalidade?",
+                  "Não. Você paga R$ 29,90 uma vez e libera o feed. Nos primeiros 7 dias pode desistir e receber o valor de volta.",
                 ],
               ].map(([q, a]) => (
                 <details
@@ -571,8 +524,7 @@ export function FeedConvertV2({
             <b className="block text-[15px] text-[#eef6f1]">
               +{stats.lockedCount} vagas de {role}
             </b>
-            a partir de {RR_PLANS.find((p) => p.id === "quarterly")?.perMonth}
-            /mês
+            {selected.perMonth} uma vez
           </div>
           <a
             href="#oferta"

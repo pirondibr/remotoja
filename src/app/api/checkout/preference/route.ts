@@ -7,6 +7,10 @@ import {
 import { sendMetaInitiateCheckout } from "@/lib/metaCapi";
 import { generateOrderId } from "@/lib/memberAuth";
 import { attachPreference, createOrder } from "@/lib/orders";
+import {
+  hasMpPublicKey,
+  resolveCheckoutUi,
+} from "@/lib/checkoutUi";
 import { parseFeedAb } from "@/lib/funnelAb";
 import { getPlan, type PlanId } from "@/lib/rrPlans";
 
@@ -31,6 +35,7 @@ export async function POST(request: Request) {
     fbp?: string;
     fbc?: string;
     funnel_variant?: string;
+    checkout_ui?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -38,14 +43,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const plan = getPlan(String(body.planId || ""));
-  if (!plan) {
-    return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
-  }
+  const plan = getPlan(body.planId);
 
   const role = String(body.role || "SEO").trim() || "SEO";
   const email = String(body.email || "").trim() || undefined;
   const funnelVariant = parseFeedAb(body.funnel_variant);
+  const requestedUi = resolveCheckoutUi(body.checkout_ui);
+  const checkoutUi =
+    requestedUi === "brick" && hasMpPublicKey() ? "brick" : "v1";
   const orderId = generateOrderId();
 
   try {
@@ -58,6 +63,7 @@ export async function POST(request: Request) {
       funnelVariant,
       fbp: body.fbp,
       fbc: body.fbc,
+      checkoutUi,
     });
 
     const preference = await createCheckoutPreference({
@@ -82,12 +88,18 @@ export async function POST(request: Request) {
       userAgent: request.headers.get("user-agent"),
     }).catch(() => {});
 
+    const proUrl = checkoutRedirectUrl(preference);
+    const brickUrl = `/checkout?order=${encodeURIComponent(orderId)}`;
+    const useBrick = checkoutUi === "brick";
     return NextResponse.json({
       orderId,
       preferenceId: preference.id,
       amountBrl: plan.priceBrl,
       planId: plan.id,
-      checkoutUrl: checkoutRedirectUrl(preference),
+      checkoutUi,
+      checkoutUrl: useBrick ? brickUrl : proUrl,
+      brickUrl,
+      proUrl,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Falha no checkout";

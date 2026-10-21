@@ -143,7 +143,92 @@ export type MpPayment = {
   transaction_amount?: number;
   payer?: { email?: string };
   metadata?: { order_id?: string; plan_id?: string; role?: string };
+  point_of_interaction?: {
+    type?: string;
+    transaction_data?: {
+      qr_code?: string;
+      qr_code_base64?: string;
+      ticket_url?: string;
+    };
+  };
 };
+
+export type PixCheckoutData = {
+  qrCode: string;
+  qrCodeBase64: string;
+  ticketUrl: string;
+};
+
+export function pixFromPayment(payment: MpPayment): PixCheckoutData | null {
+  const tx = payment.point_of_interaction?.transaction_data;
+  const qrCode = String(tx?.qr_code || "").trim();
+  const qrCodeBase64 = String(tx?.qr_code_base64 || "").trim();
+  const ticketUrl = String(tx?.ticket_url || "").trim();
+  if (!qrCode && !qrCodeBase64) return null;
+  return { qrCode, qrCodeBase64, ticketUrl };
+}
+
+export async function createMpPayment(input: {
+  orderId: string;
+  planId: string;
+  role: string;
+  amountBrl: number;
+  formData: Record<string, unknown>;
+  payerEmail?: string | null;
+}): Promise<MpPayment> {
+  const token = getMpAccessToken();
+  if (!token) throw new Error("MERCADO_PAGO_ACCESS_TOKEN não configurada");
+
+  const form = { ...input.formData };
+  const payerRaw =
+    form.payer && typeof form.payer === "object"
+      ? (form.payer as Record<string, unknown>)
+      : {};
+  const email =
+    String(payerRaw.email || input.payerEmail || "")
+      .trim()
+      .toLowerCase() || undefined;
+
+  const body = {
+    ...form,
+    transaction_amount: input.amountBrl,
+    description: `Minha Vaga Remota — ${input.role}`,
+    external_reference: input.orderId,
+    metadata: {
+      order_id: input.orderId,
+      plan_id: input.planId,
+      role: input.role,
+      checkout_ui: "brick",
+    },
+    notification_url: `${appBaseUrl()}/api/checkout/webhook`,
+    statement_descriptor: "MINHAVAGAREM",
+    payer: {
+      ...payerRaw,
+      ...(email ? { email } : {}),
+    },
+  };
+
+  const res = await fetch(`${MP_API}/v1/payments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": `${input.orderId}-${Date.now()}`,
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const data = (await res.json()) as MpPayment & {
+    message?: string;
+    error?: string;
+    cause?: Array<{ description?: string }>;
+  };
+  if (!res.ok || !data.id) {
+    const cause = data.cause?.[0]?.description || "";
+    throw new Error(data.message || data.error || cause || `Pagamento HTTP ${res.status}`);
+  }
+  return data;
+}
 
 export async function fetchMpPayment(paymentId: string): Promise<MpPayment> {
   const token = getMpAccessToken();
@@ -158,6 +243,14 @@ export async function fetchMpPayment(paymentId: string): Promise<MpPayment> {
     throw new Error(data.message || `Pagamento HTTP ${res.status}`);
   }
   return data;
+}
+
+export function preferenceCheckoutUrl(preferenceId: string): string {
+  const token = getMpAccessToken();
+  const host = token.startsWith("TEST-")
+    ? "https://sandbox.mercadopago.com.br"
+    : "https://www.mercadopago.com.br";
+  return `${host}/checkout/v1/redirect?pref_id=${encodeURIComponent(preferenceId)}`;
 }
 
 /** Usa sandbox_init_point quando o token é de teste. */

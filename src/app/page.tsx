@@ -45,7 +45,7 @@ const STEPS = [
   {
     n: "3",
     t: "Libere o feed completo",
-    d: "Assine para ver todas as vagas de todos os portais, em um só lugar.",
+    d: "Pague uma vez e veja todas as vagas de todos os portais, em um só lugar.",
   },
 ];
 
@@ -67,8 +67,8 @@ const FAQ = [
     a: "Atualizamos as vagas diariamente.",
   },
   {
-    q: "Posso cancelar quando quiser?",
-    a: "Sim. Sem fidelidade e sem multa.",
+    q: "É mensalidade?",
+    a: "Não. Você paga R$ 29,90 uma vez e libera o feed. Nos primeiros 7 dias pode pedir reembolso.",
   },
 ];
 
@@ -234,39 +234,26 @@ export default function HomeV2() {
             Um plano, todos os portais.
           </h2>
           <p className="mt-3 text-lg text-moss/80">
-            Teste grátis com seu cargo. Assine só se as vagas fizerem sentido.
+            Teste grátis com seu cargo. Pague só se as vagas fizerem sentido.
           </p>
-          <div className="mt-10 grid gap-4 md:grid-cols-2 md:max-w-2xl">
+          <div className="mt-10 grid gap-4 md:max-w-md">
             {RR_PLANS.map((plan) => (
               <div
                 key={plan.id}
-                className={`flex flex-col rounded-3xl border p-6 ${
-                  plan.popular
-                    ? "border-moss bg-forest text-cream"
-                    : "border-moss/15 bg-white text-ink"
-                }`}
+                className="flex flex-col rounded-3xl border border-moss bg-forest p-6 text-cream"
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold">{plan.name}</p>
                   {plan.badge && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                        plan.popular ? "bg-lime text-ink" : "bg-sand text-moss"
-                      }`}
-                    >
+                    <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink uppercase">
                       {plan.badge}
                     </span>
                   )}
                 </div>
                 <p className="mt-5 font-[family-name:var(--font-display)] text-4xl font-bold">
                   {plan.perMonth}
-                  <span className="text-base font-medium opacity-60">/mês</span>
                 </p>
-                <p
-                  className={`mt-2 text-sm ${plan.popular ? "text-sand/70" : "text-moss/65"}`}
-                >
-                  {plan.billed ? `${plan.billed} cobrados de uma vez` : "Cobrado todo mês"}
-                </p>
+                <p className="mt-2 text-sm text-sand/70">{plan.billed}</p>
               </div>
             ))}
           </div>

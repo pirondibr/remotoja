@@ -7,7 +7,7 @@ import { PLANS } from "@/lib/funnel";
 export const metadata: Metadata = {
   title: "Preços · Minha Vaga Remota",
   description:
-    "Planos Minha Vaga Remota: R$ 39/mês ou trimestral. Cancele quando quiser.",
+    "Acesso às vagas remotas por R$ 29,90. Pagamento único, cartão ou Pix.",
 };
 
 const features = [
@@ -31,52 +31,32 @@ export default function PricingPage() {
             <span className="block text-lime">Valor no timing.</span>
           </h1>
           <p className="mt-4 max-w-xl text-lg text-sand/75">
-            Sem fidelidade. Cancele quando quiser. Todos os planos liberam os
-            mesmos recursos.
+            Pagamento único. Cartão ou Pix. O mesmo feed completo de vagas
+            remotas.
           </p>
         </div>
       </div>
 
       <section className="mx-auto max-w-5xl px-5 py-16 md:px-10">
-        <div className="grid gap-4 md:grid-cols-2 md:max-w-2xl">
+        <div className="grid gap-4 md:max-w-md">
           {PLANS.map((plan) => (
             <div
               key={plan.id}
-              className={`flex flex-col rounded-3xl border p-6 ${
-                plan.popular
-                  ? "border-moss bg-forest text-cream"
-                  : "border-moss/15 bg-white"
-              }`}
+              className="flex flex-col rounded-3xl border border-moss bg-forest p-6 text-cream"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">{plan.name}</h2>
-                {plan.popular && (
-                  <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink uppercase">
-                    Popular
-                  </span>
-                )}
+                <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink uppercase">
+                  Pagamento único
+                </span>
               </div>
               <p className="mt-4 font-[family-name:var(--font-display)] text-4xl font-bold">
                 {plan.priceLabel}
-                <span className="text-base font-medium opacity-60">
-                  {plan.period}
-                </span>
               </p>
-              <p
-                className={`mt-2 text-sm ${plan.popular ? "text-sand/70" : "text-moss/65"}`}
-              >
-                {plan.detail}
-              </p>
-              {plan.savings && (
-                <p className="mt-2 text-sm text-mint">{plan.savings}</p>
-              )}
+              <p className="mt-2 text-sm text-sand/70">{plan.detail}</p>
               <Link
                 href="/onboard"
-                className={`mt-6 inline-flex justify-center rounded-full py-3 text-sm font-bold transition ${
-                  plan.popular
-                    ? "bg-lime text-ink hover:bg-mint"
-                    : "bg-ink text-cream hover:bg-forest"
-                }`}
+                className="mt-6 inline-flex justify-center rounded-full bg-lime py-3 text-sm font-bold text-ink transition hover:bg-mint"
               >
                 Começar
               </Link>

@@ -10,7 +10,7 @@ import {
   markOrderApproved,
   saveOrderClickIds,
 } from "@/lib/orders";
-import { getPlan } from "@/lib/rrPlans";
+import { DEFAULT_PLAN_ID, getPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
 import { findAccountByOrderId } from "@/lib/memberAccounts";
 
@@ -71,12 +71,11 @@ export async function POST(request: Request) {
 
     let order = await getOrder(orderId);
     const planId =
-      order?.plan_id || payment.metadata?.plan_id || "monthly";
+      order?.plan_id || payment.metadata?.plan_id || DEFAULT_PLAN_ID;
     const role =
       order?.role || payment.metadata?.role || "SEO";
     const plan = getPlan(planId);
-    const days = plan?.durationDays ?? 30;
-    const accessUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    const accessUntil = planAccessUntil(planId);
     const amountBrl =
       order?.amount_brl != null
         ? Number(order.amount_brl)
