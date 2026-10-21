@@ -254,6 +254,16 @@ export default function HomeV2() {
                   {plan.perMonth}
                 </p>
                 <p className="mt-2 text-sm text-sand/70">{plan.billed}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {plan.payOptions.map((option) => (
+                    <span
+                      key={option}
+                      className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-lime"
+                    >
+                      {option}
+                    </span>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

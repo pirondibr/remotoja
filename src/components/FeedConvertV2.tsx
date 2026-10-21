@@ -393,6 +393,16 @@ export function FeedConvertV2({
                   <div>
                     <p className="font-bold">{selected.name}</p>
                     <p className="text-[13px] text-[#9db3a8]">{selected.billed}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {selected.payOptions.map((option) => (
+                        <span
+                          key={option}
+                          className="rounded-full border border-[#c6ef78]/50 px-2 py-0.5 text-[11px] font-extrabold text-[#c6ef78]"
+                        >
+                          {option}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <p className="whitespace-nowrap text-right text-[22px] font-extrabold">
                     {selected.perMonth}

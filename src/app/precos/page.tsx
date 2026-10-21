@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { BrandMark } from "@/components/BrandMark";
-import { PLANS } from "@/lib/funnel";
+import { RR_PLANS } from "@/lib/rrPlans";
 
 export const metadata: Metadata = {
   title: "Preços · Minha Vaga Remota",
@@ -39,7 +39,7 @@ export default function PricingPage() {
 
       <section className="mx-auto max-w-5xl px-5 py-16 md:px-10">
         <div className="grid gap-4 md:max-w-md">
-          {PLANS.map((plan) => (
+          {RR_PLANS.map((plan) => (
             <div
               key={plan.id}
               className="flex flex-col rounded-3xl border border-moss bg-forest p-6 text-cream"
@@ -47,13 +47,23 @@ export default function PricingPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold">{plan.name}</h2>
                 <span className="rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold text-ink uppercase">
-                  Pagamento único
+                  {plan.badge}
                 </span>
               </div>
               <p className="mt-4 font-[family-name:var(--font-display)] text-4xl font-bold">
-                {plan.priceLabel}
+                {plan.perMonth}
               </p>
-              <p className="mt-2 text-sm text-sand/70">{plan.detail}</p>
+              <p className="mt-2 text-sm text-sand/70">{plan.billed}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {plan.payOptions.map((option) => (
+                  <span
+                    key={option}
+                    className="rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-lime"
+                  >
+                    {option}
+                  </span>
+                ))}
+              </div>
               <Link
                 href="/onboard"
                 className="mt-6 inline-flex justify-center rounded-full bg-lime py-3 text-sm font-bold text-ink transition hover:bg-mint"

@@ -202,7 +202,7 @@ export const PLANS = [
     name: "Acesso às vagas",
     priceLabel: "R$ 29,90",
     period: "",
-    detail: "Pagamento único. Sem mensalidade.",
+    detail: "Pague pelo Pix ou cartão. Uma vez, sem mensalidade.",
     savings: null,
     popular: true,
   },

@@ -549,6 +549,16 @@ export function FinalV2() {
                     <div>
                       <span className="font-bold text-cream">{plan.name}</span>
                       <p className="mt-1 text-sm text-sand/80">{plan.billed}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {plan.payOptions.map((option) => (
+                          <span
+                            key={option}
+                            className="rounded-full border border-lime/40 px-2 py-0.5 text-[11px] font-semibold text-lime"
+                          >
+                            {option}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className="font-[family-name:var(--font-display)] text-2xl font-bold">

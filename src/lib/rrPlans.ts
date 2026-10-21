@@ -7,7 +7,8 @@ export const RR_PLANS = [
     name: "Acesso às vagas",
     badge: "Pagamento único",
     strikethrough: null,
-    billed: "Paga uma vez. Sem mensalidade.",
+    billed: "Pague pelo Pix ou cartão. Uma vez, sem mensalidade.",
+    payOptions: ["Pague pelo Pix", "Cartão"],
     perMonth: "R$ 29,90",
     popular: true,
     /** Valor cobrado no Mercado Pago (BRL). */
