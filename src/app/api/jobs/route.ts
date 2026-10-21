@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
 import { filterJobsByCargo } from "@/lib/dashboard/llmJobAnalysis";
+import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
@@ -34,6 +35,11 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
   return true;
 }
 
+/** Cache: regras baratas (já tratam front-end = frontend). Sem LLM em todo pageview. */
+function keepMatching(jobs: DemoJob[], term: string): DemoJob[] {
+  return jobs.filter((job) => roleFitsDemoJob(job, term));
+}
+
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
     const { jobs, available } = await fetchRemotar(role);
@@ -63,7 +69,7 @@ async function searchLive(term: string): Promise<{
       maxAttempts: 14,
       pollMs: 2000,
     });
-    jobs = result.jobs;
+    jobs = await filterJobsByCargo(term, result.jobs);
     fetchedVia = result.fetched_via;
     query = result.query;
   } catch (error) {
@@ -146,8 +152,17 @@ export async function GET(request: Request) {
         ) {
           continue;
         }
-        const jobs = prepareDemoJobs(cached.jobs as DemoJob[]);
-        if (jobs.length === 0) continue;
+        const filtered = keepMatching(cached.jobs as DemoJob[], plan.primary);
+        if (filtered.length < MIN_DEMO_JOBS) continue;
+        if (filtered.length < (cached.jobs as DemoJob[]).length) {
+          void setCachedJobs({
+            kind: "demo",
+            role: term,
+            jobs: filtered,
+            fetched_via: cached.fetched_via || "cache_demo",
+          }).catch(() => {});
+        }
+        const jobs = prepareDemoJobs(filtered);
         return jsonWithSearch(request, role, {
           role,
           query: buildJobsQuery(plan.primary),

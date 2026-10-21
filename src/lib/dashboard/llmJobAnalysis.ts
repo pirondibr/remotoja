@@ -46,7 +46,7 @@ function cargoFits(job: DashboardJob): boolean {
 
 /**
  * Decide o que entra no feed: LLM se houver chave, senão regras.
- * Usar só em fallback (Remotar). Google do demo vai sem esse corte.
+ * Demo live (Google + Remotar) usa isto. Cache do demo usa só as regras.
  */
 export async function filterJobsByCargo<T extends DashboardJob>(
   role: string,
