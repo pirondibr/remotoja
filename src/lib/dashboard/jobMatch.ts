@@ -54,6 +54,10 @@ const RELATED_BY_TERM: Record<string, string[]> = {
   auxiliar: ["assistente", "apoio"],
   licitacao: ["licitacoes", "pregao", "editais"],
   licitacoes: ["licitacao", "pregao", "editais"],
+  contador: ["contabil", "contabilidade", "contabilista"],
+  contabil: ["contador", "contabilidade", "contabilista"],
+  contabilidade: ["contador", "contabil", "contabilista"],
+  contabilista: ["contador", "contabil", "contabilidade"],
 };
 
 const STOPWORDS = new Set([
@@ -135,6 +139,17 @@ export function classifyCargoMatch(
     if (hit >= Math.ceil(parts.length * 0.6)) return "relacionado";
   } else if (parts[0] && parts[0].length >= 3 && titleHas(parts[0])) {
     return "exato";
+  }
+
+  // Mesma raiz: contador ↔ contábil ↔ contabilidade (6 letras).
+  const root = t.length >= 6 ? t.slice(0, 6) : "";
+  if (
+    root &&
+    title
+      .split(/\s+/)
+      .some((word) => word.length >= 6 && (word.startsWith(root) || root.startsWith(word.slice(0, 6))))
+  ) {
+    return "relacionado";
   }
 
   const blob = `${company} ${snippet}`;
