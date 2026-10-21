@@ -90,7 +90,12 @@ export async function createCheckoutPreference(
             { id: "debit_card" },
             { id: "prepaid_card" },
           ]
-        : [{ id: "ticket" }, { id: "atm" }],
+        : [
+            { id: "ticket" },
+            { id: "atm" },
+            { id: "debit_card" },
+            { id: "prepaid_card" },
+          ],
       installments: isPixOnlyPlan(plan.id) ? 1 : 12,
     },
   };

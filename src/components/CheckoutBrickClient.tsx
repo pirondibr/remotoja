@@ -155,7 +155,6 @@ export function CheckoutBrickClient() {
                 : {
                     bankTransfer: ["pix"],
                     creditCard: "all",
-                    debitCard: "all",
                     maxInstallments: 12,
                   },
             },
