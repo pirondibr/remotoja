@@ -29,16 +29,7 @@ function postedLabel(job: DemoJob): string {
   return formatDemoJobAgo(job);
 }
 
-function freshestPostedLabel(jobs: DemoJob[]): string {
-  if (!jobs.length) return "algumas horas";
-  // Menor “horas atrás” fake da lista (mais fresco)
-  let best = 20;
-  for (const job of jobs) {
-    const m = formatDemoJobAgo(job).match(/^(\d+)/);
-    if (m) best = Math.min(best, Number(m[1]));
-  }
-  return best === 1 ? "1 hora" : `${best} horas`;
-}
+const OFFER_SECONDS = 5 * 60;
 
 function Countdown({ seconds }: { seconds: number }) {
   const [left, setLeft] = useState(seconds);
@@ -192,11 +183,6 @@ export function FinalV2() {
 
   /** Quando pagar, outros scrapers entram — mostramos o dobro do que achamos agora. */
   const moreCount = Math.max(uniqueJobs.length * 2, 2);
-
-  const headlineTime = useMemo(
-    () => freshestPostedLabel(uniqueJobs),
-    [uniqueJobs]
-  );
 
   async function logLead(
     trimmed: string,
@@ -418,7 +404,7 @@ export function FinalV2() {
           <section className="animate-rise flex flex-1 flex-col">
             <div className="relative mb-6 overflow-hidden rounded-2xl border border-lime/35 bg-gradient-to-r from-forest/80 to-moss/40 p-4">
               <div className="absolute top-3 right-3">
-                <Countdown seconds={186} />
+                <Countdown seconds={OFFER_SECONDS} />
               </div>
               <div className="flex flex-col gap-3 pr-16 sm:flex-row sm:items-center sm:justify-between sm:pr-24">
                 <div>
@@ -439,11 +425,11 @@ export function FinalV2() {
 
             <h1 className="text-center font-[family-name:var(--font-display)] text-[1.65rem] leading-tight font-bold sm:text-3xl">
               Sua próxima vaga foi publicada{" "}
-              <span className="text-lime">{headlineTime}</span>
+              <span className="text-lime">7 horas atrás</span>
             </h1>
             <p className="mx-auto mt-3 max-w-sm text-center text-sm text-sand/65">
-              Vagas top recebem 100+ candidatos rápido. Candidate-se antes da
-              multidão.
+              Vagas top recebem 100+ candidatos rapidamente. Candidate-se
+              antes da multidão.
             </p>
 
             <div className="mt-7 space-y-3">
