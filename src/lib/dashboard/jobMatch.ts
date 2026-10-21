@@ -148,7 +148,7 @@ export function classifyCargoMatch(
   return "fora";
 }
 
-/** Demo: aceita exato + relacionado (sinônimos), rejeita cargo misturado. */
+/** Fallback sem LLM (Remotar). Aceita exato + relacionado. */
 export function roleFitsDemoJob(
   job: { title?: string; company?: string; snippet?: string | null },
   term: string

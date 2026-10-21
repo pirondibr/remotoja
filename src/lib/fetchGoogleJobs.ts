@@ -1,5 +1,4 @@
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
-import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
 import type { DemoJob } from "@/lib/demoJobs";
 
 const API_POST = "https://api.dataforseo.com/v3/serp/google/jobs/task_post";
@@ -129,11 +128,11 @@ export async function fetchGoogleJobsByRole(
     if (status === 20000) {
       const items: RawItem[] = data.tasks[0]?.result?.[0]?.items || [];
       const roleTerm = role.trim();
+      // Sem filtro de cargo aqui: a query já foi ao Google.
+      // Regras (frontend ≠ front-end) cortavam vagas boas antes da LLM do pago.
       const jobs = items
         .map(normalizeItem)
-        .filter((job): job is DemoJob => Boolean(job))
-        // Google mistura vagas; exato + sinônimos (atendente ↔ atendimento), não Full Stack em SEO
-        .filter((job) => roleFitsDemoJob(job, roleTerm));
+        .filter((job): job is DemoJob => Boolean(job));
       return {
         query,
         role: roleTerm,

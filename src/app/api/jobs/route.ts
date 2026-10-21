@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchGoogleJobsByRole } from "@/lib/fetchGoogleJobs";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
-import { roleFitsDemoJob } from "@/lib/dashboard/jobMatch";
+import { filterJobsByCargo } from "@/lib/dashboard/llmJobAnalysis";
 import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
@@ -34,14 +34,11 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
   return true;
 }
 
-function keepMatching(jobs: DemoJob[], term: string): DemoJob[] {
-  return jobs.filter((job) => roleFitsDemoJob(job, term));
-}
-
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
     const { jobs, available } = await fetchRemotar(role);
-    const matched = keepMatching(jobs, role);
+    // Remotar às vezes devolve o feed inteiro — LLM (ou regras) corta o resto.
+    const matched = await filterJobsByCargo(role, jobs);
     if (isUnfilteredDump(available ?? 0, matched.length)) return [];
     return matched.slice(0, 12);
   } catch {
@@ -149,9 +146,8 @@ export async function GET(request: Request) {
         ) {
           continue;
         }
-        const filtered = keepMatching(cached.jobs as DemoJob[], plan.primary);
-        if (filtered.length < MIN_DEMO_JOBS) continue;
-        const jobs = prepareDemoJobs(filtered);
+        const jobs = prepareDemoJobs(cached.jobs as DemoJob[]);
+        if (jobs.length === 0) continue;
         return jsonWithSearch(request, role, {
           role,
           query: buildJobsQuery(plan.primary),

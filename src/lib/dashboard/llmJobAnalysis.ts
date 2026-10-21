@@ -3,7 +3,7 @@ import {
   hasOpenRouter,
   openRouterChat,
 } from "@/lib/openrouter";
-import type { MatchTier } from "@/lib/dashboard/jobMatch";
+import { roleFitsDemoJob, type MatchTier } from "@/lib/dashboard/jobMatch";
 import type { DashboardJob } from "@/lib/dashboard/types";
 import type { RemoteAssess } from "@/lib/dashboard/assessRemotePage";
 
@@ -38,6 +38,26 @@ function asTier(raw: unknown): MatchTier | null {
     .trim();
   if (t === "exato" || t === "relacionado" || t === "fora") return t;
   return null;
+}
+
+function cargoFits(job: DashboardJob): boolean {
+  return job.match_tier === "exato" || job.match_tier === "relacionado";
+}
+
+/**
+ * Decide o que entra no feed: LLM se houver chave, senão regras.
+ * Usar só em fallback (Remotar). Google do demo vai sem esse corte.
+ */
+export async function filterJobsByCargo<T extends DashboardJob>(
+  role: string,
+  jobs: T[]
+): Promise<T[]> {
+  if (jobs.length === 0) return [];
+  const llm = await classifyCargoWithLlm(role, jobs);
+  if (llm.usedLlm) {
+    return (llm.jobs as T[]).filter(cargoFits);
+  }
+  return jobs.filter((job) => roleFitsDemoJob(job, role));
 }
 
 /**

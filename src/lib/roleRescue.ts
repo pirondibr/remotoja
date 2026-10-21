@@ -205,6 +205,10 @@ export function wordInText(needle: string, hay: string): boolean {
   const h = foldRole(hay);
   if (!n || !h) return false;
   if (h.includes(n)) return true;
+  // front-end / front end / frontend são o mesmo token — não é sinônimo.
+  const nCompact = n.replace(/[\s\-_\/]+/g, "");
+  const hCompact = h.replace(/[\s\-_\/]+/g, "");
+  if (nCompact.length >= 4 && hCompact.includes(nCompact)) return true;
   const nStem = stemRoleWord(n);
   if (nStem.length >= 4 && h.includes(nStem)) return true;
   return h
