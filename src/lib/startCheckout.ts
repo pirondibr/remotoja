@@ -6,7 +6,7 @@ import {
   trackMetaEvent,
 } from "@/lib/metaPixel";
 import type { FeedAbVariant } from "@/lib/funnelAb";
-import { DEFAULT_PLAN_ID, getPlan, type PlanId } from "@/lib/rrPlans";
+import { DEFAULT_PLAN_ID, getPlan, isTestPlan, type PlanId } from "@/lib/rrPlans";
 
 function checkoutUiFromPage(): CheckoutUi | undefined {
   if (typeof window === "undefined") return undefined;
@@ -49,22 +49,24 @@ export async function startCheckout(input: {
 
   const planId = input.planId || DEFAULT_PLAN_ID;
   const plan = getPlan(planId);
-  const value =
-    typeof data.amountBrl === "number" ? data.amountBrl : plan?.priceBrl;
-  const eventId = data.orderId
-    ? initiateCheckoutEventId(data.orderId)
-    : undefined;
-  trackMetaEvent(
-    "InitiateCheckout",
-    {
-      value,
-      currency: "BRL",
-      content_ids: [planId],
-      content_type: "product",
-      num_items: 1,
-    },
-    eventId
-  );
+  if (!isTestPlan(planId)) {
+    const value =
+      typeof data.amountBrl === "number" ? data.amountBrl : plan?.priceBrl;
+    const eventId = data.orderId
+      ? initiateCheckoutEventId(data.orderId)
+      : undefined;
+    trackMetaEvent(
+      "InitiateCheckout",
+      {
+        value,
+        currency: "BRL",
+        content_ids: [planId],
+        content_type: "product",
+        num_items: 1,
+      },
+      eventId
+    );
+  }
 
   return { checkoutUrl: data.checkoutUrl, orderId: data.orderId };
 }

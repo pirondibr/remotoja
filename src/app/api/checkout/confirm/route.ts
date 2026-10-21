@@ -10,7 +10,7 @@ import {
   markOrderApproved,
   saveOrderClickIds,
 } from "@/lib/orders";
-import { DEFAULT_PLAN_ID, getPlan, planAccessUntil } from "@/lib/rrPlans";
+import { DEFAULT_PLAN_ID, getPlan, isTestPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
 import { findAccountByOrderId } from "@/lib/memberAccounts";
 
@@ -97,24 +97,26 @@ export async function POST(request: Request) {
     });
     order = (await getOrder(orderId)) || order;
 
-    await sendUniqueMetaPurchase({
-      paymentId: String(payment.id),
-      orderId,
-      value: amountBrl,
-      planId,
-      email: payment.payer?.email || order?.payer_email,
-      fbp: body.fbp || order?.fbp,
-      fbc: body.fbc || order?.fbc,
-      clientIp: clientIp(request),
-      userAgent: request.headers.get("user-agent"),
-    });
+    if (!isTestPlan(planId)) {
+      await sendUniqueMetaPurchase({
+        paymentId: String(payment.id),
+        orderId,
+        value: amountBrl,
+        planId,
+        email: payment.payer?.email || order?.payer_email,
+        fbp: body.fbp || order?.fbp,
+        fbc: body.fbc || order?.fbc,
+        clientIp: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      });
 
-    await logPaidPurchase({
-      role,
-      email: payment.payer?.email || order?.payer_email,
-      funnelVariant: order?.funnel_variant,
-      userAgent: request.headers.get("user-agent"),
-    });
+      await logPaidPurchase({
+        role,
+        email: payment.payer?.email || order?.payer_email,
+        funnelVariant: order?.funnel_variant,
+        userAgent: request.headers.get("user-agent"),
+      });
+    }
 
     const token = buildMemberToken({
       orderId,

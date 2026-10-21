@@ -1,5 +1,5 @@
 import type { FeedAbVariant } from "@/lib/funnelAb";
-import { getPlan, type PlanId } from "@/lib/rrPlans";
+import { getPlan, isPixOnlyPlan, type PlanId } from "@/lib/rrPlans";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -81,10 +81,17 @@ export async function createCheckoutPreference(
     auto_return: "all",
     notification_url: `${base}/api/checkout/webhook`,
     statement_descriptor: "MINHAVAGAREM",
-    // Cartão + PIX (exclui boleto/lotérica)
     payment_methods: {
-      excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
-      installments: 12,
+      excluded_payment_types: isPixOnlyPlan(plan.id)
+        ? [
+            { id: "ticket" },
+            { id: "atm" },
+            { id: "credit_card" },
+            { id: "debit_card" },
+            { id: "prepaid_card" },
+          ]
+        : [{ id: "ticket" }, { id: "atm" }],
+      installments: isPixOnlyPlan(plan.id) ? 1 : 12,
     },
   };
 

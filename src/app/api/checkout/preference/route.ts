@@ -12,7 +12,7 @@ import {
   resolveCheckoutUi,
 } from "@/lib/checkoutUi";
 import { parseFeedAb } from "@/lib/funnelAb";
-import { getPlan, type PlanId } from "@/lib/rrPlans";
+import { getPlan, isTestPlan, type PlanId } from "@/lib/rrPlans";
 
 function clientIp(request: Request): string | undefined {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -48,7 +48,9 @@ export async function POST(request: Request) {
   const role = String(body.role || "SEO").trim() || "SEO";
   const email = String(body.email || "").trim() || undefined;
   const funnelVariant = parseFeedAb(body.funnel_variant);
-  const requestedUi = resolveCheckoutUi(body.checkout_ui);
+  const requestedUi = isTestPlan(plan.id)
+    ? "brick"
+    : resolveCheckoutUi(body.checkout_ui);
   const checkoutUi =
     requestedUi === "brick" && hasMpPublicKey() ? "brick" : "v1";
   const orderId = generateOrderId();
@@ -76,17 +78,18 @@ export async function POST(request: Request) {
 
     await attachPreference(orderId, preference.id);
 
-    // CAPI InitiateCheckout (browser dispara o mesmo event_id)
-    void sendMetaInitiateCheckout({
-      orderId,
-      value: plan.priceBrl,
-      planId: plan.id,
-      email,
-      fbp: body.fbp,
-      fbc: body.fbc,
-      clientIp: clientIp(request),
-      userAgent: request.headers.get("user-agent"),
-    }).catch(() => {});
+    if (!isTestPlan(plan.id)) {
+      void sendMetaInitiateCheckout({
+        orderId,
+        value: plan.priceBrl,
+        planId: plan.id,
+        email,
+        fbp: body.fbp,
+        fbc: body.fbc,
+        clientIp: clientIp(request),
+        userAgent: request.headers.get("user-agent"),
+      }).catch(() => {});
+    }
 
     const proUrl = checkoutRedirectUrl(preference);
     const brickUrl = `/checkout?order=${encodeURIComponent(orderId)}`;

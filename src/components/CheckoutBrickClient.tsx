@@ -7,7 +7,7 @@ import Link from "next/link";
 import { BrandMark } from "@/components/BrandMark";
 import { loadAttribution } from "@/lib/attribution";
 import { firePurchasePixel, metaBrowserIds } from "@/lib/metaPixel";
-import { formatBrl } from "@/lib/rrPlans";
+import { formatBrl, isTestPlan } from "@/lib/rrPlans";
 
 type PixData = {
   qrCode: string;
@@ -29,6 +29,7 @@ type Session = {
   hasPublicKey: boolean;
   proUrl: string;
   pix?: PixData | null;
+  pixOnly?: boolean;
 };
 
 type BrickController = { unmount?: () => void };
@@ -145,21 +146,23 @@ export function CheckoutBrickClient() {
           {
             initialization: {
               amount: session.amountBrl,
-              ...(session.preferenceId
+              ...(session.preferenceId && !session.pixOnly
                 ? { preferenceId: session.preferenceId }
                 : {}),
               ...(session.email ? { payer: { email: session.email } } : {}),
             },
             customization: {
               visual: { style: { theme: "dark" } },
-              paymentMethods: {
-                creditCard: "all",
-                debitCard: "all",
-                bankTransfer: ["pix"],
-                prepaidCard: "all",
-                mercadoPago: "all",
-                maxInstallments: 12,
-              },
+              paymentMethods: session.pixOnly
+                ? { bankTransfer: ["pix"] }
+                : {
+                    creditCard: "all",
+                    debitCard: "all",
+                    bankTransfer: ["pix"],
+                    prepaidCard: "all",
+                    mercadoPago: "all",
+                    maxInstallments: 12,
+                  },
             },
             callbacks: {
               onReady: () => {
@@ -251,12 +254,14 @@ export function CheckoutBrickClient() {
           hasAccount?: boolean;
         };
         if (res.ok && data.ok) {
-          await firePurchasePixel({
-            orderId: current.orderId,
-            paymentId,
-            value: current.amountBrl,
-            planId: current.planId,
-          });
+          if (!isTestPlan(current.planId)) {
+            await firePurchasePixel({
+              orderId: current.orderId,
+              paymentId,
+              value: current.amountBrl,
+              planId: current.planId,
+            });
+          }
           const role = data.role || current.role;
           router.replace(
             data.hasAccount
@@ -366,7 +371,7 @@ export function CheckoutBrickClient() {
           className={showPix ? "hidden" : "mt-6"}
         />
         <div id="statusBrick_container" className="mt-6" />
-        {session?.proUrl && session.hasPublicKey && !showPix && (
+        {session?.proUrl && session.hasPublicKey && !showPix && !session.pixOnly && (
           <p className="mt-6 text-center text-xs text-sand/50">
             Quer o checkout antigo?{" "}
             <a href={session.proUrl} className="text-lime hover:underline">

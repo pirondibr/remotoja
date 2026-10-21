@@ -6,7 +6,7 @@ import {
   markOrderApproved,
   markOrderStatus,
 } from "@/lib/orders";
-import { getPlan, planAccessUntil } from "@/lib/rrPlans";
+import { getPlan, isTestPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
 
 async function processPayment(paymentId: string) {
@@ -31,26 +31,28 @@ async function processPayment(paymentId: string) {
       });
     }
 
-    await logPaidPurchase({
-      role: order.role,
-      email: payment.payer?.email || order.payer_email,
-      funnelVariant: order.funnel_variant,
-    });
+    if (!isTestPlan(order.plan_id)) {
+      await logPaidPurchase({
+        role: order.role,
+        email: payment.payer?.email || order.payer_email,
+        funnelVariant: order.funnel_variant,
+      });
 
-    const plan = getPlan(order.plan_id);
-    const value =
-      typeof order.amount_brl === "number"
-        ? Number(order.amount_brl)
-        : plan?.priceBrl ?? 0;
-    await sendUniqueMetaPurchase({
-      paymentId: String(payment.id),
-      orderId,
-      value,
-      planId: order.plan_id,
-      email: payment.payer?.email || order.payer_email,
-      fbp: order.fbp,
-      fbc: order.fbc,
-    });
+      const plan = getPlan(order.plan_id);
+      const value =
+        typeof order.amount_brl === "number"
+          ? Number(order.amount_brl)
+          : plan?.priceBrl ?? 0;
+      await sendUniqueMetaPurchase({
+        paymentId: String(payment.id),
+        orderId,
+        value,
+        planId: order.plan_id,
+        email: payment.payer?.email || order.payer_email,
+        fbp: order.fbp,
+        fbc: order.fbc,
+      });
+    }
     return;
   }
 

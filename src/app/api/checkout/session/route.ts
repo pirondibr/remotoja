@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getMpPublicKey, hasMpPublicKey } from "@/lib/checkoutUi";
 import { fetchMpPayment, pixFromPayment, preferenceCheckoutUrl } from "@/lib/mercadoPago";
 import { getOrder } from "@/lib/orders";
-import { getPlan } from "@/lib/rrPlans";
+import { getPlan, isPixOnlyPlan } from "@/lib/rrPlans";
 
 export async function GET(request: Request) {
   const orderId = new URL(request.url).searchParams.get("order")?.trim() || "";
@@ -43,5 +43,6 @@ export async function GET(request: Request) {
     hasPublicKey: hasMpPublicKey(),
     proUrl,
     pix,
+    pixOnly: isPixOnlyPlan(order.plan_id),
   });
 }
