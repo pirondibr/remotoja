@@ -2,7 +2,6 @@ import { dedupeJobs, rankJobsForFeed } from "@/lib/dashboard/common";
 import { fetchCatho } from "@/lib/dashboard/catho";
 import { fetchGoogleDashboard } from "@/lib/dashboard/google";
 import { fetchGupy } from "@/lib/dashboard/gupy";
-import { fetchIndeed } from "@/lib/dashboard/indeed";
 import { fetchInfoJobs } from "@/lib/dashboard/infojobs";
 import { fetchLinkedIn } from "@/lib/dashboard/linkedin";
 import { fetchRemotar } from "@/lib/dashboard/remotar";
@@ -14,7 +13,6 @@ import { filterPortugueseJobs } from "@/lib/dashboard/languageFilter";
 import {
   AnalysisLogBuilder,
   BEE_PREMIUM_CREDITS,
-  BEE_PREMIUM_JS_CREDITS,
   beeCreditUsd,
 } from "@/lib/dashboard/analysisLog";
 import {
@@ -49,7 +47,7 @@ type Fetcher = {
   beeCredits?: number;
 };
 
-/** Programathor pausado. LinkedIn ativo + filtro PT em todos os scrapes. */
+/** Programathor e Indeed pausados. LinkedIn ativo + filtro PT em todos os scrapes. */
 const FETCHERS: Fetcher[] = [
   {
     name: "gupy",
@@ -69,13 +67,7 @@ const FETCHERS: Fetcher[] = [
     // ~1–2 páginas premium sem JS
     beeCredits: BEE_PREMIUM_CREDITS * 2,
   },
-  {
-    name: "indeed",
-    run: fetchIndeed,
-    timeoutMs: 22000,
-    requiresScrapingBee: true,
-    beeCredits: BEE_PREMIUM_JS_CREDITS,
-  },
+  // Indeed pausado: timeout de 22s segurava o scrape paralelo. Código em indeed.ts.
   {
     name: "google_vagas",
     run: fetchGoogleDashboard,
