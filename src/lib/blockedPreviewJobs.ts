@@ -7,7 +7,7 @@ export type LockedPreviewJob = {
   fora: boolean;
 };
 
-export const VISIBLE_LOCKED_TITLES = 16;
+export const VISIBLE_LOCKED_TITLES = 10;
 
 export function isOffLinkedIn(source: string): boolean {
   return !source.toLowerCase().includes("linkedin");

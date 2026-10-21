@@ -111,24 +111,27 @@ function JobCard({
 
 function LockedRow({ job }: { job: LockedPreviewJob }) {
   return (
-    <div className="flex items-center gap-3 border-t border-[#1d3a2e] px-3.5 py-3 first:border-t-0">
+    <div className="flex items-center gap-3 border-t border-[#1d3a2e] px-3.5 py-[13px] first:border-t-0">
       <div className="min-w-0 flex-1">
-        <div className="text-[15px] leading-snug font-bold text-[#eef6f1]">
+        <div className="text-[15px] leading-[1.3] font-bold text-[#eef6f1]">
           {job.title}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12.5px] text-[#9db3a8]">
           {job.fora && (
-            <span className="rounded-full bg-[#c6ef78]/16 px-2 py-0.5 text-xs font-bold text-[#c6ef78]">
+            <span className="rounded-full bg-[rgba(198,239,120,.16)] px-2 py-0.5 text-xs font-bold text-[#c6ef78]">
               Fora do LinkedIn
             </span>
           )}
+          <span className="inline-flex items-center rounded-full border border-dashed border-[#2b5640] bg-[#0a1d15] px-2 py-0.5 text-xs text-[#7f978b]">
+            Empresa
+          </span>
           <span>
             {job.portal} · {job.when}
           </span>
         </div>
       </div>
       <div
-        className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-[#1d3a2e] bg-[#0a1d15]"
+        className="ml-auto flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border border-[#1d3a2e] bg-[#0a1d15]"
         title="Bloqueada"
       >
         <LockIcon />
@@ -335,11 +338,11 @@ export function FeedConvertV3({
               />
             ))}
 
-            <div ref={lockedRef} className="mt-[26px]">
+            <div ref={lockedRef} className="relative mt-[26px]">
               {lockedJobs.length > 0 && (
                 <>
                   <div className="mb-3 flex items-baseline justify-between px-0.5">
-                    <h2 className="text-[15px] font-bold tracking-wide">
+                    <h2 className="m-0 text-[15px] font-bold tracking-[0.2px]">
                       As outras {stats.lockedCount} vagas
                     </h2>
                     <small className="text-[13px] text-[#9db3a8]">
@@ -347,9 +350,11 @@ export function FeedConvertV3({
                     </small>
                   </div>
                   <div className="mb-2.5 flex flex-wrap gap-x-3.5 gap-y-1.5 px-0.5 text-[12.5px] text-[#9db3a8]">
-                    <span>Título, portal e data estão abertos.</span>
                     <span className="inline-flex items-center gap-1.5">
-                      <LockIcon size={14} />
+                      Título, portal e data estão abertos.
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <LockIcon size={16} />
                       Empresa e link para se candidatar liberam no feed.
                     </span>
                   </div>
@@ -357,8 +362,8 @@ export function FeedConvertV3({
                     {visibleLocked.map((job, i) => (
                       <LockedRow key={`${job.title}-${i}`} job={job} />
                     ))}
-                    <div className="border-t border-[#1d3a2e] bg-gradient-to-b from-[#0d241b] to-[#10301f] px-3.5 py-4 text-center">
-                      <b className="block font-[family-name:var(--font-display)] text-xl">
+                    <div className="border-t border-[#1d3a2e] bg-gradient-to-b from-[#0d241b] to-[#10301f] px-3.5 pt-[18px] pb-4 text-center">
+                      <b className="block font-[family-name:var(--font-display)] text-[20px] leading-tight">
                         {restLocked > 0
                           ? `e mais ${restLocked} vagas`
                           : "Todas no seu feed"}
@@ -367,14 +372,13 @@ export function FeedConvertV3({
                         {stats.foraLinkedin} das {stats.totalVagas} estão fora
                         do LinkedIn
                       </span>
-                      <div>
-                        <a
-                          href="#oferta"
-                          className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#c6ef78] px-[18px] text-[15px] font-extrabold text-[#071511] no-underline"
-                        >
-                          Liberar as {stats.lockedCount} vagas →
-                        </a>
-                      </div>
+                      <br />
+                      <a
+                        href="#oferta"
+                        className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#c6ef78] px-[18px] text-[15px] font-extrabold text-[#071511] no-underline"
+                      >
+                        Liberar as {stats.lockedCount} vagas →
+                      </a>
                     </div>
                   </div>
                 </>
