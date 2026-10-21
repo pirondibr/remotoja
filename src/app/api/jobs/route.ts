@@ -42,7 +42,7 @@ async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
     const { jobs, available } = await fetchRemotar(role);
     const matched = keepMatching(jobs, role);
-    if (isUnfilteredDump(available, matched.length)) return [];
+    if (isUnfilteredDump(available ?? 0, matched.length)) return [];
     return matched.slice(0, 12);
   } catch {
     return [];
