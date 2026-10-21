@@ -1,7 +1,16 @@
 import type { DemoJob } from "@/lib/demoJobs";
 import { ensureSchema, getSql, hasDatabase, normalizeRoleKey } from "@/lib/db";
 
-export type CacheKind = "demo" | "paid";
+export type CacheKind = "demo" | "paid" | "demo1";
+
+export function parseCacheKind(raw: unknown): CacheKind {
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (value === "demo") return "demo";
+  if (value === "demo1") return "demo1";
+  return "paid";
+}
 
 export type CachedJobsRow = {
   kind: CacheKind;
@@ -122,8 +131,9 @@ export async function clearAnalyzeCache(
 export async function cacheStats(): Promise<{
   demo: number;
   paid: number;
+  demo1: number;
 }> {
-  if (!hasDatabase()) return { demo: 0, paid: 0 };
+  if (!hasDatabase()) return { demo: 0, paid: 0, demo1: 0 };
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -131,10 +141,11 @@ export async function cacheStats(): Promise<{
     FROM job_cache
     GROUP BY kind
   `;
-  const out = { demo: 0, paid: 0 };
+  const out = { demo: 0, paid: 0, demo1: 0 };
   for (const row of rows as unknown as Array<{ kind: string; count: number }>) {
     if (row.kind === "demo") out.demo = Number(row.count);
     if (row.kind === "paid") out.paid = Number(row.count);
+    if (row.kind === "demo1") out.demo1 = Number(row.count);
   }
   return out;
 }
@@ -148,7 +159,7 @@ export type CacheListEntry = {
   updated_at: string;
 };
 
-/** Lista caches demo + pago (mais recentes primeiro). */
+/** Lista caches demo + pago + demo1 (mais recentes primeiro). */
 export async function listCacheEntries(options?: {
   limit?: number;
   offset?: number;
@@ -161,7 +172,7 @@ export async function listCacheEntries(options?: {
   const countRows = await sql`
     SELECT COUNT(*)::int AS total
     FROM job_cache
-    WHERE kind IN ('demo', 'paid')
+    WHERE kind IN ('demo', 'paid', 'demo1')
   `;
   const total = Number((countRows[0] as { total: number })?.total || 0);
   const rows = await sql`
@@ -173,7 +184,7 @@ export async function listCacheEntries(options?: {
       fetched_via,
       updated_at
     FROM job_cache
-    WHERE kind IN ('demo', 'paid')
+    WHERE kind IN ('demo', 'paid', 'demo1')
     ORDER BY updated_at DESC
     LIMIT ${limit} OFFSET ${offset}
   `;

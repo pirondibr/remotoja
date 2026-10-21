@@ -17,11 +17,16 @@ export async function POST(request: Request) {
   let kind: CacheKind | "all" = "demo";
   try {
     const body = (await request.json()) as { kind?: string };
-    if (body.kind === "paid" || body.kind === "demo" || body.kind === "all") {
+    if (
+      body.kind === "paid" ||
+      body.kind === "demo" ||
+      body.kind === "demo1" ||
+      body.kind === "all"
+    ) {
       kind = body.kind;
     } else {
       return NextResponse.json(
-        { error: "kind deve ser demo | paid | all" },
+        { error: "kind deve ser demo | paid | demo1 | all" },
         { status: 400 }
       );
     }

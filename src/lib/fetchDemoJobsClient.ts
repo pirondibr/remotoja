@@ -26,6 +26,25 @@ export function demoJobsUrl(role: string): { url: string; eventId: string } {
   return { url: `/api/jobs?${params}`, eventId };
 }
 
+/** V3: script pago, cache demo1 (não entra no dashboard demo/pago). */
+export function demo1JobsUrl(role: string): { url: string; eventId: string } {
+  const eventId = searchEventId(role);
+  if (typeof window !== "undefined") {
+    captureAttributionFromUrl(new URLSearchParams(window.location.search));
+  }
+  const fbclid = loadAttribution()?.fbclid;
+  const ids = metaBrowserIds(fbclid);
+  const params = new URLSearchParams({
+    role,
+    script: "demo1",
+    event_id: eventId,
+  });
+  if (ids.fbp) params.set("fbp", ids.fbp);
+  if (ids.fbc) params.set("fbc", ids.fbc);
+  if (fbclid) params.set("fbclid", fbclid);
+  return { url: `/api/dashboard/jobs?${params}`, eventId };
+}
+
 export function trackSearchFromJobsPayload(
   role: string,
   data: { eventId?: string } | null | undefined,

@@ -6,7 +6,7 @@ import {
   listLeadSearches,
 } from "@/lib/leadLog";
 import { countOrderFunnelAb, listRecentOrders } from "@/lib/orders";
-import { cacheStats, listCacheEntries } from "@/lib/jobCache";
+import { cacheStats, listCacheEntries, parseCacheKind } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { countPaywallFeedback } from "@/lib/paywallFeedback";
 import { originLabel } from "@/lib/attribution";
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       {
         rows: [],
         total: 0,
-        cache: { demo: 0, paid: 0 },
+        cache: { demo: 0, paid: 0, demo1: 0 },
         feeds: [],
         ab: {
           leads: { v1: 0, v2: 0, unknown: 0 },
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
           portalSources[key] = value;
         }
       }
-      const kind = entry.kind === "demo" ? "demo" : "paid";
+      const kind = parseCacheKind(entry.kind);
       return {
         kind,
         role: entry.role_key,

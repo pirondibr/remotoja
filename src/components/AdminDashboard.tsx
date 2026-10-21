@@ -39,7 +39,19 @@ type OrderRow = {
   checkout_ui?: "v1" | "brick" | null;
 };
 
-type FeedKind = "demo" | "paid";
+type FeedKind = "demo" | "paid" | "demo1";
+
+function parseFeedKind(raw: string): FeedKind {
+  if (raw === "demo") return "demo";
+  if (raw === "demo1") return "demo1";
+  return "paid";
+}
+
+function feedKindLabel(kind: FeedKind) {
+  if (kind === "demo") return "Demo";
+  if (kind === "demo1") return "Demo1";
+  return "Pago";
+}
 
 type CacheFeed = {
   kind: FeedKind;
@@ -83,7 +95,7 @@ function sourcesTip(
 type SearchesPayload = {
   rows: SearchRow[];
   total: number;
-  cache: { demo: number; paid: number };
+  cache: { demo: number; paid: number; demo1?: number };
   feeds?: CacheFeed[];
   /** compat */
   paid_feeds?: CacheFeed[];
@@ -241,8 +253,8 @@ export function AdminDashboard() {
     }
   }, [searchParams]);
 
-  async function resetCache(kind: "demo" | "paid") {
-    const label = kind === "demo" ? "demo" : "pago";
+  async function resetCache(kind: FeedKind) {
+    const label = feedKindLabel(kind).toLowerCase();
     if (
       !window.confirm(
         `Resetar cache de vagas do ${label}? A próxima busca busca de novo nas APIs.`
@@ -301,7 +313,7 @@ export function AdminDashboard() {
           <p className="mt-1 text-sm text-moss/70">
             {data?.total ?? 0} pesquisas registradas
             {data?.cache
-              ? ` · cache demo ${data.cache.demo} · cache pago ${data.cache.paid}`
+              ? ` · cache demo ${data.cache.demo} · cache pago ${data.cache.paid} · cache demo1 ${data.cache.demo1 ?? 0}`
               : ""}
           </p>
           {data?.warning && (
@@ -323,6 +335,13 @@ export function AdminDashboard() {
             className="rounded-xl border border-moss/20 bg-white px-3 py-2 text-xs font-semibold text-ink hover:border-moss/40"
           >
             Resetar vagas pago
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetCache("demo1")}
+            className="rounded-xl border border-moss/20 bg-white px-3 py-2 text-xs font-semibold text-ink hover:border-moss/40"
+          >
+            Resetar vagas demo1
           </button>
           <button
             type="button"
@@ -510,25 +529,25 @@ export function AdminDashboard() {
       {/* FEEDS DEMO + PAGO */}
       <section className="mt-8 rounded-2xl border border-moss/10 bg-white p-5">
         <h2 className="font-[family-name:var(--font-display)] text-xl font-bold text-ink">
-          Feeds (demo / pago)
+          Feeds (demo / pago / demo1)
         </h2>
         <p className="mt-1 text-sm text-moss/70">
-          Consultas em cache do funil <strong>demo</strong> e do script{" "}
-          <strong>pago</strong>. <strong>Como membro</strong> = tela do cliente
-          (sem logs). <strong>Cache</strong> / <strong>Análise</strong> = visão
-          admin. <strong>Reanalisar</strong> tem{" "}
+          Consultas em cache do funil <strong>demo</strong>, do script{" "}
+          <strong>pago</strong> e da V3 <strong>demo1</strong> (pago, cache
+          separado). <strong>Como membro</strong> = tela do cliente (sem logs).{" "}
+          <strong>Cache</strong> / <strong>Análise</strong> = visão admin.{" "}
+          <strong>Reanalisar</strong> tem{" "}
           <code className="text-xs">fresh=1</code> — não compartilhe.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={inspectScript}
-            onChange={(e) =>
-              setInspectScript(e.target.value === "demo" ? "demo" : "paid")
-            }
+            onChange={(e) => setInspectScript(parseFeedKind(e.target.value))}
             className="rounded-xl border border-moss/15 bg-cream/50 px-3 py-2.5 text-sm font-semibold text-ink outline-none focus:border-moss/40"
           >
             <option value="paid">Pago</option>
             <option value="demo">Demo</option>
+            <option value="demo1">Demo1 (V3)</option>
           </select>
           <input
             value={inspectRole}
@@ -578,7 +597,7 @@ export function AdminDashboard() {
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-moss/10 text-xs uppercase tracking-wide text-moss/60">
                 <tr>
-                  <th className="py-2 pr-3 font-semibold">Demo/Pago</th>
+                  <th className="py-2 pr-3 font-semibold">Script</th>
                   <th className="py-2 pr-3 font-semibold">Cargo</th>
                   <th className="py-2 pr-3 font-semibold">No feed</th>
                   <th className="py-2 pr-3 font-semibold">Scrape</th>
@@ -609,12 +628,14 @@ export function AdminDashboard() {
                         <td className="py-2.5 pr-3">
                           <span
                             className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                              feed.kind === "demo"
-                                ? "bg-sand text-moss"
-                                : "bg-forest/15 text-forest"
+                              feed.kind === "demo1"
+                                ? "bg-lime-200/80 text-forest"
+                                : feed.kind === "demo"
+                                  ? "bg-sand text-moss"
+                                  : "bg-forest/15 text-forest"
                             }`}
                           >
-                            {feed.kind === "demo" ? "Demo" : "Pago"}
+                            {feedKindLabel(feed.kind)}
                           </span>
                         </td>
                         <td className="py-2.5 pr-3 font-medium">{feed.role}</td>

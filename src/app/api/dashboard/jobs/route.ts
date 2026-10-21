@@ -3,9 +3,14 @@ import { canOpenPaidFeed, isAccessGateEnabled } from "@/lib/access";
 import { fetchDashboardJobs } from "@/lib/dashboard/fetchDashboardJobs";
 import {
   getCachedJobs,
+  parseCacheKind,
   setCachedJobs,
   type CacheKind,
 } from "@/lib/jobCache";
+import { sendMetaSearch } from "@/lib/metaCapi";
+import { clientIpFromRequest, resolveMetaClickIds } from "@/lib/metaClickIds";
+import { searchEventId } from "@/lib/metaPixel";
+import { appBaseUrl } from "@/lib/mercadoPago";
 import { hasDatabase } from "@/lib/db";
 import { rankJobsForFeed } from "@/lib/dashboard/common";
 import { classifyCargoMatch } from "@/lib/dashboard/jobMatch";
@@ -108,7 +113,15 @@ export async function GET(request: Request) {
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const plan = planRoleSearch(role);
   const openPreview = searchParams.get("preview") === "1";
-  if (isAccessGateEnabled() && !openPreview && !(await canOpenPaidFeed(role))) {
+  const cacheKind: CacheKind = parseCacheKind(
+    searchParams.get("script") || searchParams.get("kind") || "paid"
+  );
+  if (
+    isAccessGateEnabled() &&
+    !openPreview &&
+    cacheKind !== "demo1" &&
+    !(await canOpenPaidFeed(role))
+  ) {
     return NextResponse.json(
       { error: "Acesso de membro necessário. Conclua o pagamento." },
       { status: 401 }
@@ -121,25 +134,41 @@ export async function GET(request: Request) {
   const analyzeFlag = searchParams.get("validate") === "1";
   /** Admin: só o que o usuário viu — não refaz scrapers. */
   const cacheOnly = searchParams.get("cache_only") === "1";
-  /** Admin: demo = funil; paid = membro (default). */
-  const scriptRaw = (
-    searchParams.get("script") ||
-    searchParams.get("kind") ||
-    "paid"
-  ).toLowerCase();
-  const cacheKind: CacheKind = scriptRaw === "demo" ? "demo" : "paid";
-  const cacheLabel = cacheKind === "demo" ? "demo" : "pago";
-  /** Pago sempre valida; demo live só se admin pediu analyze. */
-  const runValidate = cacheKind === "paid" || analyzeFlag;
+  const cacheLabel =
+    cacheKind === "demo" ? "demo" : cacheKind === "demo1" ? "demo1" : "pago";
+  const publicFunnel = cacheKind === "demo1";
+  /** Pago e demo1 validam; demo live só se admin pediu analyze. */
+  const runValidate = cacheKind === "paid" || cacheKind === "demo1" || analyzeFlag;
   const adminInspect =
     searchParams.get("inspect") === "1" ||
     cacheOnly ||
     analyzeFlag ||
-    cacheKind === "demo";
+    cacheKind === "demo" ||
+    publicFunnel;
 
   const reply = (body: Record<string, unknown>, jobs: DemoJob[], cached: boolean) => {
-    if (!adminInspect && !openPreview) {
+    if (!adminInspect && !openPreview && !publicFunnel) {
       void logPaidMemberView({ request, role, jobs, cached });
+    }
+    if (publicFunnel && role.length >= 2) {
+      const clickIds = resolveMetaClickIds({
+        cookieHeader: request.headers.get("cookie"),
+        fbp: searchParams.get("fbp"),
+        fbc: searchParams.get("fbc"),
+        fbclid: searchParams.get("fbclid"),
+      });
+      const eventId =
+        searchParams.get("event_id")?.trim() || searchEventId(role);
+      void sendMetaSearch({
+        eventId,
+        searchString: role,
+        fbp: clickIds.fbp,
+        fbc: clickIds.fbc,
+        clientIp: clientIpFromRequest(request),
+        userAgent: request.headers.get("user-agent"),
+        eventSourceUrl: `${appBaseUrl()}/onboard`,
+      }).catch(() => {});
+      return NextResponse.json({ ...body, eventId });
     }
     return NextResponse.json(body);
   };
@@ -208,7 +237,11 @@ export async function GET(request: Request) {
             cacheKind === "demo"
               ? (cached.jobs as DemoJob[])
               : filterByRole(cached.jobs as DemoJob[], plan.primary);
-          if (jobs.length === 0 && !cacheOnly && cacheKind === "paid") {
+          if (
+            jobs.length === 0 &&
+            !cacheOnly &&
+            (cacheKind === "paid" || cacheKind === "demo1")
+          ) {
             // Cache antigo misturado → força live (exceto cache_only)
           } else {
             return reply(

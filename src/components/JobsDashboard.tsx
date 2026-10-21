@@ -117,11 +117,13 @@ export function JobsDashboard({
     searchParams.get("validate") === "1" || modeParam === "analyze";
   const forceFresh =
     searchParams.get("fresh") === "1" || modeParam === "analyze_fresh";
+  const scriptRaw = (
+    searchParams.get("script") ||
+    searchParams.get("kind") ||
+    "paid"
+  ).toLowerCase();
   const scriptKind =
-    (searchParams.get("script") || searchParams.get("kind") || "paid").toLowerCase() ===
-    "demo"
-      ? "demo"
-      : "paid";
+    scriptRaw === "demo" ? "demo" : scriptRaw === "demo1" ? "demo1" : "paid";
   const adminMode = inspect
     ? cacheOnly
       ? "cache"
@@ -501,7 +503,9 @@ export function JobsDashboard({
               {adminMode === "cache"
                 ? scriptKind === "demo"
                   ? "Cache do funil demo — sem refazer scrapers."
-                  : "Mesmo feed em cache que o membro vê — sem refazer scrapers."
+                  : scriptKind === "demo1"
+                    ? "Cache da V3 (demo1) — script pago, separado do demo e do membro."
+                    : "Mesmo feed em cache que o membro vê — sem refazer scrapers."
                 : adminMode === "analyze"
                   ? forceFresh
                     ? "Reanálise ao vivo: scrape + double-check (salva ao terminar)."
@@ -510,7 +514,12 @@ export function JobsDashboard({
             </p>
             {inspect && (
               <p className="mt-1 text-xs font-semibold text-moss/70">
-                Script · {scriptKind === "demo" ? "Demo" : "Pago"}
+                Script ·{" "}
+                {scriptKind === "demo"
+                  ? "Demo"
+                  : scriptKind === "demo1"
+                    ? "Demo1"
+                    : "Pago"}
                 {fromCache && !loading
                   ? adminMode === "analyze"
                     ? " · análise em cache"

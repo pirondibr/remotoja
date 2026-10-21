@@ -15,6 +15,7 @@ import { FeedConvertV3 } from "./FeedConvertV3";
 import { PaywallExitSurvey, PaywallFeedbackBlock } from "./PaywallExitSurvey";
 import { RoleChoiceHint } from "./RoleChoiceHint";
 import {
+  demo1JobsUrl,
   demoJobsUrl,
   trackSearchFromJobsPayload,
 } from "@/lib/fetchDemoJobsClient";
@@ -245,6 +246,7 @@ export function OnboardWizard() {
 
   useEffect(() => {
     if (step.kind !== "matches") return;
+    if (!feedAb) return;
 
     const roleQuery =
       (typeof answers.role === "string" && answers.role.trim()) ||
@@ -268,7 +270,10 @@ export function OnboardWizard() {
     setJobsLoading(true);
     setJobsError(null);
 
-    const { url: jobsUrl, eventId: searchId } = demoJobsUrl(roleQuery);
+    const usePaidPreview = feedAb === "v3";
+    const { url: jobsUrl, eventId: searchId } = usePaidPreview
+      ? demo1JobsUrl(roleQuery)
+      : demoJobsUrl(roleQuery);
     fetch(jobsUrl, {
       signal: controller.signal,
     })
@@ -276,7 +281,8 @@ export function OnboardWizard() {
         const data = await res.json();
         trackSearchFromJobsPayload(roleQuery, data, searchId);
         const jobs: DemoJob[] = Array.isArray(data.jobs) ? data.jobs : [];
-        setLiveJobs(dedupeDemoJobs(jobs).slice(0, 8));
+        const nextJobs = dedupeDemoJobs(jobs);
+        setLiveJobs(usePaidPreview ? nextJobs : nextJobs.slice(0, 8));
         if (jobs.length === 0) {
           const raw = typeof data.error === "string" ? data.error : "";
           const friendly = /timeout|google jobs/i.test(raw)
@@ -343,7 +349,7 @@ export function OnboardWizard() {
       });
 
     return () => controller.abort();
-  }, [step.kind, answers, draft, prefillRole]);
+  }, [step.kind, answers, draft, prefillRole, feedAb]);
 
   function toggleMulti(option: string) {
     const current = (answers[step.id] as string[] | undefined) ?? [];

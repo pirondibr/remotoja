@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/adminAuth";
 import { buildDemoToken, demoCookieOptions } from "@/lib/memberAuth";
-import { clearAnalyzeCache, type CacheKind } from "@/lib/jobCache";
+import { clearAnalyzeCache, parseCacheKind } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 
 /**
@@ -13,7 +13,7 @@ import { hasDatabase } from "@/lib/db";
  *   ?mode=analyze        → análise salva (cache); se não houver, roda e salva
  *   ?mode=analyze_fresh  → força nova análise ao vivo e sobrescreve o cache
  *   ?mode=clear_analyze  → limpa só o cache da análise e volta ao admin
- *   ?script=demo|paid    → qual cache usar (default paid)
+ *   ?script=demo|paid|demo1 → qual cache usar (default paid)
  *
  * GET /api/admin/open-feed?role=seo&mode=cache&script=demo
  */
@@ -24,8 +24,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const role = (url.searchParams.get("role") || "SEO").trim() || "SEO";
-  const scriptRaw = (url.searchParams.get("script") || "paid").toLowerCase();
-  const kind: CacheKind = scriptRaw === "demo" ? "demo" : "paid";
+  const kind = parseCacheKind(url.searchParams.get("script") || "paid");
   const modeParam = (url.searchParams.get("mode") || "").toLowerCase();
   // Compat: validate=1 antigo = analyze
   const mode =

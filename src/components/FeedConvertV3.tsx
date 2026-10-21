@@ -166,8 +166,8 @@ export function FeedConvertV3({
 
   const freeJobs = jobs.slice(0, FREE_COUNT);
   const lockedJobs = useMemo(
-    () => buildLockedPreviewJobs(role, jobs.slice(FREE_COUNT)),
-    [role, jobs]
+    () => buildLockedPreviewJobs(jobs.slice(FREE_COUNT)),
+    [jobs]
   );
   const visibleLocked = lockedJobs.slice(0, VISIBLE_LOCKED_TITLES);
   const restLocked = Math.max(lockedJobs.length - visibleLocked.length, 0);
@@ -249,9 +249,11 @@ export function FeedConvertV3({
 
         {loading ? (
           <div className="rounded-3xl border border-[#1d3a2e] bg-[#0d241b] p-8 text-center">
-            <p className="font-semibold">Procurando vagas em {PORTALS} portais…</p>
+            <p className="font-semibold">
+              Procurando o feed completo em {PORTALS} portais…
+            </p>
             <p className="mt-2 text-sm text-[#9db3a8]">
-              Isso pode levar alguns segundos
+              A primeira busca deste cargo pode levar até 1 minuto
             </p>
           </div>
         ) : (
@@ -334,45 +336,49 @@ export function FeedConvertV3({
             ))}
 
             <div ref={lockedRef} className="mt-[26px]">
-              <div className="mb-3 flex items-baseline justify-between px-0.5">
-                <h2 className="text-[15px] font-bold tracking-wide">
-                  As outras {stats.lockedCount} vagas
-                </h2>
-                <small className="text-[13px] text-[#9db3a8]">
-                  Atualizado hoje
-                </small>
-              </div>
-              <div className="mb-2.5 flex flex-wrap gap-x-3.5 gap-y-1.5 px-0.5 text-[12.5px] text-[#9db3a8]">
-                <span>Título, portal e data estão abertos.</span>
-                <span className="inline-flex items-center gap-1.5">
-                  <LockIcon size={14} />
-                  Empresa e link para se candidatar liberam no feed.
-                </span>
-              </div>
-              <div className="overflow-hidden rounded-[20px] border border-[#1d3a2e] bg-[#0d241b]">
-                {visibleLocked.map((job, i) => (
-                  <LockedRow key={`${job.title}-${i}`} job={job} />
-                ))}
-                <div className="border-t border-[#1d3a2e] bg-gradient-to-b from-[#0d241b] to-[#10301f] px-3.5 py-4 text-center">
-                  <b className="block font-[family-name:var(--font-display)] text-xl">
-                    {restLocked > 0
-                      ? `e mais ${restLocked} vagas`
-                      : "Todas no seu feed"}
-                  </b>
-                  <span className="text-sm text-[#9db3a8]">
-                    {stats.foraLinkedin} das {stats.totalVagas} estão fora do
-                    LinkedIn
-                  </span>
-                  <div>
-                    <a
-                      href="#oferta"
-                      className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#c6ef78] px-[18px] text-[15px] font-extrabold text-[#071511] no-underline"
-                    >
-                      Liberar as {stats.lockedCount} vagas →
-                    </a>
+              {lockedJobs.length > 0 && (
+                <>
+                  <div className="mb-3 flex items-baseline justify-between px-0.5">
+                    <h2 className="text-[15px] font-bold tracking-wide">
+                      As outras {stats.lockedCount} vagas
+                    </h2>
+                    <small className="text-[13px] text-[#9db3a8]">
+                      Atualizado hoje
+                    </small>
                   </div>
-                </div>
-              </div>
+                  <div className="mb-2.5 flex flex-wrap gap-x-3.5 gap-y-1.5 px-0.5 text-[12.5px] text-[#9db3a8]">
+                    <span>Título, portal e data estão abertos.</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <LockIcon size={14} />
+                      Empresa e link para se candidatar liberam no feed.
+                    </span>
+                  </div>
+                  <div className="overflow-hidden rounded-[20px] border border-[#1d3a2e] bg-[#0d241b]">
+                    {visibleLocked.map((job, i) => (
+                      <LockedRow key={`${job.title}-${i}`} job={job} />
+                    ))}
+                    <div className="border-t border-[#1d3a2e] bg-gradient-to-b from-[#0d241b] to-[#10301f] px-3.5 py-4 text-center">
+                      <b className="block font-[family-name:var(--font-display)] text-xl">
+                        {restLocked > 0
+                          ? `e mais ${restLocked} vagas`
+                          : "Todas no seu feed"}
+                      </b>
+                      <span className="text-sm text-[#9db3a8]">
+                        {stats.foraLinkedin} das {stats.totalVagas} estão fora
+                        do LinkedIn
+                      </span>
+                      <div>
+                        <a
+                          href="#oferta"
+                          className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-[#c6ef78] px-[18px] text-[15px] font-extrabold text-[#071511] no-underline"
+                        >
+                          Liberar as {stats.lockedCount} vagas →
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <section

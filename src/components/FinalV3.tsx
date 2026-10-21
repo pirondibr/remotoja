@@ -12,7 +12,7 @@ import {
 } from "@/lib/attribution";
 import { dedupeDemoJobs, type DemoJob } from "@/lib/demoJobs";
 import {
-  demoJobsUrl,
+  demo1JobsUrl,
   trackSearchFromJobsPayload,
 } from "@/lib/fetchDemoJobsClient";
 import { saveJobSession } from "@/lib/jobSession";
@@ -73,7 +73,7 @@ export function FinalV3() {
     setJobs([]);
 
     try {
-      const { url: jobsUrl, eventId: searchId } = demoJobsUrl(trimmed);
+      const { url: jobsUrl, eventId: searchId } = demo1JobsUrl(trimmed);
       const res = await fetch(jobsUrl);
       const data = await res.json().catch(() => ({}));
       trackSearchFromJobsPayload(trimmed, data, searchId);

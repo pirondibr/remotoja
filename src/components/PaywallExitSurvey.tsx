@@ -294,6 +294,8 @@ export function usePaywallExitSurvey(opts: SurveyOpts) {
     if (!enabled || blocked || feedback.status !== "open") return;
 
     history.pushState({ mvrPaywall: 1 }, "", location.href);
+    const openedAt = Date.now();
+    const minDwellMs = 30_000;
 
     const onPop = () => {
       if (statusRef.current !== "open" || blockedRef.current || !enabledRef.current) {
@@ -307,6 +309,7 @@ export function usePaywallExitSurvey(opts: SurveyOpts) {
 
     const onMouseLeave = (event: MouseEvent) => {
       if (event.clientY > 0) return;
+      if (Date.now() - openedAt < minDwellMs) return;
       if (statusRef.current !== "open" || blockedRef.current || openRef.current) {
         return;
       }
