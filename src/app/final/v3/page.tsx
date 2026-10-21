@@ -4,7 +4,7 @@ import { FinalV3 } from "@/components/FinalV3";
 
 export const metadata: Metadata = {
   title: "Busca v3 · Minha Vaga Remota",
-  description: "Atalho de teste com a tela atual do pré-checkout.",
+  description: "Pré-checkout com lista das demais vagas bloqueadas.",
   robots: { index: false, follow: false },
 };
 

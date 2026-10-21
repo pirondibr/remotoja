@@ -24,7 +24,7 @@ type SearchRow = {
   cached: boolean;
   jobs_preview: JobPreview[];
   form_answers?: FormAnswer[];
-  funnel_variant?: "v1" | "v2" | null;
+  funnel_variant?: "v1" | "v2" | "v3" | null;
 };
 
 type OrderRow = {
@@ -35,7 +35,7 @@ type OrderRow = {
   amount_brl: number;
   status: string;
   payer_email: string | null;
-  funnel_variant: "v1" | "v2" | null;
+  funnel_variant: "v1" | "v2" | "v3" | null;
   checkout_ui?: "v1" | "brick" | null;
 };
 
@@ -88,10 +88,11 @@ type SearchesPayload = {
   /** compat */
   paid_feeds?: CacheFeed[];
   ab?: {
-    leads: { v1: number; v2: number; unknown: number };
+    leads: { v1: number; v2: number; v3: number; unknown: number };
     orders: {
       v1: { total: number; approved: number };
       v2: { total: number; approved: number };
+      v3: { total: number; approved: number };
       unknown: { total: number; approved: number };
     };
   };
@@ -148,6 +149,13 @@ function TablePager({
 }
 
 function variantBadge(variant?: string | null) {
+  if (variant === "v3") {
+    return (
+      <span className="rounded-full bg-lime-200/80 px-2 py-0.5 text-[11px] font-bold tracking-wide text-forest">
+        V3
+      </span>
+    );
+  }
   if (variant === "v2") {
     return (
       <span className="rounded-full bg-forest/10 px-2 py-0.5 text-[11px] font-bold tracking-wide text-forest">
@@ -339,17 +347,25 @@ export function AdminDashboard() {
             <p className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
               Teste A/B — páginas vistas
             </p>
-            <div className="mt-3 flex gap-6">
+            <div className="mt-3 flex flex-wrap gap-6">
               <div>
                 <p className="text-2xl font-bold text-ink">{data.ab.leads.v1}</p>
                 <p className="text-xs text-moss/60">V1 (matches + plano)</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-forest">
-                  {data.ab.leads.v2}
+                  {data.ab.leads.v3}
                 </p>
-                <p className="text-xs text-moss/60">V2 (feed + oferta)</p>
+                <p className="text-xs text-moss/60">V3 (lista bloqueada)</p>
               </div>
+              {data.ab.leads.v2 > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-moss/40">
+                    {data.ab.leads.v2}
+                  </p>
+                  <p className="text-xs text-moss/50">V2 (pausada)</p>
+                </div>
+              )}
               {data.ab.leads.unknown > 0 && (
                 <div>
                   <p className="text-2xl font-bold text-moss/40">
@@ -364,7 +380,7 @@ export function AdminDashboard() {
             <p className="text-[11px] font-semibold uppercase tracking-wide text-moss/50">
               Pedidos por página
             </p>
-            <div className="mt-3 flex gap-6">
+            <div className="mt-3 flex flex-wrap gap-6">
               <div>
                 <p className="text-2xl font-bold text-ink">
                   {data.ab.orders.v1.approved}
@@ -376,13 +392,24 @@ export function AdminDashboard() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-forest">
-                  {data.ab.orders.v2.approved}
+                  {data.ab.orders.v3.approved}
                   <span className="text-sm font-medium text-moss/40">
-                    /{data.ab.orders.v2.total}
+                    /{data.ab.orders.v3.total}
                   </span>
                 </p>
-                <p className="text-xs text-moss/60">V2 pagos / iniciados</p>
+                <p className="text-xs text-moss/60">V3 pagos / iniciados</p>
               </div>
+              {data.ab.orders.v2.total > 0 && (
+                <div>
+                  <p className="text-2xl font-bold text-moss/40">
+                    {data.ab.orders.v2.approved}
+                    <span className="text-sm font-medium text-moss/30">
+                      /{data.ab.orders.v2.total}
+                    </span>
+                  </p>
+                  <p className="text-xs text-moss/50">V2 (pausada)</p>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -938,7 +965,7 @@ export function AdminDashboard() {
                     <td colSpan={9} className="px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs font-semibold text-moss/60">
-                          Página {row.funnel_variant === "v2" ? "V2 (feed + oferta)" : row.funnel_variant === "v1" ? "V1 (matches + plano)" : "não registrada"}
+                          Página {row.funnel_variant === "v3" ? "V3 (lista bloqueada)" : row.funnel_variant === "v2" ? "V2 (feed + oferta)" : row.funnel_variant === "v1" ? "V1 (matches + plano)" : "não registrada"}
                           {" · "}O que a pessoa preencheu
                         </p>
                         <div

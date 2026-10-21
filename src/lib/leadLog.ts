@@ -25,7 +25,7 @@ export type LeadSearchInput = LeadAttribution & {
   user_agent?: string | null;
   /** Respostas do formulário do funil (work_type, salary, …). */
   answers?: FunnelAnswers | null;
-  /** Página de conversão A/B (v1 matches+paywall vs v2 feed). */
+  /** Página de conversão A/B (v1 matches+plano, v3 lista bloqueada). */
   funnel_variant?: FeedAbVariant | string | null;
 };
 
@@ -257,11 +257,12 @@ export async function listLeadSearches(options?: {
 export type FunnelAbCounts = {
   v1: number;
   v2: number;
+  v3: number;
   unknown: number;
 };
 
 export async function countLeadFunnelAb(): Promise<FunnelAbCounts> {
-  if (!hasDatabase()) return { v1: 0, v2: 0, unknown: 0 };
+  if (!hasDatabase()) return { v1: 0, v2: 0, v3: 0, unknown: 0 };
   await ensureSchema();
   const sql = getSql();
   const rows = (await sql`
@@ -271,12 +272,13 @@ export async function countLeadFunnelAb(): Promise<FunnelAbCounts> {
     FROM lead_searches
     GROUP BY 1
   `) as unknown as Array<{ funnel_variant: string; n: number }>;
-  const out: FunnelAbCounts = { v1: 0, v2: 0, unknown: 0 };
+  const out: FunnelAbCounts = { v1: 0, v2: 0, v3: 0, unknown: 0 };
   for (const row of rows) {
     const variant = parseFeedAb(row.funnel_variant);
     const n = Number(row.n) || 0;
     if (variant === "v1") out.v1 += n;
     else if (variant === "v2") out.v2 += n;
+    else if (variant === "v3") out.v3 += n;
     else out.unknown += n;
   }
   return out;

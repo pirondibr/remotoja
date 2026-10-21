@@ -1,13 +1,19 @@
 export const FEED_AB_COOKIE = "mvr_feed_ab";
 export const FEED_AB_STORAGE_KEY = "mvr_feed_ab";
 
-export type FeedAbVariant = "v1" | "v2";
+export type FeedAbVariant = "v1" | "v2" | "v3";
+export type LiveFeedAbVariant = "v1" | "v3";
 
 export function parseFeedAb(raw: unknown): FeedAbVariant | null {
   const value = String(raw || "")
     .trim()
     .toLowerCase();
-  return value === "v1" || value === "v2" ? value : null;
+  return value === "v1" || value === "v2" || value === "v3" ? value : null;
+}
+
+function parseLiveFeedAb(raw: unknown): LiveFeedAbVariant | null {
+  const value = parseFeedAb(raw);
+  return value === "v1" || value === "v3" ? value : null;
 }
 
 function persistFeedAb(variant: FeedAbVariant) {
@@ -25,10 +31,10 @@ function persistFeedAb(variant: FeedAbVariant) {
   document.cookie = `${FEED_AB_COOKIE}=${variant};path=/;max-age=${60 * 60 * 24 * 90};SameSite=Lax`;
 }
 
-function readStoredFeedAb(): FeedAbVariant | null {
+function readStoredFeedAb(): LiveFeedAbVariant | null {
   if (typeof window === "undefined") return null;
   try {
-    const fromSession = parseFeedAb(
+    const fromSession = parseLiveFeedAb(
       sessionStorage.getItem(FEED_AB_STORAGE_KEY)
     );
     if (fromSession) return fromSession;
@@ -36,18 +42,18 @@ function readStoredFeedAb(): FeedAbVariant | null {
     /* ignore */
   }
   try {
-    const fromLocal = parseFeedAb(localStorage.getItem(FEED_AB_STORAGE_KEY));
+    const fromLocal = parseLiveFeedAb(localStorage.getItem(FEED_AB_STORAGE_KEY));
     if (fromLocal) return fromLocal;
   } catch {
     /* ignore */
   }
   const match = document.cookie.match(
-    new RegExp(`(?:^|; )${FEED_AB_COOKIE}=(v1|v2)`)
+    new RegExp(`(?:^|; )${FEED_AB_COOKIE}=(v1|v2|v3)`)
   );
-  return match ? parseFeedAb(match[1]) : null;
+  return match ? parseLiveFeedAb(match[1]) : null;
 }
 
-/** 50/50 sticky assignment. `forced` from ?ab=v1|v2 for QA. */
+/** 50/50 sticky V1 vs V3. V2 só entra com ?ab=v2 (QA). */
 export function assignFeedAb(forced?: string | null): FeedAbVariant {
   const fromUrl = parseFeedAb(forced);
   if (fromUrl) {
@@ -56,7 +62,7 @@ export function assignFeedAb(forced?: string | null): FeedAbVariant {
   }
   const stored = readStoredFeedAb();
   if (stored) return stored;
-  const next: FeedAbVariant = Math.random() < 0.5 ? "v1" : "v2";
+  const next: LiveFeedAbVariant = Math.random() < 0.5 ? "v1" : "v3";
   persistFeedAb(next);
   return next;
 }

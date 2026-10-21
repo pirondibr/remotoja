@@ -301,6 +301,7 @@ export async function releaseMetaPurchaseSend(
 export type OrderAbCounts = {
   v1: { total: number; approved: number };
   v2: { total: number; approved: number };
+  v3: { total: number; approved: number };
   unknown: { total: number; approved: number };
 };
 
@@ -308,6 +309,7 @@ export async function countOrderFunnelAb(): Promise<OrderAbCounts> {
   const empty = {
     v1: { total: 0, approved: 0 },
     v2: { total: 0, approved: 0 },
+    v3: { total: 0, approved: 0 },
     unknown: { total: 0, approved: 0 },
   };
   if (!hasDatabase()) return empty;

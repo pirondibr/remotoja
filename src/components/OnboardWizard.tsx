@@ -11,6 +11,7 @@ import { startCheckout } from "@/lib/startCheckout";
 import { looksLikeMultipleRoles } from "@/lib/splitRoles";
 import { captureLeadId, loadLeadId } from "@/lib/leadClient";
 import { FeedConvertV2 } from "./FeedConvertV2";
+import { FeedConvertV3 } from "./FeedConvertV3";
 import { PaywallExitSurvey, PaywallFeedbackBlock } from "./PaywallExitSurvey";
 import { RoleChoiceHint } from "./RoleChoiceHint";
 import {
@@ -428,6 +429,23 @@ export function OnboardWizard() {
 
   const hideDefaultHeader =
     step.kind === "matches" || step.kind === "paywall";
+
+  if (step.kind === "matches" && feedAb === "v3") {
+    return (
+      <FeedConvertV3
+        role={role}
+        jobs={matches}
+        loading={jobsLoading}
+        error={jobsError}
+        onCheckout={() => void startPaidCheckout()}
+        checkoutLoading={checkoutLoading}
+        checkoutError={checkoutError}
+        email={surveyEmail}
+        leadId={leadId}
+        funnelVariant={feedAb}
+      />
+    );
+  }
 
   if (step.kind === "matches" && feedAb === "v2") {
     return (

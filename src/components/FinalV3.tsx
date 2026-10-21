@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
-import { FeedConvertV2 } from "@/components/FeedConvertV2";
+import { FeedConvertV3 } from "@/components/FeedConvertV3";
 import { RoleChoiceHint } from "@/components/RoleChoiceHint";
 import {
   captureAttributionFromUrl,
@@ -44,7 +44,7 @@ export function FinalV3() {
           channel: "demo",
           jobs_shown: list.slice(0, 20),
           cached,
-          funnel_variant: "v2",
+          funnel_variant: "v3",
           ...attr,
         }),
         keepalive: true,
@@ -120,7 +120,7 @@ export function FinalV3() {
     try {
       const result = await startCheckout({
         role: nextRole,
-        funnelVariant: "v2",
+        funnelVariant: "v3",
       });
       if ("error" in result) {
         setCheckoutError(result.error);
@@ -136,7 +136,7 @@ export function FinalV3() {
 
   if (searched) {
     return (
-      <FeedConvertV2
+      <FeedConvertV3
         role={role.trim() || "seu cargo"}
         jobs={jobs}
         loading={loading}
@@ -145,7 +145,7 @@ export function FinalV3() {
         checkoutLoading={checkoutLoading}
         checkoutError={checkoutError}
         leadId={leadId}
-        funnelVariant="v2"
+        funnelVariant="v3"
       />
     );
   }
@@ -169,10 +169,11 @@ export function FinalV3() {
           </span>
         </header>
         <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold leading-tight">
-          Veja a tela do demo
+          Veja a V3
         </h1>
         <p className="mt-2 text-sm text-[#9db3a8]">
-          Digite o cargo e abre o pré-checkout atual, sem passar pelo funil.
+          Digite o cargo e abre o pré-checkout com a lista das demais vagas
+          bloqueadas.
         </p>
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-2 sm:flex-row">
           <input
