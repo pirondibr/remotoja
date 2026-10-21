@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createMpPayment, hasMercadoPago, pixFromPayment } from "@/lib/mercadoPago";
-import { getOrder, markOrderStatus } from "@/lib/orders";
+import { clientIpFromRequest, resolveMetaClickIds } from "@/lib/metaClickIds";
+import { getOrder, markOrderStatus, saveOrderClickIds } from "@/lib/orders";
 
 export async function POST(request: Request) {
   if (!hasMercadoPago()) {
@@ -27,6 +28,20 @@ export async function POST(request: Request) {
   if (!order) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
   }
+  const clickIds = resolveMetaClickIds({
+    cookieHeader: request.headers.get("cookie"),
+    fbp: order.fbp,
+    fbc: order.fbc,
+    fbclid: order.fbclid,
+  });
+  await saveOrderClickIds({
+    orderId,
+    fbp: clickIds.fbp,
+    fbc: clickIds.fbc,
+    fbclid: clickIds.fbclid,
+    clientIp: order.client_ip || clientIpFromRequest(request),
+    userAgent: order.user_agent || request.headers.get("user-agent"),
+  });
   if (order.status === "approved") {
     return NextResponse.json({
       ok: true,

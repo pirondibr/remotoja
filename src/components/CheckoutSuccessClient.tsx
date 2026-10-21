@@ -42,6 +42,7 @@ export function CheckoutSuccessClient() {
             status,
             fbp: ids.fbp,
             fbc: ids.fbc,
+            fbclid: attr?.fbclid,
           }),
         });
         const data = (await res.json()) as {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fetchMpPayment, hasMercadoPago } from "@/lib/mercadoPago";
 import { purchaseEventId, sendUniqueMetaPurchase } from "@/lib/metaCapi";
+import { clientIpFromRequest, resolveMetaClickIds } from "@/lib/metaClickIds";
 import {
   buildMemberToken,
   memberCookieOptions,
@@ -8,17 +9,12 @@ import {
 import {
   getOrder,
   markOrderApproved,
+  metaUserFromOrder,
   saveOrderClickIds,
 } from "@/lib/orders";
 import { DEFAULT_PLAN_ID, getPlan, isTestPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
 import { findAccountByOrderId } from "@/lib/memberAccounts";
-
-function clientIp(request: Request): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
-  return request.headers.get("x-real-ip")?.trim() || undefined;
-}
 
 /**
  * Chamado pela página de sucesso com payment_id / external_reference.
@@ -35,6 +31,7 @@ export async function POST(request: Request) {
     status?: string;
     fbp?: string;
     fbc?: string;
+    fbclid?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -90,12 +87,22 @@ export async function POST(request: Request) {
       });
     }
 
+    const clickIds = resolveMetaClickIds({
+      cookieHeader: request.headers.get("cookie"),
+      fbp: body.fbp || order?.fbp,
+      fbc: body.fbc || order?.fbc,
+      fbclid: body.fbclid || order?.fbclid,
+    });
     await saveOrderClickIds({
       orderId,
-      fbp: body.fbp,
-      fbc: body.fbc,
+      fbp: clickIds.fbp,
+      fbc: clickIds.fbc,
+      fbclid: clickIds.fbclid,
+      clientIp: order?.client_ip || clientIpFromRequest(request),
+      userAgent: order?.user_agent || request.headers.get("user-agent"),
     });
     order = (await getOrder(orderId)) || order;
+    const metaUser = metaUserFromOrder(order);
 
     if (!isTestPlan(planId)) {
       await sendUniqueMetaPurchase({
@@ -103,11 +110,12 @@ export async function POST(request: Request) {
         orderId,
         value: amountBrl,
         planId,
-        email: payment.payer?.email || order?.payer_email,
-        fbp: body.fbp || order?.fbp,
-        fbc: body.fbc || order?.fbc,
-        clientIp: clientIp(request),
-        userAgent: request.headers.get("user-agent"),
+        email: payment.payer?.email || metaUser.email,
+        phone: metaUser.phone,
+        fbp: clickIds.fbp || metaUser.fbp,
+        fbc: clickIds.fbc || metaUser.fbc,
+        clientIp: metaUser.clientIp || clientIpFromRequest(request),
+        userAgent: metaUser.userAgent || request.headers.get("user-agent"),
       });
 
       await logPaidPurchase({

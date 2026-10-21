@@ -5,6 +5,7 @@ import {
   getOrder,
   markOrderApproved,
   markOrderStatus,
+  metaUserFromOrder,
 } from "@/lib/orders";
 import { getPlan, isTestPlan, planAccessUntil } from "@/lib/rrPlans";
 import { logPaidPurchase } from "@/lib/paidLeadLog";
@@ -43,14 +44,18 @@ async function processPayment(paymentId: string) {
         typeof order.amount_brl === "number"
           ? Number(order.amount_brl)
           : plan?.priceBrl ?? 0;
+      const metaUser = metaUserFromOrder(order);
       await sendUniqueMetaPurchase({
         paymentId: String(payment.id),
         orderId,
         value,
         planId: order.plan_id,
-        email: payment.payer?.email || order.payer_email,
-        fbp: order.fbp,
-        fbc: order.fbc,
+        email: payment.payer?.email || metaUser.email,
+        phone: metaUser.phone,
+        fbp: metaUser.fbp,
+        fbc: metaUser.fbc,
+        clientIp: metaUser.clientIp,
+        userAgent: metaUser.userAgent,
       });
     }
     return;

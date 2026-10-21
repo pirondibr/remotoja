@@ -48,6 +48,7 @@ export function CheckoutPendingClient() {
             externalReference,
             fbp: ids.fbp,
             fbc: ids.fbc,
+            fbclid: attr?.fbclid,
           }),
         });
         const data = (await res.json()) as {

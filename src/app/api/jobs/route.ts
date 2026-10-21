@@ -7,6 +7,7 @@ import { buildJobsQuery } from "@/lib/buildJobsQuery";
 import { getCachedJobs, setCachedJobs } from "@/lib/jobCache";
 import { hasDatabase } from "@/lib/db";
 import { sendMetaSearch } from "@/lib/metaCapi";
+import { clientIpFromRequest, resolveMetaClickIds } from "@/lib/metaClickIds";
 import { searchEventId } from "@/lib/metaPixel";
 import { appBaseUrl } from "@/lib/mercadoPago";
 import {
@@ -91,12 +92,6 @@ async function searchLive(term: string): Promise<{
   return { jobs, fetchedVia, query, googleError };
 }
 
-function clientIp(request: Request): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
-  return request.headers.get("x-real-ip")?.trim() || undefined;
-}
-
 /** Search padrão Meta (CAPI). Não mexe no Purchase / otimização do conjunto. */
 function jsonWithSearch(
   request: Request,
@@ -106,12 +101,18 @@ function jsonWithSearch(
   const url = new URL(request.url);
   const eventId =
     url.searchParams.get("event_id")?.trim() || searchEventId(role);
+  const clickIds = resolveMetaClickIds({
+    cookieHeader: request.headers.get("cookie"),
+    fbp: url.searchParams.get("fbp"),
+    fbc: url.searchParams.get("fbc"),
+    fbclid: url.searchParams.get("fbclid"),
+  });
   void sendMetaSearch({
     eventId,
     searchString: role,
-    fbp: url.searchParams.get("fbp"),
-    fbc: url.searchParams.get("fbc"),
-    clientIp: clientIp(request),
+    fbp: clickIds.fbp,
+    fbc: clickIds.fbc,
+    clientIp: clientIpFromRequest(request),
     userAgent: request.headers.get("user-agent"),
     eventSourceUrl: `${appBaseUrl()}/onboard`,
   }).catch(() => {});

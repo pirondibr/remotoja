@@ -1,3 +1,11 @@
+import {
+  buildFbc,
+  buildFbp,
+  FBCLID_COOKIE,
+  parseCookieHeader,
+  writeFirstPartyCookie,
+} from "@/lib/metaClickIds";
+
 /** Helpers client-side do Meta Pixel (fbq). */
 
 export type MetaEventParams = {
@@ -44,37 +52,77 @@ export function trackMetaEvent(
 /** Lê cookies _fbp / _fbc gerados pelo Pixel. */
 export function readMetaCookies(): { fbp?: string; fbc?: string } {
   if (typeof document === "undefined") return {};
-  const out: { fbp?: string; fbc?: string } = {};
-  for (const part of document.cookie.split(";")) {
-    const [rawKey, ...rest] = part.trim().split("=");
-    const key = rawKey?.trim();
-    const value = rest.join("=").trim();
-    if (!key || !value) continue;
-    if (key === "_fbp") out.fbp = value;
-    if (key === "_fbc") out.fbc = value;
-  }
-  return out;
+  const cookies = parseCookieHeader(document.cookie);
+  return {
+    fbp: cookies._fbp,
+    fbc: cookies._fbc,
+  };
 }
 
-/** Monta _fbc a partir de fbclid se o cookie ainda não existe. */
-export function ensureFbcFromFbclid(fbclid?: string | null): string | undefined {
-  const { fbc, fbp } = readMetaCookies();
-  if (fbc) return fbc;
+function readStoredClickId(key: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    return window.localStorage.getItem(key) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeStoredClickId(key: string, value: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* privado / quota */
+  }
+}
+
+function fbcHasFbclid(fbc: string | undefined, fbclid: string): boolean {
+  if (!fbc) return false;
+  return fbc.endsWith(`.${fbclid}`) || fbc.includes(`.${fbclid}`);
+}
+
+/** Grava _fbc (e _fbp se faltar) por 90 dias. */
+export function persistMetaClickIds(fbclid?: string | null): {
+  fbp?: string;
+  fbc?: string;
+} {
   const click = (fbclid || "").trim();
-  if (!click) return undefined;
-  const created = Math.floor(Date.now() / 1000);
-  return `fb.1.${created}.${click}`;
+  if (click) writeFirstPartyCookie(FBCLID_COOKIE, click);
+
+  const cookies = readMetaCookies();
+  const storedFbc = readStoredClickId("mvr_fbc");
+  const storedFbp = readStoredClickId("mvr_fbp");
+  const existingFbc = cookies.fbc || storedFbc;
+  const fbc =
+    (click && existingFbc && fbcHasFbclid(existingFbc, click)
+      ? existingFbc
+      : undefined) ||
+    buildFbc(click) ||
+    existingFbc;
+  if (fbc) {
+    writeFirstPartyCookie("_fbc", fbc);
+    writeStoredClickId("mvr_fbc", fbc);
+  }
+
+  const fbp = cookies.fbp || storedFbp || buildFbp();
+  if (fbp) {
+    writeFirstPartyCookie("_fbp", fbp);
+    writeStoredClickId("mvr_fbp", fbp);
+  }
+  return { fbp, fbc };
+}
+
+/** Monta _fbc a partir do fbclid se o cookie ainda não existe. */
+export function ensureFbcFromFbclid(fbclid?: string | null): string | undefined {
+  return persistMetaClickIds(fbclid).fbc;
 }
 
 export function metaBrowserIds(fbclid?: string | null): {
   fbp?: string;
   fbc?: string;
 } {
-  const cookies = readMetaCookies();
-  return {
-    fbp: cookies.fbp,
-    fbc: cookies.fbc || ensureFbcFromFbclid(fbclid),
-  };
+  return persistMetaClickIds(fbclid);
 }
 
 /** Mesmo event_id no pixel e na CAPI — um por pedido, para a Meta deduplicar. */

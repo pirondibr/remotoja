@@ -1,3 +1,10 @@
+import {
+  buildFbc,
+  FBCLID_COOKIE,
+  parseCookieHeader,
+  writeFirstPartyCookie,
+} from "@/lib/metaClickIds";
+
 const STORAGE_KEY = "mvr_attribution_v1";
 
 export type Attribution = {
@@ -21,6 +28,54 @@ const KEYS = [
   "gclid",
 ] as const;
 
+function readStoredAttribution(): Attribution {
+  if (typeof window === "undefined") return {};
+  const fromSession = parseStored(safeGet("sessionStorage"));
+  const fromLocal = parseStored(safeGet("localStorage"));
+  return { ...fromLocal, ...fromSession };
+}
+
+function safeGet(store: "sessionStorage" | "localStorage"): string | null {
+  try {
+    return window[store].getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function parseStored(raw: string | null): Attribution {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as Attribution;
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredAttribution(merged: Attribution): void {
+  const json = JSON.stringify(merged);
+  try {
+    sessionStorage.setItem(STORAGE_KEY, json);
+  } catch {
+    /* privado / quota */
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, json);
+  } catch {
+    /* privado / quota */
+  }
+}
+
+function persistFbclidCookies(fbclid?: string): void {
+  if (!fbclid || typeof document === "undefined") return;
+  writeFirstPartyCookie(FBCLID_COOKIE, fbclid);
+  const existing = parseCookieHeader(document.cookie)._fbc;
+  if (!existing) {
+    const fbc = buildFbc(fbclid);
+    if (fbc) writeFirstPartyCookie("_fbc", fbc);
+  }
+}
+
 export function captureAttributionFromUrl(searchParams: URLSearchParams): Attribution {
   const next: Attribution = {};
   for (const key of KEYS) {
@@ -33,29 +88,29 @@ export function captureAttributionFromUrl(searchParams: URLSearchParams): Attrib
 
   if (typeof window === "undefined") return next;
 
-  try {
-    const prev = loadAttribution() || {};
-    const merged: Attribution = { ...prev };
-    for (const key of KEYS) {
-      if (next[key]) merged[key] = next[key];
-    }
-    if (next.referrer && !merged.referrer) merged.referrer = next.referrer;
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    return merged;
-  } catch {
-    return next;
+  const prev = loadAttribution() || {};
+  const merged: Attribution = { ...prev };
+  for (const key of KEYS) {
+    if (next[key]) merged[key] = next[key];
   }
+  if (next.referrer && !merged.referrer) merged.referrer = next.referrer;
+  writeStoredAttribution(merged);
+  persistFbclidCookies(merged.fbclid);
+  return merged;
 }
 
 export function loadAttribution(): Attribution | null {
   if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as Attribution;
-  } catch {
-    return null;
+  const stored = readStoredAttribution();
+  const cookieFbclid =
+    typeof document !== "undefined"
+      ? parseCookieHeader(document.cookie)[FBCLID_COOKIE]
+      : undefined;
+  const fbclid = stored.fbclid || cookieFbclid;
+  if (!stored.fbclid && !fbclid && !stored.utm_source && !stored.gclid) {
+    return Object.keys(stored).length ? stored : null;
   }
+  return fbclid && !stored.fbclid ? { ...stored, fbclid } : stored;
 }
 
 /** Origem legível para o admin (Meta, Google, orgânico…). */

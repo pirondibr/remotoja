@@ -1,4 +1,4 @@
-import { loadAttribution } from "@/lib/attribution";
+import { captureAttributionFromUrl, loadAttribution } from "@/lib/attribution";
 import { parseCheckoutUi, type CheckoutUi } from "@/lib/checkoutUi";
 import {
   initiateCheckoutEventId,
@@ -20,6 +20,9 @@ export async function startCheckout(input: {
   funnelVariant?: FeedAbVariant | null;
   checkoutUi?: CheckoutUi | null;
 }): Promise<{ checkoutUrl: string; orderId?: string } | { error: string }> {
+  if (typeof window !== "undefined") {
+    captureAttributionFromUrl(new URLSearchParams(window.location.search));
+  }
   const attr = loadAttribution();
   const ids = metaBrowserIds(attr?.fbclid);
   const checkoutUi = input.checkoutUi || checkoutUiFromPage();
@@ -33,6 +36,7 @@ export async function startCheckout(input: {
       email: input.email,
       fbp: ids.fbp,
       fbc: ids.fbc,
+      fbclid: attr?.fbclid,
       funnel_variant: input.funnelVariant || undefined,
       checkout_ui: checkoutUi,
     }),

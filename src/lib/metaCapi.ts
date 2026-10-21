@@ -40,6 +40,7 @@ function normalizeEmail(email: string): string {
 
 export type MetaCapiUserData = {
   email?: string | null;
+  phone?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   clientIp?: string | null;
@@ -66,11 +67,19 @@ export type SendMetaEventInput = {
   actionSource?: "website";
 };
 
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return "";
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
 function buildUserData(user?: MetaCapiUserData): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (!user) return out;
   const email = user.email ? normalizeEmail(user.email) : "";
   if (email) out.em = [sha256(email)];
+  const phone = user.phone ? normalizePhone(user.phone) : "";
+  if (phone) out.ph = [sha256(phone)];
   if (user.fbp) out.fbp = user.fbp;
   if (user.fbc) out.fbc = user.fbc;
   if (user.clientIp) out.client_ip_address = user.clientIp;
@@ -174,6 +183,7 @@ export async function sendMetaPurchase(input: {
   value: number;
   planId: string;
   email?: string | null;
+  phone?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   clientIp?: string | null;
@@ -186,6 +196,7 @@ export async function sendMetaPurchase(input: {
     eventSourceUrl: input.eventSourceUrl || `${appBaseUrl()}/checkout/success`,
     userData: {
       email: input.email,
+      phone: input.phone,
       fbp: input.fbp,
       fbc: input.fbc,
       clientIp: input.clientIp,
@@ -221,6 +232,7 @@ export async function sendMetaInitiateCheckout(input: {
   value: number;
   planId: string;
   email?: string | null;
+  phone?: string | null;
   fbp?: string | null;
   fbc?: string | null;
   clientIp?: string | null;
@@ -233,6 +245,7 @@ export async function sendMetaInitiateCheckout(input: {
     eventSourceUrl: input.eventSourceUrl || `${appBaseUrl()}/onboard`,
     userData: {
       email: input.email,
+      phone: input.phone,
       fbp: input.fbp,
       fbc: input.fbc,
       clientIp: input.clientIp,

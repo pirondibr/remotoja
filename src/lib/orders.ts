@@ -1,6 +1,7 @@
 import { ensureSchema, getSql, hasDatabase, normalizeRoleKey } from "@/lib/db";
 import { parseCheckoutUi, type CheckoutUi } from "@/lib/checkoutUi";
 import { parseFeedAb, type FeedAbVariant } from "@/lib/funnelAb";
+import { buildFbc } from "@/lib/metaClickIds";
 import type { PlanId } from "@/lib/rrPlans";
 
 export type OrderRow = {
@@ -18,6 +19,10 @@ export type OrderRow = {
   funnel_variant?: FeedAbVariant | null;
   fbp?: string | null;
   fbc?: string | null;
+  fbclid?: string | null;
+  client_ip?: string | null;
+  user_agent?: string | null;
+  payer_phone?: string | null;
   checkout_ui?: CheckoutUi | null;
 };
 
@@ -61,6 +66,22 @@ export async function ensureOrdersSchema(): Promise<void> {
     ADD COLUMN IF NOT EXISTS checkout_ui text
   `;
   await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS fbclid text
+  `;
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS client_ip text
+  `;
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS user_agent text
+  `;
+  await sql`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS payer_phone text
+  `;
+  await sql`
     CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (status, created_at DESC)
   `;
 }
@@ -74,6 +95,10 @@ export async function createOrder(input: {
   funnelVariant?: FeedAbVariant | string | null;
   fbp?: string | null;
   fbc?: string | null;
+  fbclid?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  payerPhone?: string | null;
   checkoutUi?: CheckoutUi | string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
@@ -83,7 +108,8 @@ export async function createOrder(input: {
   const checkoutUi = parseCheckoutUi(input.checkoutUi);
   await sql`
     INSERT INTO orders (
-      id, plan_id, role, amount_brl, status, payer_email, funnel_variant, fbp, fbc, checkout_ui
+      id, plan_id, role, amount_brl, status, payer_email, funnel_variant,
+      fbp, fbc, fbclid, client_ip, user_agent, payer_phone, checkout_ui
     )
     VALUES (
       ${input.id},
@@ -93,37 +119,72 @@ export async function createOrder(input: {
       'pending',
       ${input.payerEmail || null},
       ${funnelVariant},
-      ${cleanClickId(input.fbp)},
-      ${cleanClickId(input.fbc)},
+      ${cleanText(input.fbp, 512)},
+      ${cleanText(input.fbc, 512)},
+      ${cleanText(input.fbclid, 512)},
+      ${cleanText(input.clientIp, 64)},
+      ${cleanText(input.userAgent, 512)},
+      ${cleanText(input.payerPhone, 32)},
       ${checkoutUi}
     )
     ON CONFLICT (id) DO NOTHING
   `;
 }
 
-function cleanClickId(value?: string | null): string | null {
+function cleanText(value?: string | null, max = 512): string | null {
   const next = (value || "").trim();
-  return next ? next.slice(0, 200) : null;
+  return next ? next.slice(0, max) : null;
 }
 
 export async function saveOrderClickIds(input: {
   orderId: string;
   fbp?: string | null;
   fbc?: string | null;
+  fbclid?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  payerPhone?: string | null;
 }): Promise<void> {
   if (!hasDatabase()) return;
-  const fbp = cleanClickId(input.fbp);
-  const fbc = cleanClickId(input.fbc);
-  if (!fbp && !fbc) return;
+  const fbp = cleanText(input.fbp, 512);
+  const fbc = cleanText(input.fbc, 512);
+  const fbclid = cleanText(input.fbclid, 512);
+  const clientIp = cleanText(input.clientIp, 64);
+  const userAgent = cleanText(input.userAgent, 512);
+  const payerPhone = cleanText(input.payerPhone, 32);
+  if (!fbp && !fbc && !fbclid && !clientIp && !userAgent && !payerPhone) return;
   await ensureOrdersSchema();
   const sql = getSql();
   await sql`
     UPDATE orders
     SET
       fbp = COALESCE(${fbp}, fbp),
-      fbc = COALESCE(${fbc}, fbc)
+      fbc = COALESCE(${fbc}, fbc),
+      fbclid = COALESCE(${fbclid}, fbclid),
+      client_ip = COALESCE(${clientIp}, client_ip),
+      user_agent = COALESCE(${userAgent}, user_agent),
+      payer_phone = COALESCE(${payerPhone}, payer_phone)
     WHERE id = ${input.orderId}
   `;
+}
+
+export function metaUserFromOrder(order: OrderRow | null | undefined): {
+  fbp?: string | null;
+  fbc?: string | null;
+  clientIp?: string | null;
+  userAgent?: string | null;
+  email?: string | null;
+  phone?: string | null;
+} {
+  if (!order) return {};
+  return {
+    fbp: order.fbp,
+    fbc: order.fbc || buildFbc(order.fbclid) || null,
+    clientIp: order.client_ip,
+    userAgent: order.user_agent,
+    email: order.payer_email,
+    phone: order.payer_phone,
+  };
 }
 
 export async function attachPreference(

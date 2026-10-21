@@ -5,6 +5,7 @@ import {
   hasMercadoPago,
 } from "@/lib/mercadoPago";
 import { sendMetaInitiateCheckout } from "@/lib/metaCapi";
+import { clientIpFromRequest, resolveMetaClickIds } from "@/lib/metaClickIds";
 import { generateOrderId } from "@/lib/memberAuth";
 import { attachPreference, createOrder } from "@/lib/orders";
 import {
@@ -13,12 +14,6 @@ import {
 } from "@/lib/checkoutUi";
 import { parseFeedAb } from "@/lib/funnelAb";
 import { getPlan, isTestPlan, type PlanId } from "@/lib/rrPlans";
-
-function clientIp(request: Request): string | undefined {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || undefined;
-  return request.headers.get("x-real-ip")?.trim() || undefined;
-}
 
 export async function POST(request: Request) {
   if (!hasMercadoPago()) {
@@ -34,6 +29,8 @@ export async function POST(request: Request) {
     email?: string;
     fbp?: string;
     fbc?: string;
+    fbclid?: string;
+    phone?: string;
     funnel_variant?: string;
     checkout_ui?: string;
   };
@@ -54,6 +51,15 @@ export async function POST(request: Request) {
   const checkoutUi =
     requestedUi === "brick" && hasMpPublicKey() ? "brick" : "v1";
   const orderId = generateOrderId();
+  const clickIds = resolveMetaClickIds({
+    cookieHeader: request.headers.get("cookie"),
+    fbp: body.fbp,
+    fbc: body.fbc,
+    fbclid: body.fbclid,
+  });
+  const ip = clientIpFromRequest(request);
+  const userAgent = request.headers.get("user-agent") || undefined;
+  const phone = String(body.phone || "").trim() || undefined;
 
   try {
     await createOrder({
@@ -63,8 +69,12 @@ export async function POST(request: Request) {
       amountBrl: plan.priceBrl,
       payerEmail: email,
       funnelVariant,
-      fbp: body.fbp,
-      fbc: body.fbc,
+      fbp: clickIds.fbp,
+      fbc: clickIds.fbc,
+      fbclid: clickIds.fbclid,
+      clientIp: ip,
+      userAgent,
+      payerPhone: phone,
       checkoutUi,
     });
 
@@ -84,10 +94,11 @@ export async function POST(request: Request) {
         value: plan.priceBrl,
         planId: plan.id,
         email,
-        fbp: body.fbp,
-        fbc: body.fbc,
-        clientIp: clientIp(request),
-        userAgent: request.headers.get("user-agent"),
+        phone,
+        fbp: clickIds.fbp,
+        fbc: clickIds.fbc,
+        clientIp: ip,
+        userAgent,
       }).catch(() => {});
     }
 

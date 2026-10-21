@@ -240,6 +240,7 @@ export function CheckoutBrickClient() {
             externalReference: current.orderId,
             fbp: ids.fbp,
             fbc: ids.fbc,
+            fbclid: attr?.fbclid,
           }),
         });
         const data = (await res.json()) as {
