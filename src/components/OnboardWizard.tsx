@@ -757,6 +757,16 @@ export function OnboardWizard() {
                   {checkoutError}
                 </p>
               )}
+              <button
+                type="button"
+                disabled={checkoutLoading}
+                onClick={() => void startPaidCheckout()}
+                className="mt-5 w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint disabled:opacity-50"
+              >
+                {checkoutLoading
+                  ? "Abrindo pagamento…"
+                  : "Pagar com cartão ou Pix"}
+              </button>
               <PaywallFeedbackBlock
                 enabled
                 blocked={checkoutLoading}
@@ -768,19 +778,9 @@ export function OnboardWizard() {
             </div>
           )}
 
+          {step.kind !== "paywall" && (
           <div className="mt-auto pt-8 pb-4">
-            {step.kind === "paywall" ? (
-              <button
-                type="button"
-                disabled={checkoutLoading}
-                onClick={() => void startPaidCheckout()}
-                className="w-full rounded-full bg-lime py-4 text-center text-base font-bold text-ink transition hover:bg-mint disabled:opacity-50"
-              >
-                {checkoutLoading
-                  ? "Abrindo Mercado Pago…"
-                  : "Pagar com cartão ou Pix"}
-              </button>
-            ) : step.kind === "matches" ? (
+            {step.kind === "matches" ? (
               <button
                 type="button"
                 disabled={!canContinue}
@@ -800,6 +800,7 @@ export function OnboardWizard() {
               </button>
             )}
           </div>
+          )}
         </div>
       </div>
       <PaywallExitSurvey

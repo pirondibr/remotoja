@@ -146,9 +146,6 @@ export function CheckoutBrickClient() {
           {
             initialization: {
               amount: session.amountBrl,
-              ...(session.preferenceId && !session.pixOnly
-                ? { preferenceId: session.preferenceId }
-                : {}),
               ...(session.email ? { payer: { email: session.email } } : {}),
             },
             customization: {
@@ -156,11 +153,9 @@ export function CheckoutBrickClient() {
               paymentMethods: session.pixOnly
                 ? { bankTransfer: ["pix"] }
                 : {
+                    bankTransfer: ["pix"],
                     creditCard: "all",
                     debitCard: "all",
-                    bankTransfer: ["pix"],
-                    prepaidCard: "all",
-                    mercadoPago: "all",
                     maxInstallments: 12,
                   },
             },
@@ -299,14 +294,6 @@ export function CheckoutBrickClient() {
       <div className="bg-grain pointer-events-none absolute inset-0 opacity-40" />
       <div className="relative mx-auto w-full max-w-xl">
         <BrandMark light size="sm" />
-        <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-bold">
-          Pagar no site
-        </h1>
-        <p className="mt-2 text-sm text-sand/70">
-          Cartão ou Pix sem sair da Minha Vaga Remota. No Pix, o QR aparece
-          nesta página. O e-mail é só para o Mercado Pago identificar o
-          pagamento.
-        </p>
         {session && (
           <p className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
             {session.planName} · {formatBrl(session.amountBrl)} · {session.role}
@@ -371,14 +358,6 @@ export function CheckoutBrickClient() {
           className={showPix ? "hidden" : "mt-6"}
         />
         <div id="statusBrick_container" className="mt-6" />
-        {session?.proUrl && session.hasPublicKey && !showPix && !session.pixOnly && (
-          <p className="mt-6 text-center text-xs text-sand/50">
-            Quer o checkout antigo?{" "}
-            <a href={session.proUrl} className="text-lime hover:underline">
-              Abrir Mercado Pago (v1)
-            </a>
-          </p>
-        )}
         <p className="mt-4 text-center text-xs text-sand/40">
           <Link href="/onboard" className="hover:text-sand/70">
             Voltar
