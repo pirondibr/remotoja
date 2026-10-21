@@ -14,6 +14,7 @@ import type { DemoJob } from "@/lib/demoJobs";
 import type { ValidationReport } from "@/lib/dashboard/validateRemoteJobs";
 import type { DashboardJob } from "@/lib/dashboard/types";
 import { logPaidMemberView } from "@/lib/paidLeadLog";
+import { planRoleSearch, type RoleSearchPlan } from "@/lib/roleRescue";
 
 function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
   const tagged = (jobs as DashboardJob[]).map((job) => ({
@@ -24,6 +25,14 @@ function filterByRole(jobs: DemoJob[], role: string): DemoJob[] {
     (job) => job.match_tier === "exato" || job.match_tier === "relacionado"
   );
   return rankJobsForFeed(filtered, role) as DemoJob[];
+}
+
+async function firstCachedJobs(kind: CacheKind, plan: RoleSearchPlan) {
+  for (const term of plan.attempts) {
+    const cached = await getCachedJobs(kind, term);
+    if (cached && cached.jobs.length > 0) return cached;
+  }
+  return null;
 }
 
 /** Scrape + LLM cargo + validate remoto; 60s estourava. */
@@ -97,6 +106,7 @@ function buildAnalyzeSources(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
+  const plan = planRoleSearch(role);
   if (isAccessGateEnabled() && !(await canOpenPaidFeed(role))) {
     return NextResponse.json(
       { error: "Acesso de membro necessário. Conclua o pagamento." },
@@ -143,7 +153,7 @@ export async function GET(request: Request) {
   // Feed validado / análise em cache (sem fresh).
   if (runValidate && !bypassCache && hasDatabase()) {
     try {
-      const cached = await getCachedJobs(cacheKind, role);
+      const cached = await firstCachedJobs(cacheKind, plan);
       if (
         cached &&
         cached.jobs.length > 0 &&
@@ -157,7 +167,7 @@ export async function GET(request: Request) {
             analyzeJobs ??
             (cacheKind === "demo"
               ? (cached.jobs as DemoJob[])
-              : filterByRole(cached.jobs as DemoJob[], role));
+              : filterByRole(cached.jobs as DemoJob[], plan.primary));
           const pulled_jobs = extractPulledJobs(cached.sources) ?? undefined;
           return reply(
             {
@@ -191,12 +201,12 @@ export async function GET(request: Request) {
   if (cacheOnly || (!bypassCache && !runValidate)) {
     if (hasDatabase()) {
       try {
-        const cached = await getCachedJobs(cacheKind, role);
+        const cached = await firstCachedJobs(cacheKind, plan);
         if (cached && cached.jobs.length > 0) {
           const jobs =
             cacheKind === "demo"
               ? (cached.jobs as DemoJob[])
-              : filterByRole(cached.jobs as DemoJob[], role);
+              : filterByRole(cached.jobs as DemoJob[], plan.primary);
           if (jobs.length === 0 && !cacheOnly && cacheKind === "paid") {
             // Cache antigo misturado → força live (exceto cache_only)
           } else {
@@ -262,27 +272,40 @@ export async function GET(request: Request) {
   }
 
   try {
-    const payload = await fetchDashboardJobs(role, { validate: runValidate });
+    let searchTerm = plan.primary;
+    let payload = await fetchDashboardJobs(searchTerm, {
+      validate: runValidate,
+    });
+
+    if (payload.jobs.length === 0) {
+      for (const term of plan.attempts) {
+        if (term.toLowerCase() === searchTerm.toLowerCase()) continue;
+        payload = await fetchDashboardJobs(term, { validate: runValidate });
+        searchTerm = term;
+        if (payload.jobs.length > 0) break;
+      }
+    }
 
     try {
       if (payload.jobs.length > 0 || payload.validation) {
         const existing = await getCachedJobs(cacheKind, role);
-        if (runValidate) {
-          // Feed = só válidas + logs completos para o admin acompanhar
+        const sources = runValidate
+          ? buildAnalyzeSources(existing?.sources, payload)
+          : payload.sources;
+        await setCachedJobs({
+          kind: cacheKind,
+          role,
+          jobs: payload.jobs,
+          fetched_via: payload.fetched_via,
+          sources,
+        });
+        if (searchTerm !== role) {
           await setCachedJobs({
             kind: cacheKind,
-            role,
+            role: searchTerm,
             jobs: payload.jobs,
             fetched_via: payload.fetched_via,
-            sources: buildAnalyzeSources(existing?.sources, payload),
-          });
-        } else {
-          await setCachedJobs({
-            kind: cacheKind,
-            role,
-            jobs: payload.jobs,
-            fetched_via: payload.fetched_via,
-            sources: payload.sources,
+            sources,
           });
         }
       }

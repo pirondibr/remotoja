@@ -1,4 +1,5 @@
 import type { DashboardJob } from "@/lib/dashboard/types";
+import { correctRoleTypos, wordInText } from "@/lib/roleRescue";
 
 export const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
@@ -293,7 +294,7 @@ const MATCH_STOPWORDS = new Set([
 ]);
 
 export function termMatches(title: string, term: string): boolean {
-  const t = term.trim().toLowerCase();
+  const t = (correctRoleTypos(term) || term).trim().toLowerCase();
   if (!t) return true;
   const hay = title.toLowerCase();
 
@@ -302,8 +303,8 @@ export function termMatches(title: string, term: string): boolean {
     .filter((p) => p.length >= 2 && !MATCH_STOPWORDS.has(p));
 
   const hitsTerm =
-    hay.includes(t) ||
-    (parts.length > 0 && parts.every((p) => hay.includes(p)));
+    wordInText(t, hay) ||
+    (parts.length > 0 && parts.every((p) => wordInText(p, hay)));
 
   if (!hitsTerm) return false;
 

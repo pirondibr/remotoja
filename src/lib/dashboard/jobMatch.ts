@@ -1,12 +1,13 @@
+import {
+  correctRoleTypos,
+  foldRole,
+  wordInText,
+} from "@/lib/roleRescue";
+
 export type MatchTier = "exato" | "relacionado" | "fora";
 
 function norm(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+  return foldRole(s);
 }
 
 /** Sinônimos / termos vizinhos por cargo (expandível). */
@@ -49,6 +50,10 @@ const RELATED_BY_TERM: Record<string, string[]> = {
     "engenharia de software",
   ],
   desenvolvedor: ["programador", "developer", "software engineer"],
+  assistente: ["auxiliar", "apoio"],
+  auxiliar: ["assistente", "apoio"],
+  licitacao: ["licitacoes", "pregao", "editais"],
+  licitacoes: ["licitacao", "pregao", "editais"],
 };
 
 const STOPWORDS = new Set([
@@ -103,36 +108,40 @@ export function classifyCargoMatch(
   job: { title?: string; company?: string; snippet?: string | null },
   term: string
 ): MatchTier {
-  const t = norm(term);
+  const t = norm(correctRoleTypos(term) || term);
   if (!t) return "relacionado";
 
   const title = norm(job.title || "");
   const company = norm(job.company || "");
   const snippet = norm(job.snippet || "");
   const parts = significantParts(t);
+  const titleHas = (part: string) => wordInText(part, title);
 
-  if (title.includes(t)) return "exato";
-  if (parts.length > 0 && parts.every((p) => title.includes(p))) return "exato";
+  if (titleHas(t)) return "exato";
+  if (parts.length > 0 && parts.every((p) => titleHas(p))) return "exato";
 
   const hints = relatedHints(t);
-  if (hints.some((h) => h.length >= 3 && title.includes(h))) {
-    return "relacionado";
+  if (hints.some((h) => h.length >= 3 && titleHas(h))) {
+    const extraParts = parts.filter(
+      (part) => part.length >= 4 && !hints.includes(part)
+    );
+    if (extraParts.length === 0 || extraParts.some((part) => titleHas(part))) {
+      return "relacionado";
+    }
   }
 
-  // Maioria das palavras do termo no título
   if (parts.length > 1) {
-    const hit = parts.filter((p) => title.includes(p)).length;
+    const hit = parts.filter((p) => titleHas(p)).length;
     if (hit >= Math.ceil(parts.length * 0.6)) return "relacionado";
-  } else if (parts[0] && parts[0].length >= 3) {
-    // termo curto: aceita raiz parcial no título (seo → seospecialist já coberto por includes)
-    if (title.includes(parts[0])) return "exato";
+  } else if (parts[0] && parts[0].length >= 3 && titleHas(parts[0])) {
+    return "exato";
   }
 
   const blob = `${company} ${snippet}`;
-  if (blob.includes(t) || parts.every((p) => blob.includes(p))) {
+  if (wordInText(t, blob) || parts.every((p) => wordInText(p, blob))) {
     return "fora";
   }
-  if (hints.some((h) => h.length >= 3 && blob.includes(h))) {
+  if (hints.some((h) => h.length >= 3 && wordInText(h, blob))) {
     return "fora";
   }
 

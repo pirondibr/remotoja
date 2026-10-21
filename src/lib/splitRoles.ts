@@ -2,6 +2,13 @@ const MAX_ROLES = 4;
 
 const COMPOUNDS = [
   "recrutamento e selecao",
+  "pesquisa e desenvolvimento",
+  "licitacao e contratos",
+  "licitacoes e contratos",
+  "compras e licitacoes",
+  "compras e licitacao",
+  "marketing e vendas",
+  "vendas e marketing",
   "recursos humanos",
   "gestao financeira",
   "gestao de pessoas",
@@ -10,6 +17,8 @@ const COMPOUNDS = [
   "auxiliar administrativo",
   "assistente financeiro",
   "analista financeiro",
+  "analista de licitacao",
+  "analista de licitacoes",
   "analista de rh",
   "analista de recrutamento",
   "analista de dados",
@@ -58,9 +67,19 @@ function fold(value: string): string {
     .trim();
 }
 
+function restoreCommonAccents(value: string): string {
+  return value
+    .replace(/licitacoes/gi, "licitações")
+    .replace(/licitacao/gi, "licitação")
+    .replace(/selecao/gi, "seleção")
+    .replace(/gestao/gi, "gestão")
+    .replace(/operacoes/gi, "operações")
+    .replace(/logistica/gi, "logística");
+}
+
 function titleCaseRole(value: string): string {
   const small = new Set(["e", "de", "da", "do", "das", "dos", "em"]);
-  return value
+  return restoreCommonAccents(value)
     .trim()
     .split(/\s+/)
     .map((word, i) => {
@@ -100,13 +119,16 @@ function extractFromChunk(part: string): string[] {
     .map((chunk) => chunk.replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim())
     .filter((chunk) => {
       if (chunk.startsWith("e ")) return false;
-      return significantWords(chunk).length >= 2 && !leftoverIsAffix(chunk);
+      if (leftoverIsAffix(chunk)) return false;
+      const words = significantWords(chunk);
+      if (words.length >= 2) return true;
+      return words.length === 1 && words[0].length >= 4;
     })
     .map(titleCaseRole);
 
-  if (found.length === 0) return [trimmed];
+  if (found.length === 0) return [titleCaseRole(trimmed)];
   if (leftovers.length === 0) {
-    return found.length === 1 ? [trimmed] : found;
+    return found.length === 1 ? [titleCaseRole(trimmed)] : found;
   }
   return [...found, ...leftovers];
 }
@@ -123,13 +145,28 @@ function dedupe(roles: string[]): string[] {
   return out;
 }
 
-/** Separa cargos colados (vírgula, barra, ou títulos conhecidos em sequência). */
+/** Separa cargos colados (vírgula, barra, "e"/"ou", ou títulos conhecidos). */
 export function splitRoleQuery(raw: string): string[] {
   const cleaned = raw.replace(/\s+/g, " ").trim();
   if (!cleaned) return [];
-  const parts = cleaned
-    .split(/[,;|/•·\n]+|\s+ou\s+/i)
-    .map((part) => part.trim())
+  const held: string[] = [];
+  let protectedText = fold(cleaned);
+  for (const compound of COMPOUNDS) {
+    if (!protectedText.includes(compound)) continue;
+    held.push(compound);
+    protectedText = protectedText.replace(
+      compound,
+      ` #${held.length - 1}# `
+    );
+  }
+  const parts = protectedText
+    .split(/[,;|/•·\n]+|\s+ou\s+|\s+e\s+/i)
+    .map((part) =>
+      part
+        .replace(/#(\d+)#/g, (_, index) => held[Number(index)] || "")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
     .filter((part) => part.length >= 2);
   const roles = dedupe(parts.flatMap(extractFromChunk));
   if (roles.length === 0) return [cleaned];

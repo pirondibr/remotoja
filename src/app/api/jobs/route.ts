@@ -9,6 +9,10 @@ import { sendMetaSearch } from "@/lib/metaCapi";
 import { searchEventId } from "@/lib/metaPixel";
 import { appBaseUrl } from "@/lib/mercadoPago";
 import {
+  isUnfilteredDump,
+  planRoleSearch,
+} from "@/lib/roleRescue";
+import {
   dedupeDemoJobs,
   withDemoFakePosted,
   type DemoJob,
@@ -30,13 +34,58 @@ function isUsableDemoCache(fetchedVia: string | null | undefined): boolean {
   return true;
 }
 
+function keepMatching(jobs: DemoJob[], term: string): DemoJob[] {
+  return jobs.filter((job) => roleFitsDemoJob(job, term));
+}
+
 async function fetchRemotarFallback(role: string): Promise<DemoJob[]> {
   try {
-    const { jobs } = await fetchRemotar(role);
-    return jobs.filter((job) => roleFitsDemoJob(job, role)).slice(0, 12);
+    const { jobs, available } = await fetchRemotar(role);
+    const matched = keepMatching(jobs, role);
+    if (isUnfilteredDump(available, matched.length)) return [];
+    return matched.slice(0, 12);
   } catch {
     return [];
   }
+}
+
+async function searchLive(term: string): Promise<{
+  jobs: DemoJob[];
+  fetchedVia: string;
+  query: string;
+  googleError: string | null;
+}> {
+  let googleError: string | null = null;
+  let jobs: DemoJob[] = [];
+  let fetchedVia = "error";
+  let query = buildJobsQuery(term);
+
+  try {
+    const result = await fetchGoogleJobsByRole(term, {
+      depth: 20,
+      maxAttempts: 14,
+      pollMs: 2000,
+    });
+    jobs = result.jobs;
+    fetchedVia = result.fetched_via;
+    query = result.query;
+  } catch (error) {
+    googleError =
+      error instanceof Error ? error.message : "Erro desconhecido no Google Jobs";
+  }
+
+  if (jobs.length < MIN_DEMO_JOBS) {
+    const extra = await fetchRemotarFallback(term);
+    if (extra.length > 0) {
+      jobs = dedupeDemoJobs([...jobs, ...extra]);
+      fetchedVia =
+        jobs.length > extra.length
+          ? `${fetchedVia}+remotar`
+          : "fallback_remotar";
+    }
+  }
+
+  return { jobs, fetchedVia, query, googleError };
 }
 
 function clientIp(request: Request): string | undefined {
@@ -71,6 +120,7 @@ export async function GET(request: Request) {
   const role = (searchParams.get("role") || searchParams.get("q") || "").trim();
   const preview = searchParams.get("preview") === "1";
   const bypassCache = searchParams.get("fresh") === "1";
+  const plan = planRoleSearch(role);
 
   if (!role) {
     return NextResponse.json(
@@ -82,37 +132,35 @@ export async function GET(request: Request) {
   if (preview) {
     return NextResponse.json({
       role,
-      query: buildJobsQuery(role),
+      query: buildJobsQuery(plan.primary),
+      search_term: plan.primary,
       note: "preview only",
     });
   }
 
   if (!bypassCache && hasDatabase()) {
     try {
-      const cached = await getCachedJobs("demo", role);
-      if (
-        cached &&
-        cached.jobs.length > 0 &&
-        isUsableDemoCache(cached.fetched_via)
-      ) {
-        // Reaplica filtro de cargo (cache antigo podia ter Full Stack em busca SEO)
-        const filtered = (cached.jobs as DemoJob[]).filter((job) =>
-          roleFitsDemoJob(job, role)
-        );
-        if (filtered.length < MIN_DEMO_JOBS) {
-          // Poucas vagas / cache antigo estreito → busca live e completa
-        } else {
-          const jobs = prepareDemoJobs(filtered);
-          return jsonWithSearch(request, role, {
-            role,
-            query: buildJobsQuery(role),
-            count: jobs.length,
-            jobs,
-            fetched_via: cached.fetched_via || "cache_demo",
-            cached: true,
-            cache_updated_at: cached.updated_at,
-          });
+      for (const term of plan.attempts) {
+        const cached = await getCachedJobs("demo", term);
+        if (
+          !cached ||
+          cached.jobs.length === 0 ||
+          !isUsableDemoCache(cached.fetched_via)
+        ) {
+          continue;
         }
+        const filtered = keepMatching(cached.jobs as DemoJob[], plan.primary);
+        if (filtered.length < MIN_DEMO_JOBS) continue;
+        const jobs = prepareDemoJobs(filtered);
+        return jsonWithSearch(request, role, {
+          role,
+          query: buildJobsQuery(plan.primary),
+          count: jobs.length,
+          jobs,
+          fetched_via: cached.fetched_via || "cache_demo",
+          cached: true,
+          cache_updated_at: cached.updated_at,
+        });
       }
     } catch {
       // segue para busca live se o cache falhar
@@ -120,81 +168,73 @@ export async function GET(request: Request) {
   }
 
   let googleError: string | null = null;
+  let merged: DemoJob[] = [];
+  let fetchedVia = "error";
+  let query = buildJobsQuery(plan.primary);
 
-  try {
-    const result = await fetchGoogleJobsByRole(role, {
-      depth: 20,
-      maxAttempts: 14,
-      pollMs: 2000,
-    });
+  const first = await searchLive(plan.primary);
+  merged = first.jobs;
+  fetchedVia = first.fetchedVia;
+  query = first.query;
+  googleError = first.googleError;
 
-    let merged = result.jobs;
-    if (merged.length < MIN_DEMO_JOBS) {
-      const extra = await fetchRemotarFallback(role);
+  if (merged.length < MIN_DEMO_JOBS) {
+    for (const term of plan.attempts) {
+      if (term.toLowerCase() === plan.primary.toLowerCase()) continue;
+      const extra = await fetchRemotarFallback(term);
+      if (extra.length === 0) continue;
       merged = dedupeDemoJobs([...merged, ...extra]);
+      fetchedVia = "rescue_remotar";
+      if (merged.length >= MIN_DEMO_JOBS) break;
     }
-
-    if (merged.length > 0) {
-      try {
-        await setCachedJobs({
-          kind: "demo",
-          role,
-          jobs: merged,
-          fetched_via:
-            merged.length > result.jobs.length
-              ? "dataforseo_google_jobs+remotar"
-              : result.fetched_via,
-        });
-      } catch {
-        // ignore
-      }
-      const jobs = prepareDemoJobs(merged);
-      return jsonWithSearch(request, role, {
-        ...result,
-        jobs,
-        count: jobs.length,
-        fetched_via:
-          merged.length > result.jobs.length
-            ? "dataforseo_google_jobs+remotar"
-            : result.fetched_via,
-        cached: false,
-      });
-    }
-  } catch (error) {
-    googleError =
-      error instanceof Error ? error.message : "Erro desconhecido no Google Jobs";
   }
 
-  // Se o Google atrasar/falhar: Remotar (rápido) com o mesmo cargo — não SEO genérico
-  const remotarJobs = await fetchRemotarFallback(role);
-  if (remotarJobs.length > 0) {
+  if (merged.length === 0) {
+    const next = plan.attempts.find(
+      (term) => term.toLowerCase() !== plan.primary.toLowerCase()
+    );
+    if (next) {
+      const rescued = await searchLive(next);
+      merged = rescued.jobs;
+      if (rescued.jobs.length > 0) fetchedVia = "rescue_google";
+      query = rescued.query;
+      googleError = googleError || rescued.googleError;
+    }
+  }
+
+  if (merged.length > 0) {
     try {
       await setCachedJobs({
         kind: "demo",
         role,
-        jobs: remotarJobs,
-        fetched_via: "fallback_remotar",
+        jobs: merged,
+        fetched_via: fetchedVia,
       });
+      if (plan.primary !== role) {
+        await setCachedJobs({
+          kind: "demo",
+          role: plan.primary,
+          jobs: merged,
+          fetched_via: fetchedVia,
+        });
+      }
     } catch {
       // ignore
     }
-    const jobs = prepareDemoJobs(remotarJobs);
+    const jobs = prepareDemoJobs(merged);
     return jsonWithSearch(request, role, {
       role,
-      query: buildJobsQuery(role),
+      query,
       count: jobs.length,
       jobs,
-      fetched_via: "fallback_remotar",
-      note: googleError
-        ? `Google Jobs indisponível (${googleError}). Prévia via Remotar.`
-        : "Prévia via Remotar",
+      fetched_via: fetchedVia,
       cached: false,
     });
   }
 
   return jsonWithSearch(request, role, {
     role,
-    query: buildJobsQuery(role),
+    query,
     count: 0,
     jobs: [],
     fetched_via: "error",
