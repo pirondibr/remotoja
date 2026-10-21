@@ -213,7 +213,11 @@ export function QuickJobSearch() {
         <p className="pb-4 text-center text-xs text-sand/40">
           Atalho de teste ·{" "}
           <Link href="/final/v2" className="underline hover:text-sand/70">
-            v2 estilo RR
+            v2
+          </Link>
+          {" · "}
+          <Link href="/final/v3" className="underline hover:text-sand/70">
+            v3 pré-checkout
           </Link>
           {" · "}
           <Link href="/onboard" className="underline hover:text-sand/70">
